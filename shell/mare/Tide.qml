@@ -176,7 +176,11 @@ PanelWindow {
         // Quanto do corpo já abriu (0 a 1). A altura desenhada acompanha: um
         // corpo estreito é uma gota curta, nunca um fio até lá embaixo.
         readonly property real grown: half > 0 ? Math.max(0, Math.min(1, (br - bl) / (2 * half))) : 1
-        readonly property real reach: 0.18 + 0.82 * Math.sqrt(grown)
+        // Começa do zero: com o corpo ainda sem largura não se desenha nada.
+        // (Com um mínimo de altura, o primeiro quadro era um fio; e é nesse
+        // quadro que uma máquina lenta trava, desenhando o conteúdo pela
+        // primeira vez. O fio ficava parado na tela.)
+        readonly property real reach: Math.sqrt(grown)
         readonly property real h: Math.max(0, edgeH) * reach
         readonly property real hm: Math.max(0, midH) * reach
         readonly property real fe: Math.min(tide.fillet, h / 2)
