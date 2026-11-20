@@ -1,0 +1,508 @@
+import QtQuick
+import Quickshell
+import Quickshell.Wayland
+import Quickshell.Bluetooth
+import Quickshell.Hyprland
+import Quickshell.Networking
+import Quickshell.Services.Pipewire
+import Quickshell.Services.SystemTray
+import Quickshell.Services.UPower
+
+// A ilha, no molde da do Ryoku (orpheus): uma peça só, pendurada no meio da
+// borda de cima, com filetes côncavos onde encosta na tela. Esquerda: marca,
+// workspaces e sistema; centro: relógio e clima; direita: bandeja e
+// indicadores. Translúcida em repouso, sólida enquanto um painel está aberto.
+// Os painéis descem soldados a ela, embaixo do item clicado (Tide.qml).
+PanelWindow {
+    id: bar
+
+    anchors {
+        top: true
+        left: true
+        right: true
+    }
+    implicitHeight: barH
+    exclusiveZone: barH
+    color: "transparent"
+    WlrLayershell.namespace: "mare-island"
+
+    // Só a ilha recebe cliques; o resto da faixa deixa passar.
+    mask: Region {
+        item: island
+    }
+
+    readonly property int barH: 34
+    readonly property int fillet: 12
+    readonly property int corner: 12
+    readonly property int pad: 12
+    readonly property int gap: 4
+
+    readonly property var sink: Pipewire.defaultAudioSink
+    readonly property var battery: UPower.displayDevice
+    readonly property bool online: Networking.devices.values.some(d => d.connected)
+    readonly property int batteryPct: battery ? Math.round(battery.percentage > 1 ? battery.percentage : battery.percentage * 100) : 0
+    readonly property bool panelOpen: Mare.mode !== "rest"
+
+    PwObjectTracker {
+        objects: [Pipewire.defaultAudioSink]
+    }
+
+    SystemClock {
+        id: clock
+        precision: SystemClock.Minutes
+    }
+
+    // OSD de volume: qualquer mudança (teclas, outro app) aparece sob a ilha.
+    // Espera o PipeWire assentar para não piscar ao iniciar.
+    property bool osdArmed: false
+
+    Timer {
+        interval: 2000
+        running: true
+        onTriggered: bar.osdArmed = true
+    }
+
+    Connections {
+        target: bar.sink && bar.sink.audio ? bar.sink.audio : null
+
+        function onVolumeChanged() {
+            if (bar.osdArmed && Mare.mode !== "volume")
+                Mare.osd("volume", bar.sink.audio.volume, bar.sink.audio.muted);
+        }
+
+        function onMutedChanged() {
+            if (bar.osdArmed && Mare.mode !== "volume")
+                Mare.osd("volume", bar.sink.audio.volume, bar.sink.audio.muted);
+        }
+    }
+
+    Item {
+        id: island
+
+        // A ilha abraça o conteúdo, sem sobra de nenhum lado: cresce sozinha
+        // quando aparece um item (bandeja, Bluetooth, música...) e encolhe
+        // quando ele some. Para o relógio continuar no meio da tela, ela se
+        // desloca para o lado em vez de completar o lado mais curto.
+        readonly property real natural: bar.fillet * 2 + bar.pad * 4
+            + left.implicitWidth + center.implicitWidth + right.implicitWidth
+        // Um painel mais largo que a ilha a alarga (dos dois lados) para caber
+        // inteiro dentro da borda de baixo (ombros + cantos de cada lado).
+        readonly property real extra: Math.max(0,
+            (Mare.sheetW > 0 ? Mare.sheetW + 2 * (bar.fillet + bar.corner) : 0) - natural)
+        // Distância da borda esquerda da ilha até o centro do relógio.
+        readonly property real clockOffset: bar.fillet + bar.pad + extra / 2
+            + left.implicitWidth + bar.pad + clockBox.implicitWidth / 2
+
+        anchors.top: parent.top
+        width: Math.min(bar.width, natural + extra)
+        x: Math.max(0, Math.min(bar.width - width, bar.width / 2 - clockOffset))
+        height: bar.barH
+
+        Behavior on width {
+            NumberAnimation {
+                duration: Motion.spatial
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Motion.spatialCurve
+            }
+        }
+        Behavior on x {
+            NumberAnimation {
+                duration: Motion.spatial
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Motion.spatialCurve
+            }
+        }
+
+        Binding { target: Mare; property: "islandX"; value: island.x }
+        Binding { target: Mare; property: "islandW"; value: island.width }
+
+        // Translúcida em repouso, sólida com um painel aberto (como no Ryoku).
+        property real solidity: bar.panelOpen ? 1 : Settings.get("island.restOpacity")
+
+        Behavior on solidity {
+            NumberAnimation { duration: Motion.base }
+        }
+        onSolidityChanged: shape.requestPaint()
+
+        Canvas {
+            id: shape
+            anchors.fill: parent
+            onWidthChanged: requestPaint()
+
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
+                const f = bar.fillet, r = bar.corner, w = width, h = height - 1;
+                const path = () => {
+                    ctx.moveTo(0, 0);
+                    ctx.arc(0, f, f, -Math.PI / 2, 0, false);
+                    ctx.lineTo(f, h - r);
+                    ctx.arc(f + r, h - r, r, Math.PI, Math.PI / 2, true);
+                    ctx.lineTo(w - f - r, h);
+                    ctx.arc(w - f - r, h - r, r, Math.PI / 2, 0, true);
+                    ctx.lineTo(w - f, f);
+                    ctx.arc(w, f, f, Math.PI, Math.PI * 1.5, false);
+                };
+                const c = Theme.surface;
+                ctx.beginPath();
+                path();
+                ctx.closePath();
+                ctx.fillStyle = Qt.rgba(c.r, c.g, c.b, island.solidity);
+                ctx.fill();
+                ctx.beginPath();
+                path();
+                ctx.strokeStyle = Theme.hairline;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        // Grão também na ilha, bem leve.
+        Image {
+            x: bar.fillet
+            width: parent.width - 2 * bar.fillet
+            height: parent.height
+            source: Qt.resolvedUrl("assets/grain.png")
+            fillMode: Image.Tile
+            opacity: 0.035
+        }
+
+        Item {
+            anchors.fill: parent
+            anchors.leftMargin: bar.fillet + bar.pad
+            anchors.rightMargin: bar.fillet + bar.pad
+            clip: true
+
+            // Esquerda: marca, workspaces, sistema.
+            Row {
+                id: left
+                x: island.extra / 2
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: bar.gap
+
+                Behavior on x {
+                    NumberAnimation {
+                        duration: Motion.spatial
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Motion.spatialCurve
+                    }
+                }
+
+                // Marca "Mk": o M em osso e o k em cobre, como o "x" de
+                // codexmark no perfil. Abre o launcher (ou um toque no Super).
+                Item {
+                    id: brand
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: mark.implicitWidth + 14
+                    implicitHeight: 24
+
+                    Row {
+                        id: mark
+                        anchors.centerIn: parent
+                        anchors.verticalCenterOffset: -1
+                        spacing: -1
+
+                        Text {
+                            anchors.baseline: kay.baseline
+                            text: "M"
+                            color: Theme.text
+                            font.family: Theme.serif
+                            font.pixelSize: 19
+                            font.weight: Font.Light
+                        }
+
+                        Text {
+                            id: kay
+                            text: "k"
+                            color: Theme.copper
+                            font.family: Theme.serif
+                            font.pixelSize: 19
+                            font.weight: Font.Light
+                            font.italic: true
+                        }
+                    }
+
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    TapHandler {
+                        onTapped: Mare.openAt("launcher", brand.mapToItem(null, brand.width / 2, 0).x)
+                    }
+                }
+
+                // Workspaces por letra grega (α β γ...). Sempre pelo menos três;
+                // passa disso quando um workspace mais alto existe. O atual fica
+                // sob um círculo de osso que desliza de uma letra para outra.
+                Item {
+                    id: spaces
+
+                    readonly property int slot: 24
+                    readonly property var existing: Hyprland.workspaces.values.filter(w => w.id > 0)
+                    readonly property int count: Math.max(3, ...existing.map(w => w.id))
+                    readonly property int current: Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 1
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: count * slot + (count - 1) * bar.gap
+                    implicitHeight: slot
+
+                    Rectangle {
+                        visible: spaces.current >= 1 && spaces.current <= spaces.count
+                        x: (spaces.current - 1) * (spaces.slot + bar.gap) + 1
+                        y: 1
+                        width: spaces.slot - 2
+                        height: width
+                        radius: width / 2
+                        color: Theme.text
+
+                        Behavior on x {
+                            NumberAnimation {
+                                duration: Motion.spatial
+                                easing.type: Easing.BezierSpline
+                                easing.bezierCurve: Motion.spatialCurve
+                            }
+                        }
+                    }
+
+                    Row {
+                        spacing: bar.gap
+
+                        Repeater {
+                            model: spaces.count
+
+                            Item {
+                                id: space
+                                required property int index
+                                readonly property int wsId: index + 1
+                                readonly property bool active: wsId === spaces.current
+                                readonly property bool used: spaces.existing.some(w => w.id === wsId)
+
+                                width: spaces.slot
+                                height: spaces.slot
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    anchors.margins: 1
+                                    radius: width / 2
+                                    color: Theme.wash
+                                    visible: spaceHover.hovered && !space.active
+                                }
+
+                                // Centro visual da letra, não da linha: o α
+                                // de serifa não tem ascendente e cairia baixo.
+                                TextMetrics {
+                                    id: glyph
+                                    font: label.font
+                                    text: label.text
+                                }
+
+                                Text {
+                                    id: label
+                                    anchors.centerIn: parent
+                                    anchors.verticalCenterOffset: label.height / 2
+                                        - (label.baselineOffset + glyph.tightBoundingRect.y + glyph.tightBoundingRect.height / 2)
+                                    anchors.horizontalCenterOffset: label.width / 2
+                                        - (glyph.tightBoundingRect.x + glyph.tightBoundingRect.width / 2)
+                                    text: Theme.wsName(space.wsId)
+                                    color: space.active ? Theme.ground : space.used ? Theme.textSoft : Theme.textFaint
+                                    font.family: Theme.serif
+                                    font.pixelSize: 15
+
+                                    Behavior on color {
+                                        ColorAnimation { duration: Motion.fast }
+                                    }
+                                }
+
+                                HoverHandler {
+                                    id: spaceHover
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+
+                                TapHandler {
+                                    onTapped: Hypr.workspace(space.wsId)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item { visible: Settings.get("island.showSystem"); width: bar.pad - bar.gap; height: 1 }
+
+                // Sistema, com ícone e valor; fica cobre quando passa do limite.
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Stats.temp > 0 && Settings.get("island.showSystem")
+                    icon: "󰔏"
+                    text: Math.round(Stats.temp) + "°"
+                    iconColor: Stats.temp > 90 ? Theme.copper : Theme.textDim
+                    panel: "system"
+                }
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Settings.get("island.showSystem")
+                    icon: "󰇚"
+                    text: Stats.rate(Stats.rxRate).replace(" ", "").replace(",0", "")
+                    panel: "system"
+                }
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Settings.get("island.showSystem")
+                    icon: "󰍛"
+                    text: Math.round(Stats.cpu * 100) + "%"
+                    iconColor: Stats.cpu > 0.9 ? Theme.copper : Theme.textDim
+                    panel: "system"
+                }
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Settings.get("island.showSystem")
+                    icon: "󰘚"
+                    text: Math.round(Stats.mem * 100) + "%"
+                    iconColor: Stats.mem > 0.9 ? Theme.copper : Theme.textDim
+                    panel: "system"
+                }
+            }
+
+            // Centro: relógio e data; o clima ao lado.
+            Row {
+                id: center
+                x: left.x + left.implicitWidth + bar.pad
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: bar.pad
+
+                Item {
+                    id: clockBox
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: Math.max(time.implicitWidth, date.implicitWidth) + 10
+                    implicitHeight: 30
+
+                    Text {
+                        id: time
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 1
+                        text: Qt.formatDateTime(clock.date, "hh:mm")
+                        color: Theme.text
+                        font.family: Theme.sans
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                        font.features: ({ "tnum": 1 })
+                    }
+
+                    Text {
+                        id: date
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: time.bottom
+                        anchors.topMargin: -1
+                        text: Qt.locale("pt_BR").toString(clock.date, "ddd d MMM").replace(/\./g, "")
+                        color: Theme.textDim
+                        font.family: Theme.mono
+                        font.pixelSize: 9
+                        font.letterSpacing: 0.6
+                    }
+
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    TapHandler {
+                        onTapped: Mare.openAt("calendar", clockBox.mapToItem(null, clockBox.width / 2, 0).x)
+                    }
+                }
+
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Weather.ready && Settings.get("island.showWeather")
+                    icon: Weather.ready ? Weather.icon(Weather.data.code, Weather.data.day) : ""
+                    text: Weather.ready ? Weather.data.temp + "°" : ""
+                    textColor: Theme.text
+                    panel: "calendar"
+                }
+            }
+
+            // Direita: bandeja e indicadores.
+            Row {
+                id: right
+                x: center.x + center.implicitWidth + bar.pad
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: bar.gap
+
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Media.active
+                    icon: Media.player && Media.player.isPlaying ? "󰎈" : "󰏤"
+                    iconColor: Media.player && Media.player.isPlaying ? Theme.copper : Theme.textDim
+                    panel: "media"
+                }
+
+                Repeater {
+                    model: SystemTray.items.values
+
+                    TrayIcon {
+                        required property var modelData
+                        anchors.verticalCenter: parent.verticalCenter
+                        item: modelData
+                        barWindow: bar
+                    }
+                }
+
+                // Atualizações pendentes: só aparece quando há alguma.
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Updates.count > 0 && Settings.get("updates.island")
+                    icon: "󰚰"
+                    text: String(Updates.count)
+                    iconColor: Updates.mkAvailable ? Theme.copper : Theme.textDim
+                    onClicked: {
+                        Mare.settingsPage = "atualizacoes";
+                        Mare.open("settings");
+                    }
+                }
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: Notifs.dnd ? "󰂛" : "󰂚"
+                    dot: Notifs.count > 0 && !Notifs.dnd
+                    panel: "notifications"
+                }
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: !Networking.wifiEnabled ? "󰖪" : bar.online ? "󰖩" : "󰤯"
+                    iconColor: bar.online ? Theme.textDim : Theme.copper
+                    panel: "network"
+                }
+                IslandItem {
+                    readonly property var adapter: Bluetooth.defaultAdapter
+                    readonly property bool connected: adapter !== null && adapter.devices.values.some(d => d.connected)
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: adapter !== null
+                    icon: adapter && !adapter.enabled ? "󰂲" : connected ? "󰂱" : "󰂯"
+                    iconColor: connected ? Theme.text : Theme.textDim
+                    panel: "bluetooth"
+                }
+                IslandItem {
+                    readonly property bool ready: bar.sink !== null && bar.sink.audio !== null
+                    readonly property bool muted: !ready || bar.sink.audio.muted
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: muted ? "󰖁" : "󰕾"
+                    panel: "volume"
+                    onScrolled: delta => Mare.changeVolume(delta > 0 ? 0.05 : -0.05)
+                }
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Display.hasBacklight
+                    icon: Display.nightLight ? "󰖔" : "󰃠"
+                    iconColor: Display.nightLight ? Theme.copper : Theme.textDim
+                    panel: "display"
+                    onScrolled: delta => Display.set(Display.brightness + (delta > 0 ? 0.05 : -0.05))
+                }
+                IslandItem {
+                    readonly property bool charging: bar.battery && bar.battery.state === UPowerDeviceState.Charging
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: bar.battery && bar.battery.isLaptopBattery
+                    icon: charging ? "󰂄" : bar.batteryPct > 60 ? "󰁹" : bar.batteryPct > 25 ? "󰁾" : "󰁻"
+                    iconColor: bar.batteryPct <= 15 ? Theme.copper : Theme.textDim
+                    text: bar.batteryPct + "%"
+                    textColor: Theme.text
+                    panel: "power"
+                }
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: "󰐥"
+                    panel: "session"
+                }
+            }
+        }
+    }
+}

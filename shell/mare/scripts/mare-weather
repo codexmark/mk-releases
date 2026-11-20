@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Clima atual e das próximas horas, via Open-Meteo (sem conta, sem chave).
+# A cidade vem de ~/.config/mare/city (uma linha, ex.: "Belo Horizonte");
+# sem esse arquivo, sai do fuso horário do sistema (America/Sao_Paulo -> Sao Paulo).
+# Saída: um JSON pequeno para o painel do calendário.
+set -uo pipefail
+
+city_file="${XDG_CONFIG_HOME:-$HOME/.config}/mare/city"
+if [[ -s $city_file ]]; then
+  city=$(head -1 "$city_file")
+else
+  tz=$(timedatectl show -p Timezone --value 2>/dev/null || true)
+  city=${tz##*/}
+  city=${city//_/ }
+fi
+[[ -z $city ]] && { echo '{"error":"sem cidade"}'; exit 0; }
+
+geo=$(curl -fsS --max-time 10 -G "https://geocoding-api.open-meteo.com/v1/search" \
+  --data-urlencode "name=$city" -d count=1 -d language=pt) || { echo '{"error":"sem rede"}'; exit 0; }
+lat=$(jq -r '.results[0].latitude // empty' <<<"$geo")
+lon=$(jq -r '.results[0].longitude // empty' <<<"$geo")
+name=$(jq -r '.results[0].name // empty' <<<"$geo")
+[[ -z $lat ]] && { jq -n --arg c "$city" '{error: ("cidade não encontrada: " + $c)}'; exit 0; }
+
+fc=$(curl -fsS --max-time 10 -G "https://api.open-meteo.com/v1/forecast" \
+  -d latitude="$lat" -d longitude="$lon" -d timezone=auto -d forecast_hours=12 -d forecast_days=1 \
+  -d current=temperature_2m,apparent_temperature,weather_code,is_day \
+  -d hourly=temperature_2m,weather_code \
+  -d daily=temperature_2m_max,temperature_2m_min) || { echo '{"error":"sem rede"}'; exit 0; }
+
+jq -c --arg city "$name" '{
+  city: $city,
+  temp: (.current.temperature_2m | round),
+  feels: (.current.apparent_temperature | round),
+  code: .current.weather_code,
+  day: (.current.is_day == 1),
+  max: (.daily.temperature_2m_max[0] | round),
+  min: (.daily.temperature_2m_min[0] | round),
+  hours: [range(0; (.hourly.time | length); 2) as $i
+          | {time: .hourly.time[$i][11:16], temp: (.hourly.temperature_2m[$i] | round), code: .hourly.weather_code[$i]}]
+}' <<<"$fc"

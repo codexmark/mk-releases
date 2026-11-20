@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Procura atualizações sem sudo e responde em JSON, para os Ajustes e a ilha:
+# {"checked": epoch, "system": [{name, from, to}], "aur": [...],
+#  "mk": {"version", "date", "channel", "latest", "available"}, "error": ""}
+#   system: pacotes do Arch (checkupdates, base temporária: não mexe no sistema)
+#   aur:    pacotes do AUR (yay -Qua)
+#   mk:     o próprio Mk, comparando a versão instalada com o canal (git)
+#   migrations: mudanças do Mk fora de ~/.config/mk que ainda não rodaram aqui
+set -uo pipefail
+
+err=""
+to_json() { # linhas "nome velha -> nova" em [{name, from, to}]
+  awk 'NF >= 4 { printf "%s\t%s\t%s\n", $1, $2, $4 }' |
+    jq -Rn '[inputs | split("\t") | {name: .[0], from: .[1], to: .[2]}]'
+}
+
+if command -v checkupdates >/dev/null; then
+  sys=$(checkupdates 2>/dev/null)
+  rc=$?
+  # 2 = nada para atualizar; 1 = falhou (sem internet, espelho fora)
+  ((rc == 1)) && err="não deu para consultar os espelhos (sem internet?)"
+else
+  sys=""
+  err="falta o pacman-contrib (checkupdates): sudo pacman -S pacman-contrib"
+fi
+aur=""
+command -v yay >/dev/null && aur=$(timeout 30 yay -Qua 2>/dev/null)
+
+# Versão do Mk: "commit data" escrito pela instalação.
+version="" date=""
+for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/VERSION" /usr/share/mk/VERSION; do
+  if [[ -r $f ]]; then read -r version date <"$f"; break; fi
+done
+channel=""
+for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/channel" /usr/share/mk/system/mk/channel; do
+  if [[ -r $f ]]; then channel=$(grep -v '^#' "$f" | head -1); [[ -n $channel ]] && break; fi
+done
+# A versão no canal: o arquivo VERSION do último lançamento ("commit data"),
+# lido sem baixar o resto (clone raso, só a árvore, só esse arquivo).
+latest="" latest_date=""
+if [[ -n $channel ]]; then
+  tmp=$(mktemp -d)
+  # Nunca pede senha: num canal privado sem login, só avisa.
+  if GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false \
+    timeout 20 git -c credential.interactive=never clone -q --depth 1 --filter=blob:none --no-checkout \
+    "$channel" "$tmp/c" 2>/dev/null; then
+    read -r latest latest_date < <(git -C "$tmp/c" show HEAD:VERSION 2>/dev/null) || true
+    [[ -n $latest ]] || latest=$(git -C "$tmp/c" rev-parse --short=12 HEAD)
+  elif [[ -z $err ]]; then
+    err="sem acesso ao canal do Mk ($channel)"
+  fi
+  rm -rf "${tmp:?}"
+fi
+available=false
+# Outra versão, e não mais antiga que a instalada (um Mk feito de um commit
+# que ainda não foi lançado não "volta" para o último lançamento).
+if [[ -n $latest && -n $version && ${latest:0:12} != "${version:0:12}" ]]; then
+  [[ -z $latest_date || -z $date || ! $latest_date < $date ]] && available=true
+fi
+
+# Migrações pendentes (o mk-update roda cada uma uma vez).
+migrations=0
+for kind in system user; do
+  for f in /usr/share/mk/migrations/"$kind"/*.sh; do
+    [[ -f $f ]] || continue
+    if [[ $kind == system ]]; then done_dir=/var/lib/mk/migrations
+    else done_dir=${XDG_STATE_HOME:-$HOME/.local/state}/mk/migrations; fi
+    [[ -e $done_dir/$(basename "$f") ]] || migrations=$((migrations + 1))
+  done
+done
+
+jq -nc \
+  --argjson system "$(to_json <<<"$sys")" --argjson aur "$(to_json <<<"$aur")" \
+  --arg version "${version:0:12}" --arg date "$date" --arg channel "$channel" \
+  --arg latest "$latest" --argjson available "$available" --arg error "$err" \
+  --argjson migrations "$migrations" \
+  '{checked: now | floor, system: $system, aur: $aur,
+    mk: {version: $version, date: $date, channel: $channel, latest: $latest, available: $available},
+    migrations: $migrations, error: $error}'

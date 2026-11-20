@@ -1,0 +1,5 @@
+# De onde o Mk busca a própria atualização: o repositório público de
+# lançamentos (bin/mk-release publica nele). Não precisa de login. Vazio = sem canal; os pacotes
+# do Arch e do AUR atualizam do mesmo jeito. Para um canal só seu, escreva o
+# endereço em ~/.config/mk/channel.
+https://github.com/codexmark/mk-releases.git

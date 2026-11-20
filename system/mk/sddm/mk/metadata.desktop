@@ -1,0 +1,9 @@
+[SddmGreeterTheme]
+Name=Mk
+Description=A tela de entrada do Mk: a folha de desenho técnico, o relógio em serifa e a senha com cursor de cobre.
+Author=Mk
+Type=sddm-theme
+Version=1.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+QtVersion=6

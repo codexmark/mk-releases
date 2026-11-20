@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# Atualiza o Mk inteiro, num terminal: o próprio Mk (pelo canal git, se houver
+# um), os pacotes do Arch e os do AUR. Os Ajustes abrem isto em "Atualizações".
+#
+#   mk-update           atualiza tudo, perguntando antes
+#   mk-update --check   só mostra o que há (o mesmo que os Ajustes mostram)
+#
+# Ordem: o próprio Mk, as migrações (migrations/: mudanças fora de
+# ~/.config/mk, cada uma roda uma vez), o Arch e o AUR. Depois de trocar o Mk,
+# o mk-update passa a vez para a versão nova dele mesmo (--after-mk), para
+# que a lógica nova já valha nesta rodada.
+#
+# Snapshots: com o snap-pac, cada pacman cria um snapshot antes e depois, e o
+# limine lista os snapshots no boot. Se algo quebrar, dá para voltar.
+set -euo pipefail
+
+share=${MK_SHARE:-/usr/share/mk}
+cfg=${XDG_CONFIG_HOME:-$HOME/.config}/mk
+marker=.instalado-pelo-mk
+check=$share/shell/mare/scripts/mare-updates
+[[ -x $check ]] || check=$cfg/shell/scripts/mare-updates
+mode=${1:-}
+sys_done=/var/lib/mk/migrations
+user_done=${XDG_STATE_HOME:-$HOME/.local/state}/mk/migrations
+
+# Migrações que ainda não rodaram aqui: "system/nome.sh" e "user/nome.sh".
+pending_migrations() {
+  local f kind
+  for kind in system user; do
+    for f in "$share/migrations/$kind"/*.sh; do
+      [[ -f $f ]] || continue
+      if [[ $kind == system ]]; then
+        [[ -e $sys_done/$(basename "$f") ]] || echo "$kind/$(basename "$f")"
+      else
+        [[ -e $user_done/$(basename "$f") ]] || echo "$kind/$(basename "$f")"
+      fi
+    done
+  done
+}
+
+copper=$'\e[38;2;206;94;50m' bone=$'\e[38;2;205;196;186m' dim=$'\e[38;2;113;107;105m' off=$'\e[0m'
+say() { printf '\n%s──%s %s%s%s\n' "$copper" "$off" "$bone" "$*" "$off"; }
+note() { printf '%s%s%s\n' "$dim" "$*" "$off"; }
+ask() {
+  local reply
+  read -rp "$1 [S/n] " reply
+  [[ -z $reply || $reply == [sSyY]* ]]
+}
+pause() {
+  [[ -t 0 ]] || return 0
+  echo
+  read -rsp "${dim}Enter fecha.${off}" _ || true
+  echo
+}
+trap pause EXIT
+
+printf '\n  %sM%s%sk%s  %satualizações%s\n' "$bone" "$off" "$copper" "$off" "$dim" "$off"
+
+say "procurando"
+info=$(bash "$check")
+nsys=$(jq '.system | length' <<<"$info")
+naur=$(jq '.aur | length' <<<"$info")
+mk_available=$(jq -r '.mk.available' <<<"$info")
+channel=$(jq -r '.mk.channel' <<<"$info")
+error=$(jq -r '.error' <<<"$info")
+[[ -n $error ]] && note "aviso: $error"
+
+printf '  Mk         %s\n' "$(jq -r 'if .mk.available then "nova versão (\(.mk.latest))"
+  elif .mk.channel == "" then "sem canal de atualização" else "em dia (\(.mk.version))" end' <<<"$info")"
+printf '  sistema    %s pacotes\n' "$nsys"
+printf '  AUR        %s pacotes\n' "$naur"
+mapfile -t pend < <(pending_migrations)
+((${#pend[@]})) && printf '  ajustes    %s mudanças do Mk no sistema\n' "${#pend[@]}"
+if ((nsys + naur > 0)); then
+  jq -r '(.system + .aur)[] | "    \(.name)  \(.from) → \(.to)"' <<<"$info" | head -40
+  ((nsys + naur > 40)) && note "    … e mais $((nsys + naur - 40))"
+fi
+
+[[ $mode == --check ]] && exit 0
+if [[ $mode != --after-mk ]]; then
+  if [[ $mk_available != true ]] && ((nsys + naur + ${#pend[@]} == 0)); then
+    say "tudo em dia"
+    exit 0
+  fi
+  ask "Atualizar agora?" || exit 0
+fi
+
+# 1. O próprio Mk: baixa o canal, troca /usr/share/mk e as configs que o Mk
+#    criou em ~/.config/mk (os seus ajustes.json/ajustes.lua ficam).
+if [[ $mk_available == true && $mode != --after-mk ]]; then
+  say "Mk"
+  tmp=$(mktemp -d)
+  GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 "$channel" "$tmp/mk"
+  # O lançamento traz o VERSION ("commit data"); sem ele, o commit do canal.
+  if [[ -s $tmp/mk/VERSION ]]; then
+    version=$(head -1 "$tmp/mk/VERSION")
+  else
+    version="$(git -C "$tmp/mk" rev-parse --short=12 HEAD) $(git -C "$tmp/mk" log -1 --format=%cs)"
+    printf '%s\n' "$version" >"$tmp/mk/VERSION"
+  fi
+  rm -rf "${tmp:?}/mk/.git"
+  [[ -f $share/aur-pendentes.txt ]] && cp "$share/aur-pendentes.txt" "$tmp/mk/"
+  sudo rm -rf "${share:?}.novo"
+  sudo cp -a "$tmp/mk" "$share.novo"
+  sudo rm -rf "${share:?}"
+  sudo mv "$share.novo" "$share"
+  sudo install -m755 "$share/bin/mk-session" /usr/bin/mk-session
+  sudo install -m755 "$share/bin/mk-update" /usr/bin/mk-update
+  sudo install -Dm644 "$share/system/mk/mk-os-release.hook" /etc/pacman.d/hooks/mk-os-release.hook
+  for pair in hypr:config/hypr shell:shell/mare ghostty:config/ghostty fastfetch:config/fastfetch bash:config/bash; do
+    dst=$cfg/${pair%%:*}
+    if [[ -e $dst/$marker || ! -e $dst ]]; then
+      # Copia ao lado e troca de uma vez: o Hyprland e o Maré vigiam esses
+      # arquivos e não podem ver a pasta vazia no meio da troca.
+      mkdir -p "$cfg"
+      rm -rf "${dst:?}.novo" "${dst:?}.velho"
+      cp -r "$share/${pair#*:}" "$dst.novo"
+      touch "$dst.novo/$marker"
+      [[ -e $dst ]] && mv "$dst" "$dst.velho"
+      mv "$dst.novo" "$dst"
+      rm -rf "${dst:?}.velho"
+    else
+      note "mantido (não é do Mk): $dst"
+    fi
+  done
+  printf '%s\n' "$version" >"$cfg/VERSION"
+  rm -rf "${tmp:?}"
+  # O Maré recarrega arquivos sozinho, mas não registra arquivos novos de
+  # serviço (singletons): reinicia ele inteiro, como no login.
+  if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && command -v qs >/dev/null; then
+    # O Hyprland relê a config inteira (e limpa um aviso de erro da troca).
+    hyprctl reload >/dev/null 2>&1 || true
+    qs kill -p "$cfg/shell" >/dev/null 2>&1 || true
+    log=${XDG_CACHE_HOME:-$HOME/.cache}/mk
+    hyprctl dispatch "hl.dsp.exec_cmd(\"qs -p '$cfg/shell' > '$log/mare.log' 2>&1\")" >/dev/null
+  fi
+  note "Mk em $version. O Hyprland pega a config nova no próximo login."
+  # O resto (migrações, pacotes) com a versão nova do mk-update.
+  trap - EXIT
+  exec /usr/bin/mk-update --after-mk
+fi
+
+# 2. Migrações: o que mudou no Mk fora de ~/.config/mk, cada uma uma vez.
+if ((${#pend[@]})); then
+  say "ajustes do Mk no sistema"
+  for m in "${pend[@]}"; do
+    note "  $m"
+    if [[ $m == system/* ]]; then
+      sudo env MK_SHARE="$share" bash "$share/migrations/$m"
+      sudo mkdir -p "$sys_done"
+      sudo touch "$sys_done/$(basename "$m")"
+    else
+      MK_SHARE="$share" bash "$share/migrations/$m"
+      mkdir -p "$user_done"
+      touch "$user_done/$(basename "$m")"
+    fi
+  done
+fi
+
+# 3. Pacotes do Arch.
+if ((nsys > 0)); then
+  say "sistema (sudo pede a sua senha)"
+  sudo pacman -Syu
+fi
+
+# 4. AUR, com o yay (compila como você, sem sudo, e pede a senha só para instalar).
+if ((naur > 0)) && command -v yay >/dev/null; then
+  say "AUR"
+  yay -Sua --noconfirm --answerclean None --answerdiff None
+fi
+
+# Pacotes do AUR que não vieram no pendrive da instalação.
+if [[ -s $share/aur-pendentes.txt ]] && command -v yay >/dev/null; then
+  mapfile -t aur_pend <"$share/aur-pendentes.txt"
+  say "AUR que ficou de fora da instalação: ${aur_pend[*]}"
+  if ask "Instalar agora?"; then
+    yay -S --needed --answerclean None --answerdiff None --removemake "${aur_pend[@]}" &&
+      sudo rm -f "$share/aur-pendentes.txt"
+  fi
+fi
+
+# Kernel novo só vale depois de reiniciar.
+if [[ ! -d /usr/lib/modules/$(uname -r) ]]; then
+  say "o kernel foi atualizado: reinicie quando puder"
+else
+  say "pronto"
+fi

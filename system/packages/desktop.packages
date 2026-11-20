@@ -1,0 +1,55 @@
+# Sessão gráfica: Hyprland e as peças em volta dele.
+# É aqui que mora "a sua cara". A barra, o launcher e as notificações abaixo
+# são um ponto de partida simples (waybar + fuzzel + mako); troque à vontade
+# por quickshell, swaync, etc.
+
+# Compositor e sessão
+hyprland
+# uwsm: inicia o Hyprland como sessão systemd (mesmo esquema do Omarchy)
+uwsm
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+hyprpolkitagent
+xorg-xwayland
+qt6-wayland
+qt5-wayland
+xdg-user-dirs
+xdg-utils
+
+# Login
+sddm
+
+# Ociosidade, bloqueio de tela, luz noturna, conta-gotas
+# (o papel de parede é desenhado pelo próprio Maré)
+hypridle
+hyprlock
+hyprsunset
+hyprpicker
+
+# Shell: a linha do Maré (shell/mare) roda no Quickshell. Ela também é o
+# launcher e o servidor de notificações, então não há mako nem fuzzel.
+quickshell
+libnotify
+
+# Captura de tela, área de transferência e mídia
+grim
+slurp
+wl-clipboard
+# wl-clip-persist: o que foi copiado sobrevive ao fechar o app de origem
+wl-clip-persist
+# playerctl: teclas play/pause/próxima para qualquer player
+playerctl
+# cliphist: histórico da área de transferência (Super+Shift+V)
+cliphist
+# matugen: tira a cor principal do papel de parede para tingir o Maré
+matugen
+# qrencode: QR code para o celular entrar no Wi-Fi (painel de rede)
+qrencode
+gpu-screen-recorder
+
+# Tema
+gnome-themes-extra
+papirus-icon-theme
+qt6ct
+gnome-keyring
+polkit

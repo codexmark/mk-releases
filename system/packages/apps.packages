@@ -1,0 +1,20 @@
+# Aplicativos gráficos do dia a dia. Opcionais: o instalador pode pular este
+# arquivo. Deixei de fora o que é pesado e não é dev (kdenlive, obs-studio,
+# libreoffice, gimp/pinta); mova para cá se quiser.
+
+# Navegador (mantenha só um)
+chromium
+
+# Arquivos, imagens, PDF, vídeo
+nautilus
+sushi
+ffmpegthumbnailer
+imv
+evince
+mpv
+mpv-mpris
+
+# Mídia de linha de comando usada por outras ferramentas
+ffmpeg
+imagemagick
+yt-dlp

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Cor principal de uma imagem (o "primary" do Material You, tema escuro),
+# usada pelo Maré para tingir a interface. Uso: mare-palette <imagem>
+set -uo pipefail
+
+img=${1:-}
+[[ -f $img ]] || exit 0
+matugen image "$img" --json hex --dry-run -m dark --prefer saturation 2>/dev/null \
+  | jq -r '.colors.primary.dark.color // empty'

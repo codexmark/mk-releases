@@ -1,0 +1,29 @@
+# Prompt do Mk: uma linha, cobre e osso. A pasta, o git e, à direita, o tempo
+# do comando quando ele demora.
+add_newline = true
+format = "$directory$git_branch$git_status$cmd_duration$line_break$character"
+
+[character]
+success_symbol = "[›](#ce5e32)"
+error_symbol = "[›](bold #ff5f40)"
+vimcmd_symbol = "[‹](#cdc4ba)"
+
+[directory]
+style = "#cdc4ba"
+truncation_length = 3
+truncation_symbol = "…/"
+format = "[$path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+symbol = ""
+style = "#958f87"
+format = "[· $branch]($style) "
+
+[git_status]
+style = "#ce5e32"
+format = "[$all_status$ahead_behind]($style) "
+
+[cmd_duration]
+min_time = 2000
+style = "#716b69"
+format = "[$duration]($style) "

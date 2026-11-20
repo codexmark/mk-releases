@@ -1,0 +1,78 @@
+# Kit de desenvolvimento. O coração deste projeto.
+# Mistura as linguagens do Ryoku (dev.packages) com o kit de terminal do Omarchy.
+# Versões específicas de linguagem por projeto: use o mise.
+
+# Terminal e shell
+ghostty
+tmux
+starship
+zoxide
+fzf
+bash-completion
+atuin
+
+# CLI moderna
+ripgrep
+fd
+bat
+eza
+dua-cli
+plocate
+jq
+yq
+gum
+btop
+fastfetch
+tldr
+yazi
+inotify-tools
+socat
+whois
+
+# Git
+git
+github-cli
+lazygit
+git-delta
+difftastic
+
+# Editor (a config LazyVim é aplicada por scripts/user/neovim.sh)
+neovim
+tree-sitter-cli
+
+# Linguagens e gerenciadores de versão
+mise
+go
+rust
+nodejs
+npm
+pnpm
+python
+python-pip
+python-pipx
+uv
+ruby
+lua51
+luarocks
+
+# Compilação nativa (módulos C de node/python/ruby)
+clang
+llvm
+cmake
+
+# Bibliotecas cliente de banco, para drivers nativos compilarem
+postgresql-libs
+mariadb-libs
+libyaml
+
+# Containers
+docker
+docker-compose
+docker-buildx
+lazydocker
+
+# Utilidades de projeto
+just
+direnv
+httpie
+pgcli

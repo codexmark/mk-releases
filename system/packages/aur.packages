@@ -1,0 +1,21 @@
+# Pacotes do AUR. NÃO entram no pacstrap: são compilados depois da instalação,
+# com internet, e a falha de um não deve travar a instalação.
+# Regra: só vem para cá o que não existe em core/extra.
+# Use o nome do PackageBase do AUR.
+
+# Helper do AUR (instalado primeiro, para compilar o resto)
+yay-bin
+
+# Hooks do limine: regeneram o menu de boot e adicionam o submenu de snapshots
+limine-mkinitcpio-hook
+limine-snapper-sync
+
+# Firewall que o Docker não fura (o Docker escreve no iptables por fora do ufw)
+ufw-docker
+
+# Compartilhamento de arquivos na rede local, estilo AirDrop
+localsend-bin
+
+# Fraunces: a serifa do perfil codexmark (marca Mk, letras dos workspaces,
+# títulos). Só existe no AUR; sem ela o Maré usa a Noto Serif.
+ttf-fraunces-variable

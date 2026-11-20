@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Cria um usuário novo já com o Mk, para testar o desktop do zero, sem
+# misturar com o seu usuário. Precisa de root.
+#
+#   sudo bin/new-user <nome> [--admin] [--wallpapers]
+#
+#   --admin       põe o usuário no grupo wheel (pode usar sudo)
+#   --wallpapers  copia os papéis de parede de quem chamou o sudo
+#
+# Faz: cria o usuário, instala os pacotes que faltam, instala a sessão "Mk"
+# na tela de login, copia a config do Mk para a home dele e pede a senha.
+# Rodar de novo com um usuário que já existe só atualiza a config dele.
+set -euo pipefail
+
+if [[ $EUID -ne 0 ]]; then
+  echo "rode com sudo: sudo $0 <nome> [--admin] [--wallpapers]" >&2
+  exit 1
+fi
+
+name=${1:-}
+if [[ ! $name =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+  echo "nome inválido: use letras minúsculas, números, - e _ (ex.: mare)" >&2
+  exit 2
+fi
+shift
+admin=0
+wallpapers=0
+for arg in "$@"; do
+  case $arg in
+    --admin) admin=1 ;;
+    --wallpapers) wallpapers=1 ;;
+    *) echo "opção desconhecida: $arg" >&2; exit 2 ;;
+  esac
+done
+
+repo=$(cd "$(dirname "$0")/.." && pwd)
+marker=.instalado-pelo-mk
+needed=(quickshell hypridle hyprlock hyprsunset ghostty cliphist wl-clip-persist playerctl matugen qrencode brightnessctl otf-geist-mono-nerd ttf-space-mono-nerd uwsm)
+
+# 1. Pacotes
+missing=()
+for p in "${needed[@]}"; do
+  pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p")
+done
+if ((${#missing[@]})); then
+  echo "== instalando: ${missing[*]}"
+  pacman -S --needed "${missing[@]}"
+fi
+
+# 2. Sessão na tela de login (vale para todos os usuários)
+echo "== sessão Mk na tela de login"
+install -Dm755 "$repo/bin/mk-session" /usr/local/bin/mk-session
+cat >/usr/share/wayland-sessions/mk.desktop <<'EOF'
+[Desktop Entry]
+Name=Mk
+Comment=Hyprland com o Maré
+Exec=/usr/local/bin/mk-session
+Type=Application
+EOF
+
+# 3. Usuário
+created=0
+if id "$name" >/dev/null 2>&1; then
+  echo "== $name já existe: só atualizo a config"
+else
+  groups=()
+  for g in video audio input; do
+    getent group "$g" >/dev/null && groups+=("$g")
+  done
+  ((admin)) && groups+=(wheel)
+  echo "== criando $name (grupos: ${groups[*]:-nenhum extra})"
+  args=(-m -s /bin/bash)
+  ((${#groups[@]})) && args+=(-G "$(IFS=,; echo "${groups[*]}")")
+  useradd "${args[@]}" "$name"
+  created=1
+fi
+home=$(getent passwd "$name" | cut -d: -f6)
+group=$(id -gn "$name")
+
+# 4. Config do Mk na home dele (só sobrescreve o que o Mk criou)
+place() {
+  local src=$1 dst=$2
+  if [[ -e $dst && ! -e $dst/$marker ]]; then
+    echo "ERRO: $dst já existe e não foi criado pelo Mk; não vou sobrescrever." >&2
+    exit 1
+  fi
+  rm -rf "$dst"
+  mkdir -p "$(dirname "$dst")"
+  cp -r "$src" "$dst"
+  touch "$dst/$marker"
+  echo "  $dst"
+}
+echo "== config do Mk"
+place "$repo/config/hypr" "$home/.config/mk/hypr"
+place "$repo/config/ghostty" "$home/.config/mk/ghostty"
+place "$repo/shell/mare" "$home/.config/mk/shell"
+place "$repo/config/fastfetch" "$home/.config/mk/fastfetch"
+place "$repo/config/bash" "$home/.config/mk/bash"
+grep -q 'mk/bash/mk.bash' "$home/.bashrc" 2>/dev/null ||
+  printf '\n# Mk: ficha do fastfetch, prompt e atalhos\n[[ -f ~/.config/mk/bash/mk.bash ]] && source ~/.config/mk/bash/mk.bash\n' >>"$home/.bashrc"
+# Versões antigas punham o Maré em ~/.config/quickshell, que o Ryoku recria.
+if [[ -e $home/.config/quickshell/mare/$marker ]]; then
+  rm -rf "$home/.config/quickshell/mare"
+fi
+mkdir -p "$home/Work" "$home/Pictures/Wallpapers"
+
+if ((wallpapers)) && [[ -n ${SUDO_USER:-} ]]; then
+  src=$(getent passwd "$SUDO_USER" | cut -d: -f6)/Pictures/Wallpapers
+  if [[ -d $src ]]; then
+    echo "== copiando papéis de parede de $SUDO_USER"
+    find "$src" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
+      -exec cp -n {} "$home/Pictures/Wallpapers/" \;
+  fi
+fi
+
+chown -R "$name:$group" "$home/.config/mk" "$home/Work" "$home/Pictures"
+
+# 5. Senha (você digita; só na criação)
+if ((created)); then
+  echo "== defina a senha de $name"
+  passwd "$name"
+fi
+
+echo
+echo "Pronto. Saia da sessão atual; na tela de login escolha o usuário \"$name\""
+echo "e a sessão \"Mk\". O primeiro login demora um pouco mais."
+echo "Para apagar o usuário e a home dele depois: sudo userdel -r $name"

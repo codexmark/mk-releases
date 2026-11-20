@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Junta, sem alterar nada, o que for preciso para entender por que a sessão do
+# Mk não abriu direito num usuário: a config do Maré, relatórios de crash e
+# a captura de tela mais recente. Tudo vai para /tmp/mk-diagnostico,
+# legível por quem chamou o sudo.
+#
+#   sudo bin/diagnose-user <nome>
+set -uo pipefail
+
+[[ $EUID -eq 0 ]] || { echo "rode com sudo: sudo $0 <nome>" >&2; exit 1; }
+name=${1:-}
+id "$name" >/dev/null 2>&1 || { echo "usuário não existe: $name" >&2; exit 2; }
+home=$(getent passwd "$name" | cut -d: -f6)
+out=/tmp/mk-diagnostico
+rm -rf "$out"
+mkdir -p "$out"
+
+{
+  echo "== ~/.config/quickshell"
+  ls -la "$home/.config/quickshell" 2>&1
+  echo
+  echo "== ~/.config/mk/shell (o Maré)"
+  ls -la "$home/.config/mk/shell" 2>&1 | head -60
+  echo
+  echo "== ~/.config/mk/hypr"
+  ls -la "$home/.config/mk/hypr" 2>&1
+  echo
+  echo "== ~/.cache/mk/mare.log (fim)"
+  tail -40 "$home/.cache/mk/mare.log" 2>&1
+  echo
+  echo "== estado do Quickshell"
+  find "$home/.local/state/quickshell" -maxdepth 3 2>&1 | head -20
+  echo
+  echo "== crashes do Quickshell"
+  find "$home/.cache/quickshell/crashes" -maxdepth 2 -type f 2>&1 | head -20
+  echo
+  echo "== processos de $name agora"
+  ps -u "$name" -o pid,etime,cmd 2>&1 | head -40
+} >"$out/relatorio.txt"
+
+# Últimos relatórios de crash (texto), se houver.
+find "$home/.cache/quickshell/crashes" -type f \( -name '*.txt' -o -name '*.log' -o -name 'info*' -o -name '*.qslog' \) \
+  -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -4 | cut -d' ' -f2- | while read -r f; do
+  cp "$f" "$out/crash-$(basename "$(dirname "$f")")-$(basename "$f")"
+done
+
+cp "$home/.cache/mk/mare.log" "$out/" 2>/dev/null
+
+# Capturas de tela mais recentes da home do usuário.
+find "$home" -maxdepth 3 -type f \( -iname '*.png' -o -iname '*.jpg' \) -mmin -240 \
+  -not -path '*/.config/*' -not -path '*/Pictures/Wallpapers/*' -not -path '*/.local/*' -not -path '*/.cache/*' \
+  -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -3 | cut -d' ' -f2- | while read -r f; do
+  cp "$f" "$out/"
+done
+
+owner=${SUDO_USER:-root}
+chown -R "$owner:" "$out"
+echo "Pronto: $out"
+ls -la "$out"

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Uma VM para testar o Mk, sem tocar em disco de verdade.
+#
+#   iso/vm iso      inicia pelo ISO mais novo de iso/out (para rodar mk-install)
+#   iso/vm          inicia pelo disco da VM (o Mk já instalado)
+#   iso/vm reset    apaga o disco da VM e começa do zero
+#
+# A VM fica em ~/.cache/mk-vm: um disco qcow2 de 40 GB (cresce conforme usa)
+# e as variáveis do UEFI, onde fica a entrada "Mk" do boot. No live, rode
+# mk-install e escolha /dev/vda.
+#
+# A porta 2222 daqui vai para o SSH da VM (ssh -p 2222 usuario@localhost),
+# e ~/.cache/mk-vm/monitor.sock é o monitor do QEMU, que tira capturas da
+# tela da VM: echo "screendump /tmp/vm.ppm" | socat - UNIX:~/.cache/mk-vm/monitor.sock
+set -euo pipefail
+
+repo=$(cd "$(dirname "$0")/.." && pwd)
+dir=${XDG_CACHE_HOME:-$HOME/.cache}/mk-vm
+ovmf=/usr/share/edk2/x64
+
+command -v qemu-system-x86_64 >/dev/null || { echo "falta o qemu: sudo pacman -S --needed qemu-desktop edk2-ovmf" >&2; exit 1; }
+[[ -f $ovmf/OVMF_CODE.4m.fd ]] || { echo "falta o UEFI da VM: sudo pacman -S --needed edk2-ovmf" >&2; exit 1; }
+
+case ${1:-disk} in
+  reset)
+    rm -f "${dir:?}/disk.qcow2" "${dir:?}/vars.fd"
+    echo "disco da VM apagado: $dir"
+    exit 0 ;;
+  iso|disk) ;;
+  *)
+    echo "uso: iso/vm [iso | reset]" >&2
+    exit 2 ;;
+esac
+
+mkdir -p "$dir"
+[[ -f $dir/disk.qcow2 ]] || qemu-img create -q -f qcow2 "$dir/disk.qcow2" 40G
+[[ -f $dir/vars.fd ]] || cp "$ovmf/OVMF_VARS.4m.fd" "$dir/vars.fd"
+
+args=(
+  -name Mk
+  -enable-kvm -cpu host -smp 4 -m 6G -machine q35
+  -drive "if=pflash,format=raw,readonly=on,file=$ovmf/OVMF_CODE.4m.fd"
+  -drive "if=pflash,format=raw,file=$dir/vars.fd"
+  -drive "file=$dir/disk.qcow2,if=virtio"
+  -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:2222-:22"
+  -monitor "unix:$dir/monitor.sock,server,nowait"
+  -device virtio-vga
+  -device qemu-xhci -device usb-tablet
+  -audiodev "pipewire,id=som" -device intel-hda -device "hda-duplex,audiodev=som"
+)
+
+if [[ ${1:-disk} == iso ]]; then
+  iso=""
+  for f in "$repo"/iso/out/mk-*.iso; do
+    [[ -f $f && ( -z $iso || $f -nt $iso ) ]] && iso=$f
+  done
+  [[ -n $iso ]] || { echo "nenhum ISO em iso/out: rode iso/build primeiro" >&2; exit 1; }
+  echo "iniciando pelo ISO: $iso"
+  args+=(-cdrom "$iso" -boot order=d)
+fi
+
+exec qemu-system-x86_64 "${args[@]}"

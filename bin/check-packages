@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Confere se cada pacote das listas existe onde deveria:
+#   base/desktop/dev/apps/hardware -> repositórios oficiais (core, extra, multilib)
+#   aur                            -> AUR
+# Não instala nada. Sai com erro se algum pacote estiver no lugar errado.
+set -uo pipefail
+source "$(dirname "$0")/lib-packages.sh"
+
+OFFICIAL_REPOS=" core extra multilib "
+fail=0
+
+repo_of() {
+  pacman -Si "$1" 2>/dev/null | awk -F': ' '/^(Repository|Reposit)/{print $2; exit}'
+}
+
+check_official() {
+  local file=$1 pkg repo
+  while read -r pkg; do
+    repo=$(repo_of "$pkg")
+    if [[ -z $repo ]]; then
+      echo "  FALTA   $pkg ($file): não existe nos repositórios configurados"
+      fail=1
+    elif [[ $OFFICIAL_REPOS != *" $repo "* ]]; then
+      echo "  AVISO   $pkg ($file): vem de [$repo], não de um repositório oficial"
+      fail=1
+    fi
+  done
+}
+
+for name in base desktop dev apps; do
+  echo "== $name.packages"
+  check_official "$name" < <(read_list "$PKG_DIR/$name.packages")
+done
+
+echo "== hardware.packages"
+check_official hardware < <(read_hardware amd intel nvidia vm)
+
+echo "== aur.packages"
+mapfile -t aur < <(read_list "$PKG_DIR/aur.packages")
+query=$(printf '&arg[]=%s' "${aur[@]}")
+found=$(curl -fsS "https://aur.archlinux.org/rpc/v5/info?${query#&}" | jq -r '.results[].PackageBase, .results[].Name' | sort -u)
+for pkg in "${aur[@]}"; do
+  if ! grep -qx "$pkg" <<<"$found"; then
+    echo "  FALTA   $pkg (aur): não encontrado no AUR"
+    fail=1
+  elif [[ $(repo_of "$pkg") == @(core|extra|multilib) ]]; then
+    echo "  AVISO   $pkg (aur): também existe nos oficiais, mova para outra lista"
+    fail=1
+  fi
+done
+
+if ((fail)); then
+  echo "Há problemas nas listas."
+  exit 1
+fi
+echo "Tudo certo: todas as listas batem com os repositórios."

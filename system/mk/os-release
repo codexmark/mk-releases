@@ -1,0 +1,8 @@
+NAME="Mk"
+PRETTY_NAME="Mk"
+ID=mk
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;206;94;50"
+HOME_URL="https://github.com/codexmark"
+LOGO=archlinux-logo

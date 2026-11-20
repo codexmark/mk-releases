@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Estado de um projeto para o painel do Maré, em JSON.
+# Uso: mare-project <diretório>
+# Saída: {"branch","dirty","runtime","containers":[{name,status,running}],"ports":[..]}
+set -uo pipefail
+
+dir=${1:-}
+if [[ -z $dir || ! -d $dir ]]; then
+  echo '{"branch":"","dirty":0,"runtime":"","containers":[],"ports":[]}'
+  exit 0
+fi
+cd "$dir" || exit 0
+
+branch=$(git branch --show-current 2>/dev/null || true)
+dirty=$(git status --porcelain 2>/dev/null | wc -l)
+
+# Versões do mise configuradas neste projeto, ex.: "go 1.25 · node 22"
+runtime=""
+if command -v mise >/dev/null && [[ -f mise.toml || -f .mise.toml || -f .tool-versions ]]; then
+  runtime=$(mise current 2>/dev/null | awk '{printf "%s%s %s", (NR>1?" · ":""), $1, $2}')
+fi
+
+# Containers do docker compose cujo diretório de trabalho é este projeto
+containers='[]'
+docker_ports=""
+if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+  rows=$(docker ps -a --filter "label=com.docker.compose.project.working_dir=$dir" \
+    --format '{{.Label "com.docker.compose.service"}}\t{{.State}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null)
+  if [[ -n $rows ]]; then
+    containers=$(jq -Rn '[inputs | split("\t") | {name: .[0], running: (.[1] == "running"), status: .[2]}]' <<<"$rows")
+    docker_ports=$(grep -oE '[0-9.:]+:[0-9]+->' <<<"$rows" | grep -oE ':[0-9]+->' | tr -d '>-' || true)
+  fi
+fi
+
+# Portas TCP escutando por processos que rodam dentro deste diretório (servidores de dev)
+proc_ports=""
+while read -r line; do
+  port=$(awk '{print $4}' <<<"$line" | grep -oE '[0-9]+$')
+  pid=$(grep -oE 'pid=[0-9]+' <<<"$line" | head -1 | cut -d= -f2)
+  [[ -z $port || -z $pid ]] && continue
+  cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+  [[ $cwd == "$dir" || $cwd == "$dir"/* ]] && proc_ports+=":$port"$'\n'
+done < <(ss -ltnpH 2>/dev/null)
+
+ports=$(printf '%s\n%s\n' "$docker_ports" "$proc_ports" | grep -E '^:[0-9]+$' | sort -t: -k2 -n -u | jq -Rn '[inputs]')
+
+jq -n \
+  --arg branch "$branch" \
+  --argjson dirty "$dirty" \
+  --arg runtime "$runtime" \
+  --argjson containers "$containers" \
+  --argjson ports "$ports" \
+  '{branch: $branch, dirty: $dirty, runtime: $runtime, containers: $containers, ports: $ports}'

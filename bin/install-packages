@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Instala as listas num Arch já instalado. Idempotente: --needed pula o que já existe.
+# Uso: bin/install-packages <perfil-de-hardware...> [--no-apps]
+#   ex.: bin/install-packages amd nvidia
+set -euo pipefail
+source "$(dirname "$0")/lib-packages.sh"
+
+profiles=()
+with_apps=1
+for arg in "$@"; do
+  case $arg in
+    --no-apps) with_apps=0 ;;
+    amd | intel | nvidia | vm) profiles+=("$arg") ;;
+    *) echo "argumento desconhecido: $arg" >&2; exit 2 ;;
+  esac
+done
+if ((${#profiles[@]} == 0)); then
+  echo "informe o perfil de hardware: amd, intel, nvidia e/ou vm" >&2
+  exit 2
+fi
+
+lists=(base desktop dev)
+((with_apps)) && lists+=(apps)
+
+mapfile -t pkgs < <(
+  for name in "${lists[@]}"; do read_list "$PKG_DIR/$name.packages"; done
+  read_hardware "${profiles[@]}"
+)
+sudo pacman -S --needed --noconfirm "${pkgs[@]}"
+
+# AUR: depois dos oficiais, com yay. Falhas aqui não abortam.
+if ! command -v yay >/dev/null; then
+  tmp=$(mktemp -d)
+  git clone --depth 1 https://aur.archlinux.org/yay-bin.git "$tmp/yay-bin"
+  (cd "$tmp/yay-bin" && makepkg -si --noconfirm)
+  rm -rf "$tmp"
+fi
+while read -r pkg; do
+  yay -S --needed --noconfirm "$pkg" || echo "AVISO: $pkg (AUR) falhou, siga em frente" >&2
+done < <(read_list "$PKG_DIR/aur.packages")

@@ -1,0 +1,22 @@
+# Drivers e microcode por perfil de hardware. O instalador escolhe a(s)
+# seção(ões) da máquina (ex.: amd + nvidia num notebook híbrido).
+# Formato igual ao do Ryoku: [secao] seguida dos pacotes.
+
+[amd]
+amd-ucode
+vulkan-radeon
+
+[intel]
+intel-ucode
+vulkan-intel
+intel-media-driver
+
+[nvidia]
+# nvidia-open-dkms serve para placas Turing (GTX 16xx / RTX 20xx) em diante
+nvidia-open-dkms
+nvidia-utils
+libva-nvidia-driver
+egl-wayland
+
+[vm]
+vulkan-swrast

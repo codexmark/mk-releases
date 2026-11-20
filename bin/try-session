@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# Instala o Mk como uma sessão separada, escolhida na tela de login,
+# sem tocar na config do desktop atual (~/.config/hypr fica como está).
+#
+#   bin/try-session install     copia as configs e cria o lançador da sessão
+#   bin/try-session uninstall   remove tudo o que o install criou
+#   bin/try-session status      mostra o que está instalado e o que falta
+#
+# Os passos que precisam de root (pacotes e a entrada na tela de login) não são
+# executados: o script imprime os comandos para você rodar.
+set -euo pipefail
+
+repo=$(cd "$(dirname "$0")/.." && pwd)
+cfg=${XDG_CONFIG_HOME:-$HOME/.config}
+hypr_dst=$cfg/mk/hypr
+ghostty_dst=$cfg/mk/ghostty
+qs_dst=$cfg/mk/shell
+# Versões antigas punham o Maré em ~/.config/quickshell, que outro desktop pode recriar.
+old_qs_dst=$cfg/quickshell/mare
+launcher=/usr/local/bin/mk-session
+session_file=/usr/share/wayland-sessions/mk.desktop
+marker=.instalado-pelo-mk
+# Antes de virar Mk, o projeto se chamava meu-os: config em ~/.config/meu-os,
+# lançador /usr/local/bin/meu-os-session e a entrada "meu-os" no login.
+old_root=$cfg/meu-os
+old_marker=.instalado-pelo-meu-os
+old_launcher=/usr/local/bin/meu-os-session
+old_session_file=/usr/share/wayland-sessions/meu-os.desktop
+
+# Pacotes sem os quais a sessão não funciona direito.
+needed=(quickshell hypridle hyprlock hyprsunset ghostty cliphist wl-clip-persist playerctl matugen qrencode brightnessctl otf-geist-mono-nerd ttf-space-mono-nerd)
+
+# Apaga a instalação antiga do meu-os, só as partes que ela criou.
+remove_old() {
+  local d
+  for d in hypr ghostty shell; do
+    if [[ -e $old_root/$d/$old_marker ]]; then
+      rm -rf "${old_root:?}/$d"
+      echo "  removido (meu-os antigo): $old_root/$d"
+    fi
+  done
+  rmdir "$old_root" 2>/dev/null || true
+}
+
+# Copia um diretório para o destino, mas só sobrescreve o que este script criou.
+place() {
+  local src=$1 dst=$2
+  if [[ -e $dst && ! -e $dst/$marker ]]; then
+    echo "ERRO: $dst já existe e não foi criado pelo Mk; não vou sobrescrever." >&2
+    exit 1
+  fi
+  rm -rf "$dst"
+  mkdir -p "$(dirname "$dst")"
+  cp -r "$src" "$dst"
+  touch "$dst/$marker"
+  echo "  copiado: $dst"
+}
+
+remove() {
+  local dst=$1
+  if [[ -e $dst/$marker ]]; then
+    rm -rf "$dst"
+    echo "  removido: $dst"
+  elif [[ -e $dst ]]; then
+    echo "  mantido (não é do Mk): $dst"
+  fi
+}
+
+missing_packages() {
+  local p out=()
+  for p in "${needed[@]}"; do
+    pacman -Qq "$p" >/dev/null 2>&1 || out+=("$p")
+  done
+  echo "${out[*]}"
+}
+
+root_steps() {
+  local missing
+  missing=$(missing_packages)
+  echo
+  echo "Passos com sudo (rode você mesmo):"
+  if [[ -n $missing ]]; then
+    echo
+    echo "  sudo pacman -S --needed $missing"
+  fi
+  if ! cmp -s "$repo/bin/mk-session" "$launcher"; then
+    echo
+    echo "  sudo install -Dm755 $repo/bin/mk-session $launcher"
+  fi
+  if [[ -f $old_launcher || -f $old_session_file ]]; then
+    echo
+    echo "  sudo rm -f $old_launcher $old_session_file    # a sessão antiga \"meu-os\""
+  fi
+  if [[ ! -f $session_file ]]; then
+    echo
+    echo "  printf '[Desktop Entry]\\nName=Mk\\nComment=Hyprland com o Maré\\nExec=$launcher\\nType=Application\\n' | sudo tee $session_file"
+  fi
+}
+
+case ${1:-status} in
+  install)
+    echo "Instalando a sessão do Mk:"
+    place "$repo/config/hypr" "$hypr_dst"
+    place "$repo/config/ghostty" "$ghostty_dst"
+    place "$repo/config/fastfetch" "$cfg/mk/fastfetch"
+    place "$repo/config/bash" "$cfg/mk/bash"
+    place "$repo/shell/mare" "$qs_dst"
+    remove "$old_qs_dst"
+    remove_old
+    printf '%s %s\n' "$(git -C "$repo" rev-parse --short=12 HEAD 2>/dev/null || echo dev)" \
+      "$(git -C "$repo" log -1 --format=%cs 2>/dev/null || date +%F)" >"$cfg/mk/VERSION"
+    if Hyprland --verify-config -c "$hypr_dst/hyprland.lua" 2>&1 | grep -q '^config ok'; then
+      echo "  config do Hyprland: ok"
+    else
+      echo "  AVISO: a config do Hyprland tem erros; rode: Hyprland --verify-config -c $hypr_dst/hyprland.lua" >&2
+    fi
+    root_steps
+    echo
+    echo "Depois: saia da sessão atual e escolha \"Mk\" na tela de login."
+    echo "Para voltar ao desktop de antes, escolha a sessão dele no login."
+    ;;
+  uninstall)
+    echo "Removendo a sessão do Mk:"
+    remove "$hypr_dst"
+    remove "$ghostty_dst"
+    remove "$cfg/mk/fastfetch"
+    remove "$cfg/mk/bash"
+    remove "$qs_dst"
+    remove "$old_qs_dst"
+    remove_old
+    rmdir "$cfg/mk" 2>/dev/null || true
+    if [[ -f $session_file || -f $launcher ]]; then
+      echo
+      echo "Para tirar a sessão do sistema (com sudo; vale para todos os usuários):"
+      echo "  sudo rm -f $session_file $launcher"
+    fi
+    ;;
+  status)
+    for p in "$hypr_dst" "$qs_dst" "$launcher" "$session_file"; do
+      [[ -e $p ]] && echo "  ok      $p" || echo "  falta   $p"
+    done
+    missing=$(missing_packages)
+    [[ -n $missing ]] && echo "  pacotes que faltam: $missing" || echo "  pacotes: ok"
+    ;;
+  *)
+    echo "uso: bin/try-session install | uninstall | status" >&2
+    exit 2
+    ;;
+esac

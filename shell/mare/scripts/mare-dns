@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Troca o DNS da conexão em uso, sem sudo e sem derrubar a conexão.
+# Uso: mare-dns auto | cloudflare | google
+#
+# Diferente do omarchy-dns (que grava uma config global com root), aqui só a
+# conexão atual muda, pelo NetworkManager, e `nmcli dev reapply` aplica na
+# hora. "auto" volta ao DNS que o roteador oferece.
+set -euo pipefail
+
+mode=${1:-}
+case $mode in
+  auto)
+    v4=""; v6=""; ignore=no ;;
+  cloudflare)
+    v4="1.1.1.1 1.0.0.1"; v6="2606:4700:4700::1111 2606:4700:4700::1001"; ignore=yes ;;
+  google)
+    v4="8.8.8.8 8.8.4.4"; v6="2001:4860:4860::8888 2001:4860:4860::8844"; ignore=yes ;;
+  *)
+    echo "uso: mare-dns auto | cloudflare | google" >&2
+    exit 2 ;;
+esac
+
+dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
+[[ -n $dev ]] || { echo "sem conexão ativa" >&2; exit 1; }
+conn=$(nmcli -g GENERAL.CONNECTION dev show "$dev")
+[[ -n $conn ]] || { echo "$dev não está ligado a uma conexão do NetworkManager" >&2; exit 1; }
+
+nmcli con mod "$conn" \
+  ipv4.dns "$v4" ipv4.ignore-auto-dns "$ignore" \
+  ipv6.dns "$v6" ipv6.ignore-auto-dns "$ignore"
+nmcli dev reapply "$dev" >/dev/null
+echo "$conn: dns $mode"

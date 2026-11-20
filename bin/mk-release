@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Lança uma versão do Mk: publica o código deste commit no repositório público
+# de lançamentos, de onde todo Mk instalado se atualiza (sem login no GitHub).
+# O código do dia a dia continua no repositório privado; só vai a público o
+# que passa por aqui.
+#
+#   bin/mk-release                 lança o commit atual (HEAD)
+#   bin/mk-release "o que mudou"   com uma frase sua no lugar da lista de commits
+#
+# O lançamento leva os arquivos do git (sem .git, sem o que o .gitignore
+# ignora) e um VERSION com "commit data": é por ele que os Mk instalados
+# sabem que há versão nova.
+set -euo pipefail
+
+repo=$(cd "$(dirname "$0")/.." && pwd)
+releases=${MK_RELEASES:-https://github.com/codexmark/mk-releases.git}
+work=${XDG_CACHE_HOME:-$HOME/.cache}/mk-release/mk-releases
+
+cd "$repo"
+if [[ -n $(git status --porcelain --untracked-files=no) ]]; then
+  echo "há mudanças sem commit; faça o commit antes de lançar" >&2
+  exit 1
+fi
+if [[ -n $(git log --oneline '@{u}..' 2>/dev/null) ]]; then
+  echo "aviso: há commits que ainda não foram para o repositório privado (git push)" >&2
+fi
+
+src=$(git rev-parse --short=12 HEAD)
+date=$(git log -1 --format=%cs)
+
+# O repositório de lançamentos, numa pasta de trabalho só para isso.
+if [[ -d $work/.git ]]; then
+  git -C "$work" fetch -q origin
+  git -C "$work" reset -q --hard origin/main 2>/dev/null || true
+else
+  rm -rf "${work:?}"
+  mkdir -p "$(dirname "$work")"
+  git clone -q "$releases" "$work"
+fi
+
+last=""
+[[ -f $work/VERSION ]] && read -r last _ <"$work/VERSION"
+if [[ $last == "$src" ]]; then
+  echo "o Mk $src já está lançado"
+  exit 0
+fi
+
+# Troca tudo pelo conteúdo deste commit.
+find "$work" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+git archive HEAD | tar -x -C "$work"
+printf '%s %s\n' "$src" "$date" >"$work/VERSION"
+
+if [[ -n ${1:-} ]]; then
+  notes=$1
+elif [[ -n $last ]] && git cat-file -e "$last" 2>/dev/null; then
+  notes=$(git log --format='- %s' "$last..HEAD")
+else
+  notes="Primeiro lançamento."
+fi
+
+git -C "$work" add -A
+# No repositório público, o endereço "noreply" do GitHub no lugar do seu e-mail.
+git -C "$work" -c user.name="$(git config user.name)" \
+  -c user.email="${MK_RELEASE_EMAIL:-16628997+codexmark@users.noreply.github.com}" \
+  commit -q -m "Mk $date ($src)" -m "$notes"
+git -C "$work" push -q origin HEAD:main
+echo "lançado: Mk $date ($src) em ${releases%.git}"
+echo "$notes"

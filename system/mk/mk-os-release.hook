@@ -1,0 +1,14 @@
+# O sistema se chama Mk: "Welcome to Mk!" no boot, Mk no login e no
+# hostnamectl. O pacote filesystem traz o /etc/os-release do Arch; a cada
+# instalação ou atualização dele, este gancho põe o do Mk no lugar.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+
+[Action]
+Description = Nome do sistema: Mk
+When = PostTransaction
+Depends = coreutils
+Exec = /usr/bin/sh -c 'rm -f /etc/os-release && cp /usr/share/mk/system/mk/os-release /etc/os-release && cp /usr/share/mk/system/mk/issue /etc/issue'

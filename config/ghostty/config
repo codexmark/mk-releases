@@ -1,0 +1,49 @@
+# Ghostty na direção Folha. Carregado só pela sessão do Mk
+# (ghostty --config-default-files=false --config-file=?~/.config/mk/ghostty/config),
+# então o ~/.config/ghostty de outros desktops fica como está.
+
+font-family = SpaceMono Nerd Font
+font-family = GeistMono Nerd Font
+font-family = JetBrainsMono Nerd Font
+font-size = 11
+adjust-cell-height = 12%
+
+# Preto que nunca é preto, texto em osso, cursor e seleção de cobre.
+background = #0f0e0d
+foreground = #cdc4ba
+cursor-color = #ce5e32
+cursor-text = #0f0e0d
+cursor-style = bar
+cursor-style-blink = false
+selection-background = #3a2a22
+selection-foreground = #cdc4ba
+
+# Paleta quente e contida: o vermelho é o cobre, as outras cores são
+# versões apagadas, para o terminal não brigar com a interface.
+palette = 0=#141211
+palette = 1=#ce5e32
+palette = 2=#8a9a6c
+palette = 3=#c9a45c
+palette = 4=#7d8fa3
+palette = 5=#a3798a
+palette = 6=#7fa39b
+palette = 7=#b0a9a0
+palette = 8=#4d4844
+palette = 9=#e07448
+palette = 10=#a3b385
+palette = 11=#dcbc7a
+palette = 12=#98a9bc
+palette = 13=#bb93a3
+palette = 14=#9bbcb4
+palette = 15=#cdc4ba
+
+# Respiro nas bordas e nenhuma decoração: a moldura é do Hyprland.
+window-padding-x = 16
+window-padding-y = 14
+window-padding-balance = true
+window-decoration = false
+gtk-titlebar = false
+
+confirm-close-surface = false
+copy-on-select = clipboard
+mouse-hide-while-typing = true

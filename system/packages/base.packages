@@ -1,0 +1,88 @@
+# Sistema base. Instalado via pacstrap, funciona offline.
+# Um pacote por linha; '#' e linhas em branco são ignorados.
+# Origem: base.packages do Ryoku, sem o que é específico do shell dele.
+# Tudo aqui vem de core/extra (verifique com bin/check-packages).
+
+# Núcleo
+base
+base-devel
+linux
+linux-firmware
+# headers: módulos DKMS (drivers fora da árvore do kernel)
+linux-headers
+dkms
+mkinitcpio
+sudo
+# man-db/less: páginas de manual funcionando (Omarchy tem, Ryoku não)
+man-db
+# pacman-contrib: checkupdates (o Mk procura atualizações sem sudo), paccache
+pacman-contrib
+less
+pciutils
+usbutils
+
+# Boot: limine + btrfs + LUKS + snapshots automáticos a cada pacman.
+# Os hooks do limine (limine-mkinitcpio-hook, limine-snapper-sync) vêm do AUR,
+# veja aur.packages.
+btrfs-progs
+cryptsetup
+dosfstools
+exfatprogs
+efibootmgr
+limine
+plymouth
+snapper
+snap-pac
+
+# Rede
+networkmanager
+iwd
+wireless-regdb
+iw
+# avahi + nss-mdns: resolver nomes .local (impressoras, outras máquinas da rede)
+avahi
+nss-mdns
+# openssh: ssh e git por ssh; o servidor (sshd) fica desligado até você ligar
+openssh
+# firewall: ufw nega entrada por padrão (configurado em scripts/system/firewall.sh)
+ufw
+
+# Bluetooth
+bluez
+bluez-utils
+
+# Áudio (PipeWire)
+pipewire
+pipewire-alsa
+pipewire-pulse
+pipewire-audio
+wireplumber
+alsa-utils
+rtkit
+pamixer
+
+# Gráficos (drivers por fabricante ficam em hardware.packages)
+mesa
+vulkan-icd-loader
+
+# Energia
+power-profiles-daemon
+upower
+brightnessctl
+
+# Arquivos e mídia removível
+unzip
+udiskie
+gvfs-mtp
+gvfs-smb
+
+# Fontes
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+inter-font
+ttf-jetbrains-mono-nerd
+# Geist Mono com ícones Nerd Font: ícones da ilha e mono de reserva
+otf-geist-mono-nerd
+# Space Mono: a mono do perfil codexmark (rótulos, terminal)
+ttf-space-mono-nerd

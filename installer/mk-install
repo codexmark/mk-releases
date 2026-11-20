@@ -1,0 +1,857 @@
+#!/usr/bin/env bash
+# Instalador do Mk. Roda no live (como root) e instala o Mk num disco inteiro:
+# UEFI, GPT, ESP de 2 GiB em /boot, btrfs com subvolumes (@, @home, @log, @pkg),
+# LUKS opcional, limine, snapper, os pacotes de system/packages e o desktop Mk.
+#
+#   mk-install                      pergunta tudo na tela
+#   mk-install --answers <arquivo>  sem perguntas (para testes em VM); veja
+#                                   installer/answers.example
+#
+# Precisa de internet: os pacotes vêm dos espelhos do Arch. Os do AUR vêm já
+# compilados no repositório local do ISO (/usr/share/mk/aur-repo).
+set -euo pipefail
+
+here=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+if [[ -n ${MK_SRC:-} ]]; then
+  src=$MK_SRC
+elif [[ -d /usr/share/mk/system/packages ]]; then
+  src=/usr/share/mk
+else
+  src=$(cd "$here/.." && pwd) # rodando de dentro do repositório
+fi
+aur_repo=${MK_AUR_REPO:-$src/aur-repo}
+[[ -d $aur_repo ]] || aur_repo=$src/iso/work/aur/repo
+target=/mnt
+log=/var/log/mk-install.log
+marker=.instalado-pelo-mk
+mapper=mkroot
+
+copper='#ce5e32'
+bone='#cdc4ba'
+dim='#716b69'
+
+# shellcheck source=SCRIPTDIR/../bin/lib-packages.sh
+source "$src/bin/lib-packages.sh"
+
+# ---------------------------------------------------------------------------
+# Telas. Com gum quando há terminal; sem gum, read simples.
+# ---------------------------------------------------------------------------
+use_gum=0
+[[ -t 0 && -t 1 ]] && command -v gum >/dev/null && use_gum=1
+
+title() {
+  if ((use_gum)); then
+    gum style --foreground "$copper" --bold --margin "1 0 0 0" "$*"
+  else
+    printf '\n\e[1;38;2;206;94;50m%s\e[0m\n' "$*"
+  fi
+}
+
+note() {
+  if ((use_gum)); then gum style --foreground "$dim" "$*"; else printf '%s\n' "$*"; fi
+}
+
+die() {
+  printf '\n\e[1;31mERRO:\e[0m %s\n' "$*" >&2
+  exit 1
+}
+
+warn() { printf '\e[33mAVISO:\e[0m %s\n' "$*" >&2; }
+
+# Etapas numeradas, com o tempo desde o começo: [ 3/14 ] pacotes  02:41
+step_i=0
+step_total=14
+started=$SECONDS
+step() {
+  step_i=$((step_i + 1))
+  local t=$((SECONDS - started))
+  printf '\n\e[38;2;206;94;50m[%2d/%d]\e[0m \e[1m%s\e[0m  \e[38;2;113;107;105m%02d:%02d\e[0m\n' \
+    "$step_i" "$step_total" "$*" $((t / 60)) $((t % 60))
+}
+
+# Seção da entrevista, como os painéis do Mk: "02  Você ———".
+section() {
+  local num=$1 name=$2 hint=${3:-}
+  if ((use_gum)); then
+    echo
+    gum join --horizontal \
+      "$(gum style --foreground "$copper" "$num  ")" \
+      "$(gum style --foreground "$bone" --bold "$name")" \
+      "$(gum style --foreground "$dim" "  ────────────────────")"
+    [[ -n $hint ]] && gum style --foreground "$dim" --italic "$hint"
+  else
+    printf '\n\e[38;2;206;94;50m%s\e[0m  \e[1m%s\e[0m\n' "$num" "$name"
+    [[ -n $hint ]] && printf '%s\n' "$hint"
+  fi
+  return 0
+}
+
+# ask <pergunta> <padrão>
+ask() {
+  local reply
+  if ((use_gum)); then
+    gum input --header "$1" --value "$2" --width 60
+  else
+    read -rp "$1 [$2]: " reply
+    printf '%s\n' "${reply:-$2}"
+  fi
+}
+
+ask_secret() {
+  local reply
+  if ((use_gum)); then
+    gum input --password --header "$1" --width 60
+  else
+    read -rsp "$1: " reply
+    echo >&2
+    printf '%s\n' "$reply"
+  fi
+}
+
+# confirm <pergunta> [sim|nao]  (o segundo argumento é o padrão)
+confirm() {
+  local reply
+  if ((use_gum)); then
+    local args=(--affirmative "Sim" --negative "Não")
+    [[ ${2:-sim} == nao ]] && args+=(--default=false)
+    gum confirm "${args[@]}" "$1"
+  else
+    read -rp "$1 [s/n]: " reply
+    [[ -z $reply ]] && [[ ${2:-sim} == sim ]] && return 0
+    [[ $reply == [sSyY]* ]]
+  fi
+}
+
+# choose <cabeçalho> <opção>...  (uma linha por opção na saída)
+choose() {
+  local header=$1 reply i
+  shift
+  if ((use_gum)); then
+    gum choose --header "$header" "$@"
+  else
+    echo "$header" >&2
+    i=1
+    for opt in "$@"; do echo "  $i) $opt" >&2; i=$((i + 1)); done
+    read -rp "número: " reply
+    if ! [[ $reply =~ ^[0-9]+$ ]] || ((reply < 1 || reply > $#)); then die "opção inválida"; fi
+    printf '%s\n' "${!reply}"
+  fi
+}
+
+# filter <cabeçalho> <padrão>  (lê as opções da entrada)
+filter() {
+  if ((use_gum)); then
+    gum filter --header "$1" --value "$2" --height 15
+  else
+    local reply
+    read -rp "$1 [$2]: " reply </dev/tty
+    printf '%s\n' "${reply:-$2}"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Respostas
+# ---------------------------------------------------------------------------
+DISK='' HOSTNAME_='' USERNAME='' PASSWORD='' TIMEZONE='' KEYMAP='' LOCALE=''
+HARDWARE='' APPS=nao ENCRYPT=nao CONFIRM='' POWEROFF=nao
+answers=''
+
+while (($#)); do
+  case $1 in
+    --answers) answers=${2:-}; shift 2 ;;
+    -h | --help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "opção desconhecida: $1" ;;
+  esac
+done
+
+# Lê CHAVE=valor sem executar nada do arquivo.
+load_answers() {
+  local line key value
+  [[ -r $1 ]] || die "não consigo ler $1"
+  while IFS= read -r line || [[ -n $line ]]; do
+    [[ $line =~ ^[[:space:]]*(#|$) ]] && continue
+    [[ $line =~ ^([A-Z_]+)=(.*)$ ]] || die "linha inválida em $1: $line"
+    key=${BASH_REMATCH[1]}
+    value=${BASH_REMATCH[2]}
+    value=${value#\"}; value=${value%\"}
+    case $key in
+      DISK | USERNAME | PASSWORD | TIMEZONE | KEYMAP | LOCALE | HARDWARE | APPS | ENCRYPT | CONFIRM | POWEROFF)
+        printf -v "$key" '%s' "$value" ;;
+      HOSTNAME) HOSTNAME_=$value ;;
+      *) die "chave desconhecida em $1: $key" ;;
+    esac
+  done <"$1"
+}
+
+part_name() {
+  if [[ $1 =~ [0-9]$ ]]; then echo "${1}p$2"; else echo "$1$2"; fi
+}
+
+# O disco de onde o live foi iniciado (não pode ser escolhido).
+live_disk() {
+  local dev
+  dev=$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null || true)
+  [[ -n $dev ]] && lsblk -npdo PKNAME "$dev" 2>/dev/null | head -1
+  return 0
+}
+
+list_disks() {
+  local live name type size model
+  live=$(live_disk)
+  while read -r name type size model; do
+    [[ $type == disk ]] || continue
+    [[ $name == /dev/zram* || $name == "$live" ]] && continue
+    printf '%s  %s  %b\n' "$name" "$size" "${model:-}"
+  done < <(lsblk -dpnr -o NAME,TYPE,SIZE,MODEL)
+}
+
+detect_hardware() {
+  local hw=() gpu
+  case $(grep -m1 vendor_id /proc/cpuinfo | awk '{print $3}') in
+    AuthenticAMD) hw+=(amd) ;;
+    GenuineIntel) hw+=(intel) ;;
+  esac
+  gpu=$(lspci 2>/dev/null | grep -Ei 'vga|3d|display' || true)
+  grep -qi nvidia <<<"$gpu" && hw+=(nvidia)
+  grep -qiE 'amd|ati ' <<<"$gpu" && [[ " ${hw[*]} " != *" amd "* ]] && hw+=(amd)
+  grep -qi intel <<<"$gpu" && [[ " ${hw[*]} " != *" intel "* ]] && hw+=(intel)
+  systemd-detect-virt -q 2>/dev/null && hw+=(vm)
+  echo "${hw[*]}"
+}
+
+valid_user() { [[ $1 =~ ^[a-z_][a-z0-9_-]{0,31}$ && $1 != root ]]; }
+valid_host() { [[ $1 =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$ ]]; }
+
+welcome() {
+  if ((use_gum)); then
+    clear
+    gum style --border double --border-foreground "$copper" --padding "1 6" --margin "1 2" --align center \
+      "$(gum join --horizontal "$(gum style --foreground "$bone" --bold "M")" "$(gum style --foreground "$copper" --italic --bold "k")")" \
+      "" "$(gum style --foreground "$bone" "Bem-vindo ao Mk.")" \
+      "$(gum style --foreground "$dim" --italic "Um desktop Arch, pronto para trabalhar.")"
+    gum style --foreground "$dim" --margin "0 2" \
+      "Quatro perguntas (disco, você, região, drivers), uma revisão e o resto é com o instalador." \
+      "Leva uns 15 minutos, quase tudo baixando pacotes. Ctrl+C cancela antes da revisão sem mexer em nada."
+  else
+    title "Mk · instalador"
+    note "Quatro perguntas, uma revisão e o resto é com o instalador. Ctrl+C cancela."
+  fi
+}
+
+online() {
+  curl -fsI --max-time 5 https://geo.mirror.pkgbuild.com/ >/dev/null 2>&1
+}
+
+# Antes das perguntas: confere a internet e, sem cabo, ajuda a entrar num Wi-Fi.
+ensure_network() {
+  local i dev ssid pass
+  for i in 1 2 3; do online && return 0; sleep 2; done
+  dev=$(iwctl device list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/station/ { print $1; exit }')
+  [[ -n $dev ]] || die "sem internet e sem Wi-Fi. Ligue um cabo de rede e rode mk-install de novo."
+  section 00 Internet "Sem cabo de rede. Vamos entrar num Wi-Fi."
+  while ! online; do
+    iwctl station "$dev" scan >/dev/null 2>&1 || true
+    sleep 3
+    mapfile -t nets < <(iwctl station "$dev" get-networks 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' |
+      awk 'NR > 4 && NF { sub(/^ *(> *)?/, ""); sub(/ +(psk|open|8021x) +[*]+ *$/, ""); if ($0 != "") print }')
+    ((${#nets[@]})) || { warn "nenhuma rede encontrada; tentando de novo"; continue; }
+    ssid=$(choose "Qual rede?" "${nets[@]}" "procurar de novo")
+    [[ $ssid == "procurar de novo" ]] && continue
+    pass=$(ask_secret "Senha de $ssid (vazio se for aberta)")
+    if [[ -n $pass ]]; then
+      iwctl --passphrase "$pass" station "$dev" connect "$ssid" >/dev/null 2>&1 || true
+    else
+      iwctl station "$dev" connect "$ssid" >/dev/null 2>&1 || true
+    fi
+    for i in {1..10}; do online && break; sleep 2; done
+    online || warn "não conectou em $ssid; confira a senha"
+  done
+  note "conectado em $ssid"
+}
+
+interview() {
+  local disks pick pass2 hw_all detected
+
+  section 01 Disco "O Mk usa o disco inteiro. O pendrive do live não aparece aqui."
+  mapfile -t disks < <(list_disks)
+  ((${#disks[@]})) || die "nenhum disco encontrado (o pendrive do live não aparece na lista)"
+  pick=$(choose "Em qual disco instalar?" "${disks[@]}")
+  DISK=${pick%% *}
+
+  section 02 Você "O nome deste computador, o seu usuário e a senha (que também vale para o sudo)."
+  while :; do
+    HOSTNAME_=$(ask "Nome do computador (hostname)" "mk")
+    valid_host "$HOSTNAME_" && break
+    warn "use letras, números e -, sem espaços"
+  done
+  while :; do
+    USERNAME=$(ask "Seu usuário" "")
+    valid_user "$USERNAME" && break
+    warn "use letras minúsculas, números, - e _, começando por letra (ex.: mark)"
+  done
+  while :; do
+    PASSWORD=$(ask_secret "Senha de $USERNAME")
+    [[ -n $PASSWORD ]] || { warn "a senha não pode ser vazia"; continue; }
+    pass2=$(ask_secret "Repita a senha")
+    [[ $PASSWORD == "$pass2" ]] && break
+    warn "as senhas não são iguais"
+  done
+
+  section 03 Região
+  TIMEZONE=America/Porto_Velho KEYMAP=br-abnt2 LOCALE=pt_BR.UTF-8
+  note "Fuso: $TIMEZONE · Teclado: $KEYMAP · Idioma: $LOCALE"
+  if ! confirm "Usar esses padrões de região?" sim; then
+    TIMEZONE=$(timedatectl list-timezones | filter "Fuso horário" "$TIMEZONE")
+    KEYMAP=$(localectl list-keymaps | filter "Teclado" "$KEYMAP")
+    LOCALE=$(grep -o '^[^ ]*UTF-8' /usr/share/i18n/SUPPORTED | filter "Idioma" "$LOCALE")
+  fi
+
+  section 04 "Drivers e apps" "Já vem marcado o que foi detectado nesta máquina."
+  detected=$(detect_hardware)
+  hw_all=(amd intel nvidia vm)
+  if ((use_gum)); then
+    HARDWARE=$(gum choose --no-limit --header "Drivers (detectado: ${detected:-nada}). Espaço marca, Enter segue." \
+      --selected "${detected// /,}" "${hw_all[@]}" | tr '\n' ' ')
+  else
+    HARDWARE=$(ask "Drivers (${hw_all[*]}, separados por espaço)" "$detected")
+  fi
+
+  APPS=nao ENCRYPT=nao
+  if confirm "Instalar os apps gráficos (chromium, nautilus, mpv, evince...)?" sim; then APPS=sim; fi
+  if confirm "Criptografar o disco (LUKS)? A senha do disco será a mesma do usuário." nao; then ENCRYPT=sim; fi
+}
+
+validate() {
+  [[ -b $DISK ]] || die "disco inválido: $DISK"
+  [[ $(lsblk -dno TYPE "$DISK") == disk ]] || die "$DISK não é um disco inteiro"
+  [[ $DISK != "$(live_disk)" ]] || die "$DISK é o pendrive do live"
+  valid_host "$HOSTNAME_" || die "hostname inválido: $HOSTNAME_"
+  valid_user "$USERNAME" || die "usuário inválido: $USERNAME"
+  [[ -n $PASSWORD ]] || die "senha vazia"
+  [[ -e /usr/share/zoneinfo/$TIMEZONE ]] || die "fuso inválido: $TIMEZONE"
+  grep -q "^$LOCALE " /usr/share/i18n/SUPPORTED || die "idioma inválido: $LOCALE"
+  [[ -n $(find /usr/share/kbd/keymaps -name "$KEYMAP.map.gz" -print -quit) ]] || die "teclado inválido: $KEYMAP"
+  local h
+  for h in $HARDWARE; do
+    [[ $h =~ ^(amd|intel|nvidia|vm)$ ]] || die "perfil de hardware desconhecido: $h"
+  done
+  local size
+  size=$(lsblk -dbno SIZE "$DISK")
+  ((size >= 24 * 1024 ** 3)) || die "$DISK tem menos de 24 GiB"
+}
+
+# A revisão: mostra tudo e pede a palavra "formatar" para apagar o disco.
+confirm_wipe() {
+  local layout
+  layout=$(lsblk -no NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS "$DISK" 2>/dev/null || true)
+  local summary
+  summary=$(printf '%s\n' \
+    "Disco:      $DISK ($(lsblk -dno SIZE "$DISK") $(lsblk -dno MODEL "$DISK"))" \
+    "Hostname:   $HOSTNAME_" \
+    "Usuário:    $USERNAME (sudo)" \
+    "Região:     $TIMEZONE · $KEYMAP · $LOCALE" \
+    "Drivers:    ${HARDWARE:-nenhum}" \
+    "Apps:       $APPS" \
+    "LUKS:       $ENCRYPT")
+  if ((use_gum)); then
+    section 05 Revisão "Confira antes de seguir. Até aqui nada foi alterado."
+    gum style --border rounded --border-foreground "$dim" --padding "0 2" "$summary"
+    gum style --border thick --border-foreground "#ff3b30" --foreground "#ff3b30" --bold \
+      --padding "1 3" --margin "1 0" --align center \
+      "ATENÇÃO: TUDO EM $DISK SERÁ APAGADO" \
+      "" "Partições, sistemas, arquivos: nada volta." "" "$layout"
+  else
+    printf '\n%s\n' "$summary"
+    printf '\n\e[1;41;97m  ATENÇÃO: TUDO EM %s SERÁ APAGADO. NADA VOLTA.  \e[0m\n%s\n\n' "$DISK" "$layout"
+  fi
+  if [[ -n $answers ]]; then
+    [[ $CONFIRM == formatar || $CONFIRM == "$DISK" ]] || die "no arquivo de respostas, use CONFIRM=formatar"
+    note "confirmado pelo arquivo de respostas (CONFIRM=$CONFIRM)"
+    return 0
+  fi
+  local typed
+  typed=$(ask "Para apagar $DISK e instalar, escreva formatar. Qualquer outra coisa cancela." "")
+  typed=$(tr '[:upper:]' '[:lower:]' <<<"${typed//[[:space:]]/}")
+  [[ $typed == formatar ]] || die "cancelado: nada foi alterado"
+}
+
+# ---------------------------------------------------------------------------
+# Instalação
+# ---------------------------------------------------------------------------
+cleanup() {
+  local rc=$?
+  if ((rc != 0)); then
+    printf '\n\e[1;31mA instalação parou (código %s).\e[0m Log: %s\n' "$rc" "$log" >&2
+    echo "Para tentar de novo: umount -R $target; cryptsetup close $mapper (se usou LUKS); mk-install" >&2
+  fi
+}
+
+preflight() {
+  [[ $EUID -eq 0 ]] || die "rode como root (no live você já é root)"
+  [[ -d /sys/firmware/efi ]] || die "o live não foi iniciado em modo UEFI; reinicie escolhendo a entrada UEFI do pendrive"
+  local cmd
+  for cmd in pacstrap arch-chroot genfstab sgdisk mkfs.fat mkfs.btrfs cryptsetup; do
+    command -v "$cmd" >/dev/null || die "falta $cmd no live"
+  done
+  mountpoint -q "$target" && die "$target já está montado; rode: umount -R $target"
+  return 0
+}
+
+check_network() {
+  step "internet"
+  local i
+  for i in {1..15}; do
+    curl -fsI --max-time 5 https://geo.mirror.pkgbuild.com/ >/dev/null 2>&1 && return 0
+    sleep 2
+  done
+  die "sem internet. Cabo funciona sozinho; Wi-Fi: iwctl station wlan0 connect <rede>"
+}
+
+partition() {
+  step "formatando $DISK"
+  local p
+  swapoff -a 2>/dev/null || true
+  for p in $(lsblk -lnpo NAME "$DISK" | tail -n +2); do umount -q "$p" 2>/dev/null || true; done
+  wipefs -af "$DISK"
+  sgdisk --zap-all "$DISK" >/dev/null
+  sgdisk -n 1:0:+2G -t 1:ef00 -c 1:MK_EFI \
+    -n 2:0:0 -t 2:8304 -c 2:mk "$DISK" >/dev/null
+  partprobe "$DISK" 2>/dev/null || true
+  udevadm settle
+  esp=$(part_name "$DISK" 1)
+  rootpart=$(part_name "$DISK" 2)
+  [[ -b $esp && -b $rootpart ]] || die "as partições $esp e $rootpart não apareceram"
+
+  mkfs.fat -F 32 -n MK_EFI "$esp" >/dev/null
+  if [[ $ENCRYPT == sim ]]; then
+    step "LUKS em $rootpart"
+    printf '%s' "$PASSWORD" | cryptsetup luksFormat --type luks2 --batch-mode --key-file - "$rootpart"
+    printf '%s' "$PASSWORD" | cryptsetup open --key-file - "$rootpart" "$mapper"
+    rootdev=/dev/mapper/$mapper
+  else
+    rootdev=$rootpart
+  fi
+  mkfs.btrfs -f -L mk "$rootdev" >/dev/null
+
+  step "subvolumes btrfs"
+  mount "$rootdev" "$target"
+  for p in @ @home @log @pkg; do btrfs -q subvolume create "$target/$p"; done
+  umount "$target"
+  local opts=noatime,compress=zstd
+  mount -o "$opts,subvol=@" "$rootdev" "$target"
+  mkdir -p "$target"/{boot,home,var/log,var/cache/pacman/pkg}
+  mount -o "$opts,subvol=@home" "$rootdev" "$target/home"
+  mount -o "$opts,subvol=@log" "$rootdev" "$target/var/log"
+  mount -o "$opts,subvol=@pkg" "$rootdev" "$target/var/cache/pacman/pkg"
+  mount -o umask=0077 "$esp" "$target/boot"
+}
+
+# pacman.conf do live + o repositório local do AUR.
+make_pacman_conf() {
+  pacman_conf=$(mktemp /tmp/mk-pacman.XXXXXX.conf)
+  cp /etc/pacman.conf "$pacman_conf"
+  if [[ -f $aur_repo/mk-aur.db.tar.gz ]]; then
+    printf '\n[mk-aur]\nSigLevel = Optional TrustAll\nServer = file://%s\n' "$aur_repo" >>"$pacman_conf"
+  fi
+}
+
+install_packages() {
+  local pkgs=() f
+  for f in base desktop dev; do
+    mapfile -t -O "${#pkgs[@]}" pkgs < <(read_list "$PKG_DIR/$f.packages")
+  done
+  [[ $APPS == sim ]] && mapfile -t -O "${#pkgs[@]}" pkgs < <(read_list "$PKG_DIR/apps.packages")
+  # shellcheck disable=SC2086 # um perfil por palavra
+  [[ -n $HARDWARE ]] && mapfile -t -O "${#pkgs[@]}" pkgs < <(read_hardware $HARDWARE)
+
+  step "relógio e chaves do pacman"
+  timedatectl set-ntp true 2>/dev/null || true
+  systemctl start pacman-init.service 2>/dev/null || true
+
+  step "sistema: ${#pkgs[@]} pacotes da internet (a parte demorada)"
+  pacstrap -K -C "$pacman_conf" "$target" "${pkgs[@]}"
+}
+
+install_aur() {
+  local list=$aur_repo/packages.txt pkgs=() p
+  if [[ ! -s $list ]]; then
+    warn "nenhum pacote do AUR no ISO; instale depois com yay (lista em /usr/share/mk/system/packages/aur.packages)"
+    return 0
+  fi
+  mapfile -t pkgs <"$list"
+  step "pacotes do AUR, já no pendrive: ${pkgs[*]}"
+  # -G -M: não copiar de novo o chaveiro e a lista de espelhos do live.
+  if ! pacstrap -G -M -C "$pacman_conf" "$target" "${pkgs[@]}"; then
+    warn "a instalação conjunta falhou; tentando um por um"
+    for p in "${pkgs[@]}"; do
+      pacstrap -G -M -C "$pacman_conf" "$target" "$p" || warn "não instalou $p"
+    done
+  fi
+  # O que ficou de fora do ISO (não compilou no build) fica para o yay depois.
+  local wanted missing=()
+  while IFS= read -r wanted; do
+    arch-chroot "$target" pacman -Qq "$wanted" >/dev/null 2>&1 || missing+=("$wanted")
+  done < <(read_list "$PKG_DIR/aur.packages")
+  if ((${#missing[@]})); then
+    warn "do AUR, ficaram faltando: ${missing[*]}. Depois do primeiro login: yay -S ${missing[*]}"
+    printf '%s\n' "${missing[@]}" >"$target/usr/share/mk/aur-pendentes.txt"
+  fi
+}
+
+configure_base() {
+  step "fstab, região, rede"
+  genfstab -U "$target" >>"$target/etc/fstab"
+  # Sem subvolid: um rollback de snapshot troca o @ e o id muda.
+  sed -i 's/subvolid=[0-9]*,//' "$target/etc/fstab"
+
+  ln -sf "/usr/share/zoneinfo/$TIMEZONE" "$target/etc/localtime"
+  arch-chroot "$target" hwclock --systohc || true
+
+  sed -i -e "s/^#\\($LOCALE \\)/\\1/" -e 's/^#\(en_US.UTF-8 \)/\1/' "$target/etc/locale.gen"
+  arch-chroot "$target" locale-gen >/dev/null
+  echo "LANG=$LOCALE" >"$target/etc/locale.conf"
+  echo "KEYMAP=$KEYMAP" >"$target/etc/vconsole.conf"
+
+  # Teclado do X (tela de login): br-abnt2 -> br, us -> us, de-latin1 -> de.
+  mkdir -p "$target/etc/X11/xorg.conf.d"
+  cat >"$target/etc/X11/xorg.conf.d/00-keyboard.conf" <<EOF
+Section "InputClass"
+        Identifier "system-keyboard"
+        MatchIsKeyboard "on"
+        Option "XkbLayout" "${KEYMAP%%-*}"
+EndSection
+EOF
+
+  echo "$HOSTNAME_" >"$target/etc/hostname"
+  cat >"$target/etc/hosts" <<EOF
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   $HOSTNAME_.localdomain $HOSTNAME_
+EOF
+  arch-chroot "$target" systemd-machine-id-setup >/dev/null 2>&1 || true
+
+  # .local pela rede (avahi + nss-mdns)
+  if ! grep -q mdns_minimal "$target/etc/nsswitch.conf"; then
+    sed -i 's/^\(hosts:.*\)resolve/\1mdns_minimal [NOTFOUND=return] resolve/' "$target/etc/nsswitch.conf"
+  fi
+}
+
+# Copia src para dst e marca como do Mk (igual ao bin/new-user).
+place() {
+  rm -rf "$2"
+  mkdir -p "$(dirname "$2")"
+  cp -r "$1" "$2"
+  touch "$2/$marker"
+}
+
+install_desktop() {
+  step "o desktop Mk"
+  # O repositório inteiro fica em /usr/share/mk (scripts, listas, configs).
+  mkdir -p "$target/usr/share/mk"
+  tar -C "$src" --exclude=./aur-repo --exclude=./iso/work --exclude=./iso/out --exclude=.git -cf - . |
+    tar -C "$target/usr/share/mk" -xf -
+
+  # O nome do sistema: Mk no boot e no login, e continua Mk depois das
+  # atualizações do pacote filesystem (o gancho reaplica).
+  install -Dm644 "$src/system/mk/mk-os-release.hook" "$target/etc/pacman.d/hooks/mk-os-release.hook"
+  rm -f "$target/etc/os-release"
+  install -m644 "$src/system/mk/os-release" "$target/etc/os-release"
+  install -m644 "$src/system/mk/issue" "$target/etc/issue"
+
+  install -Dm755 "$src/bin/mk-session" "$target/usr/bin/mk-session"
+  install -Dm755 "$src/bin/mk-update" "$target/usr/bin/mk-update"
+  install -Dm644 /dev/stdin "$target/usr/share/wayland-sessions/mk.desktop" <<'EOF'
+[Desktop Entry]
+Name=Mk
+Comment=Hyprland com o Maré
+Exec=/usr/bin/mk-session
+Type=Application
+EOF
+
+  # Usuários novos nascem com o Mk (o skel entra na home no useradd -m).
+  local skel=$target/etc/skel
+  place "$src/config/hypr" "$skel/.config/mk/hypr"
+  place "$src/config/ghostty" "$skel/.config/mk/ghostty"
+  place "$src/shell/mare" "$skel/.config/mk/shell"
+  place "$src/config/fastfetch" "$skel/.config/mk/fastfetch"
+  place "$src/config/bash" "$skel/.config/mk/bash"
+  mkdir -p "$skel/Work" "$skel/Pictures/Wallpapers"
+  # O terminal do Mk: a ficha do fastfetch, o prompt e os atalhos.
+  if ! grep -q 'mk/bash/mk.bash' "$skel/.bashrc" 2>/dev/null; then
+    printf '\n# Mk: ficha do fastfetch, prompt e atalhos\n[[ -f ~/.config/mk/bash/mk.bash ]] && source ~/.config/mk/bash/mk.bash\n' >>"$skel/.bashrc"
+  fi
+
+  # Uma instalação nova já tem tudo o que as migrações fariam: marca todas
+  # como feitas, para o mk-update não repetir nada.
+  local m
+  mkdir -p "$target/var/lib/mk/migrations" "$skel/.local/state/mk/migrations"
+  for m in "$src"/migrations/system/*.sh; do [[ -f $m ]] && touch "$target/var/lib/mk/migrations/$(basename "$m")"; done
+  for m in "$src"/migrations/user/*.sh; do [[ -f $m ]] && touch "$skel/.local/state/mk/migrations/$(basename "$m")"; done
+
+  # Boot (plymouth) e entrada (sddm) com a cara do Mk.
+  mkdir -p "$target/usr/share/plymouth/themes" "$target/usr/share/sddm/themes" "$target/etc/plymouth"
+  cp -r "$src/system/mk/plymouth/mk" "$target/usr/share/plymouth/themes/mk"
+  printf '[Daemon]\nTheme=mk\nShowDelay=0\n' >"$target/etc/plymouth/plymouthd.conf"
+  cp -r "$src/system/mk/sddm/mk" "$target/usr/share/sddm/themes/mk"
+  mkdir -p "$target/etc/sddm.conf.d"
+  printf '[Theme]\nCurrent=mk\n' >"$target/etc/sddm.conf.d/20-mk-theme.conf"
+}
+
+create_user() {
+  step "usuário $USERNAME"
+  local groups=(wheel) g
+  for g in video audio input docker; do
+    arch-chroot "$target" getent group "$g" >/dev/null && groups+=("$g")
+  done
+  arch-chroot "$target" useradd -m -s /bin/bash -G "$(IFS=,; echo "${groups[*]}")" "$USERNAME"
+  printf '%s:%s\n' "$USERNAME" "$PASSWORD" | arch-chroot "$target" chpasswd
+  arch-chroot "$target" passwd -q -l root
+  install -Dm440 /dev/stdin "$target/etc/sudoers.d/10-mk-wheel" <<<'%wheel ALL=(ALL:ALL) ALL'
+
+  # Conferência: a config do Mk precisa estar na home (vinda do skel).
+  local home=$target/home/$USERNAME d
+  for d in hypr ghostty shell; do
+    [[ -e $home/.config/mk/$d/$marker ]] || die "a config $d não chegou em $home/.config/mk"
+  done
+}
+
+configure_boot() {
+  step "boot (limine)"
+  local hooks=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole block)
+  [[ $ENCRYPT == sim ]] && hooks+=(sd-encrypt)
+  hooks+=(filesystems fsck)
+  # NVIDIA: sem kms no initramfs, para o nouveau não carregar antes.
+  if [[ " $HARDWARE " == *" nvidia "* ]]; then
+    local h out=()
+    for h in "${hooks[@]}"; do [[ $h == kms ]] || out+=("$h"); done
+    hooks=("${out[@]}")
+  fi
+  mkdir -p "$target/etc/mkinitcpio.conf.d"
+  echo "HOOKS=(${hooks[*]})" >"$target/etc/mkinitcpio.conf.d/mk.conf"
+
+  local root_uuid cmdline
+  if [[ $ENCRYPT == sim ]]; then
+    root_uuid=$(blkid -s UUID -o value "$rootpart")
+    cmdline="rd.luks.name=$root_uuid=$mapper root=/dev/mapper/$mapper rootflags=subvol=@ rw quiet splash"
+  else
+    root_uuid=$(blkid -s UUID -o value "$rootdev")
+    cmdline="root=UUID=$root_uuid rootflags=subvol=@ rw quiet splash"
+  fi
+  boot_cmdline=$cmdline
+
+  # Lido pelo limine-mkinitcpio-hook (AUR) a cada kernel novo.
+  cat >"$target/etc/default/limine" <<EOF
+TARGET_OS_NAME="Mk"
+ESP_PATH="/boot"
+KERNEL_CMDLINE[default]="$cmdline"
+ENABLE_LIMINE_FALLBACK=yes
+FIND_BOOTLOADERS=yes
+BOOT_ORDER="*, *fallback, Snapshots"
+MAX_SNAPSHOT_ENTRIES=5
+EOF
+
+  mkdir -p "$target/boot/EFI/limine" "$target/boot/EFI/BOOT"
+  cp "$target/usr/share/limine/BOOTX64.EFI" "$target/boot/EFI/limine/BOOTX64.EFI"
+  # Cópia no caminho padrão: firmware sem entrada na NVRAM ainda acha o Mk.
+  cp "$target/usr/share/limine/BOOTX64.EFI" "$target/boot/EFI/BOOT/BOOTX64.EFI"
+  limine_header >"$target/boot/limine.conf"
+}
+
+limine_header() {
+  cat <<'EOF'
+# Menu de boot do Mk (limine). Doc: https://github.com/limine-bootloader/limine/blob/trunk/CONFIG.md
+timeout: 3
+interface_branding: Mk
+term_background: 0b0b0b
+backdrop: 0b0b0b
+term_foreground: cdc4ba
+term_foreground_bright: ce5e32
+EOF
+}
+
+limine_entry() {
+  cat <<EOF
+
+/Mk
+    protocol: linux
+    path: boot():/vmlinuz-linux
+    cmdline: $boot_cmdline
+    module_path: boot():/initramfs-linux.img
+EOF
+  # O preset padrão do Arch não gera mais o fallback; só entra se existir.
+  [[ -f $target/boot/initramfs-linux-fallback.img ]] || return 0
+  cat <<EOF
+
+/Mk (fallback)
+    protocol: linux
+    path: boot():/vmlinuz-linux
+    cmdline: $boot_cmdline
+    module_path: boot():/initramfs-linux-fallback.img
+EOF
+}
+
+# O limine.conf que o limine vai ler: o da pasta do EFI, senão o da raiz da ESP.
+active_limine_conf() {
+  if [[ -f $target/boot/EFI/limine/limine.conf ]]; then
+    echo "$target/boot/EFI/limine/limine.conf"
+  else
+    echo "$target/boot/limine.conf"
+  fi
+}
+
+# Toda entrada aponta para arquivos que existem na ESP?
+limine_conf_ok() {
+  local conf=$1 file n=0
+  [[ -f $conf ]] || return 1
+  while read -r file; do
+    [[ -f $target/boot/$file ]] || return 1
+    n=$((n + 1))
+  done < <(sed -n 's/^[[:space:]]*\(path\|module_path\|image_path\|kernel_path\): *boot():\/*//p' "$conf")
+  ((n > 0))
+}
+
+finish_boot() {
+  step "mkinitcpio"
+  arch-chroot "$target" mkinitcpio -P
+
+  # Com o limine-mkinitcpio-hook, ele escreve as entradas; sem ele (ou se o
+  # resultado não for bootável), ficam as entradas fixas do Mk.
+  local conf
+  if arch-chroot "$target" sh -c 'command -v limine-update' >/dev/null 2>&1; then
+    arch-chroot "$target" limine-update || warn "limine-update falhou; uso as entradas fixas"
+  fi
+  conf=$(active_limine_conf)
+  if ! limine_conf_ok "$conf"; then
+    { limine_header; limine_entry; } >"$target/boot/limine.conf"
+    rm -f "$target/boot/EFI/limine/limine.conf"
+    conf=$target/boot/limine.conf
+  fi
+  limine_conf_ok "$conf" || die "o limine.conf não aponta para um kernel que exista em /boot"
+  note "limine: ${conf#"$target"}"
+
+  if [[ -d /sys/firmware/efi/efivars ]] && ! efibootmgr 2>/dev/null | grep -q ' Mk'; then
+    efibootmgr --create --disk "$DISK" --part 1 --label Mk --loader '\EFI\limine\BOOTX64.EFI' >/dev/null ||
+      warn "não consegui criar a entrada Mk na NVRAM; o firmware ainda acha EFI/BOOT/BOOTX64.EFI"
+  fi
+}
+
+configure_snapper() {
+  step "snapshots (snapper: um a cada atualização)"
+  if arch-chroot "$target" snapper --no-dbus -c root create-config /; then
+    sed -i -e 's/^TIMELINE_CREATE=.*/TIMELINE_CREATE="no"/' \
+      -e 's/^NUMBER_LIMIT=.*/NUMBER_LIMIT="5"/' \
+      -e 's/^NUMBER_LIMIT_IMPORTANT=.*/NUMBER_LIMIT_IMPORTANT="5"/' \
+      "$target/etc/snapper/configs/root"
+  else
+    warn "snapper create-config falhou; configure depois com: sudo snapper -c root create-config /"
+  fi
+}
+
+configure_services() {
+  step "serviços"
+  local unit units=(NetworkManager.service bluetooth.service sddm.service avahi-daemon.service
+    power-profiles-daemon.service systemd-timesyncd.service ufw.service docker.socket
+    fstrim.timer plocate-updatedb.timer snapper-cleanup.timer limine-snapper-sync.service)
+  for unit in "${units[@]}"; do
+    if [[ -n $(find "$target/usr/lib/systemd/system" -maxdepth 1 -name "$unit" -print -quit) ]]; then
+      arch-chroot "$target" systemctl enable "$unit" >/dev/null 2>&1 || warn "não habilitou $unit"
+    fi
+  done
+
+  # Firewall (o mesmo de scripts/system/firewall.sh): nega entrada, libera
+  # saída, LocalSend e DNS do Docker. No chroot só se grava a regra; o ufw
+  # liga no primeiro boot.
+  if [[ -x $target/usr/bin/ufw ]]; then
+    arch-chroot "$target" sh -c '
+      ufw default deny incoming && ufw default allow outgoing &&
+      ufw allow 53317/tcp && ufw allow 53317/udp &&
+      ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 comment allow-docker-dns
+    ' >/dev/null 2>&1 || warn "regras do ufw não gravadas; rode depois /usr/share/mk/scripts/system/firewall.sh"
+    sed -i 's/^ENABLED=.*/ENABLED=yes/' "$target/etc/ufw/ufw.conf"
+  fi
+
+  # Tela de login: com LUKS a senha já foi digitada no boot, então entra
+  # direto (como no Omarchy); sem LUKS, o sddm já vem com o usuário e a
+  # sessão Mk escolhidos.
+  mkdir -p "$target/etc/sddm.conf.d"
+  if [[ $ENCRYPT == sim ]]; then
+    cat >"$target/etc/sddm.conf.d/10-mk.conf" <<EOF
+[Autologin]
+User=$USERNAME
+Session=mk
+EOF
+  fi
+  mkdir -p "$target/var/lib/sddm"
+  cat >"$target/var/lib/sddm/state.conf" <<EOF
+[Last]
+Session=/usr/share/wayland-sessions/mk.desktop
+User=$USERNAME
+EOF
+  arch-chroot "$target" chown -R sddm:sddm /var/lib/sddm 2>/dev/null || true
+}
+
+user_extras() {
+  step "LazyVim para $USERNAME"
+  arch-chroot -u "$USERNAME" "$target" env HOME="/home/$USERNAME" \
+    bash /usr/share/mk/scripts/user/neovim.sh >/dev/null 2>&1 ||
+    warn "LazyVim não aplicado; depois rode: bash /usr/share/mk/scripts/user/neovim.sh"
+}
+
+main() {
+  [[ -n $answers ]] && load_answers "$answers"
+  preflight
+  if [[ -z $answers ]]; then
+    welcome
+    ensure_network
+    interview
+  fi
+  validate
+  confirm_wipe
+
+  step_total=15
+  [[ $ENCRYPT == sim ]] && step_total=16
+  started=$SECONDS
+
+  trap cleanup EXIT
+  exec > >(tee -a "$log") 2>&1
+  printf '\n=== mk-install %s: %s -> %s ===\n' "$(date -Is)" "$src" "$DISK"
+  check_network
+  make_pacman_conf
+  partition
+  install_packages
+  configure_base
+  install_desktop
+  configure_boot
+  install_aur
+  create_user
+  configure_snapper
+  configure_services
+  finish_boot
+  user_extras
+
+  cp "$log" "$target/var/log/mk-install.log"
+  step "desmontando"
+  sync
+  umount -R "$target"
+  if [[ $ENCRYPT == sim ]]; then cryptsetup close "$mapper"; fi
+  trap - EXIT
+
+  local t=$((SECONDS - started))
+  if ((use_gum)); then
+    gum style --border double --border-foreground "$copper" --padding "1 4" --margin "1 2" --align center \
+      "$(gum style --foreground "$bone" --bold "Pronto. O Mk está em $DISK.")" "" \
+      "$(gum style --foreground "$dim" "$(printf 'Levou %d min. Tire o pendrive, reinicie e entre como %s.' $((t / 60)) "$USERNAME")")" \
+      "$(gum style --foreground "$dim" "Lá dentro: Super abre a busca, Super + , os ajustes.")"
+  else
+    title "Pronto. O Mk está em $DISK ($((t / 60)) min)."
+    note "Tire o pendrive, reinicie e entre como $USERNAME."
+  fi
+  note "Depois, com internet: /usr/share/mk/scripts/user/mise-tools.sh (node, python, CLIs de IA)"
+  if [[ -n $answers ]]; then
+    if [[ $POWEROFF == sim ]]; then systemctl poweroff; fi
+  elif confirm "Reiniciar agora?" sim; then
+    systemctl reboot
+  fi
+}
+
+main

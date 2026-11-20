@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Detalhes da bateria que o UPower não traz, em JSON:
+# {"cycles": n, "health": 0..1, "limit": 0..100 ou null}
+#   health: capacidade cheia de hoje / capacidade de fábrica
+#   limit:  limite de carga, quando o notebook expõe (senão null)
+set -uo pipefail
+
+bat=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
+if [[ -z $bat ]]; then
+  echo '{"cycles":null,"health":null,"limit":null}'
+  exit 0
+fi
+
+read_num() { [[ -r $1 ]] && cat "$1" 2>/dev/null || echo ""; }
+
+cycles=$(read_num "$bat/cycle_count")
+full=$(read_num "$bat/energy_full"); design=$(read_num "$bat/energy_full_design")
+if [[ -z $full || -z $design ]]; then
+  full=$(read_num "$bat/charge_full"); design=$(read_num "$bat/charge_full_design")
+fi
+limit=$(read_num "$bat/charge_control_end_threshold")
+
+jq -nc --arg cycles "$cycles" --arg full "$full" --arg design "$design" --arg limit "$limit" '{
+  cycles: (if $cycles == "" or $cycles == "0" then null else ($cycles | tonumber) end),
+  health: (if $full == "" or $design == "" or $design == "0" then null else (($full | tonumber) / ($design | tonumber)) end),
+  limit: (if $limit == "" then null else ($limit | tonumber) end)
+}'

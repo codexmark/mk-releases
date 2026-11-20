@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Mk
+Description=O boot do Mk: o Mk sobre o preto quente e uma linha de cobre que avança.
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/mk
+ScriptFile=/usr/share/plymouth/themes/mk/mk.script

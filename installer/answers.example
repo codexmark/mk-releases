@@ -1,0 +1,17 @@
+# Respostas para `mk-install --answers <arquivo>`: instala sem perguntar nada.
+# Feito para testes em VM. CONFIRM=formatar autoriza apagar DISK; sem ele, nada é apagado.
+DISK=/dev/vda
+CONFIRM=formatar
+HOSTNAME=mk
+USERNAME=mark
+PASSWORD=troque-esta-senha
+TIMEZONE=America/Porto_Velho
+KEYMAP=br-abnt2
+LOCALE=pt_BR.UTF-8
+# amd intel nvidia vm (separados por espaço)
+HARDWARE=vm
+# sim | nao
+APPS=nao
+ENCRYPT=nao
+# desliga a VM no fim (sim | nao)
+POWEROFF=sim

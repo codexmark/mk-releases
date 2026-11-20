@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+# Gera o ISO do Mk. Rode como o seu usuário (não com sudo): os pacotes do AUR
+# são compilados com makepkg, que não roda como root. Só o último passo, o
+# mkarchiso, pede sudo.
+#
+#   iso/build              compila o AUR, monta o perfil e chama sudo mkarchiso
+#   iso/build --prepare    só compila o AUR e monta o perfil (não usa sudo)
+#   iso/build --syncdeps   deixa o makepkg instalar (com sudo) o que falta para
+#                          compilar um pacote do AUR e remover depois
+#
+# Saídas: iso/work/ (AUR, perfil montado, área do mkarchiso) e iso/out/*.iso.
+# A área do mkarchiso fica com dono root; para apagar: sudo rm -rf iso/work
+set -euo pipefail
+
+iso=$(cd "$(dirname "$0")" && pwd)
+repo=$(cd "$iso/.." && pwd)
+work=$iso/work
+out=$iso/out
+releng=${RELENG:-/usr/share/archiso/configs/releng}
+aur_url=https://aur.archlinux.org
+repo_name=mk-aur
+
+prepare_only=0
+syncdeps=0
+for arg in "$@"; do
+  case $arg in
+    --prepare) prepare_only=1 ;;
+    --syncdeps) syncdeps=1 ;;
+    -h | --help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "opção desconhecida: $arg" >&2; exit 2 ;;
+  esac
+done
+
+if [[ $EUID -eq 0 ]]; then
+  echo "rode como o seu usuário, sem sudo: $0 (o mkarchiso pede sudo no fim)" >&2
+  exit 1
+fi
+
+# shellcheck source=SCRIPTDIR/../bin/lib-packages.sh
+source "$repo/bin/lib-packages.sh"
+
+need=()
+for cmd in git makepkg repo-add jq curl; do
+  command -v "$cmd" >/dev/null || need+=("$cmd")
+done
+[[ -d $releng ]] || need+=("archiso")
+if ((${#need[@]})); then
+  echo "faltam ferramentas: ${need[*]}" >&2
+  echo "instale com: sudo pacman -S --needed archiso git jq curl base-devel" >&2
+  exit 1
+fi
+
+say() { printf '\n\e[38;2;206;94;50m==\e[0m %s\n' "$*"; }
+
+# ---------------------------------------------------------------------------
+# 1. AUR: compila cada pacote de aur.packages e monta um repositório local.
+#    Dependências que também só existem no AUR entram na fila sozinhas.
+#    Uma falha não para o build: o pacote fica de fora e vai para o relatório.
+# ---------------------------------------------------------------------------
+aur_src=$work/aur/src
+aur_pkg=$work/aur/pkg
+aur_repo=$work/aur/repo
+report=$work/aur/report.txt
+mkdir -p "$aur_src" "$aur_pkg"
+rm -rf "$aur_repo"
+mkdir -p "$aur_repo"
+: >"$report"
+
+declare -A seen=()
+queue=()
+built=()
+failed=()
+
+# Lê um campo do .SRCINFO (só os do pacote base e dos pacotes que vamos usar).
+srcinfo_field() {
+  sed -n "s/^[[:space:]]*$2 = //p" "$1" | sed 's/[<>=].*//' | sort -u
+}
+
+# Um nome de dependência está nos repositórios oficiais (ou é provido por algum)?
+in_repos() {
+  pacman -Sp --print-format %n "$1" >/dev/null 2>&1
+}
+
+aur_base_of() {
+  curl -fsS "$aur_url/rpc/v5/info?arg%5B%5D=$1" | jq -r '.results[0].PackageBase // empty'
+}
+
+fail() {
+  failed+=("$1")
+  printf 'FALHOU  %s: %s\n' "$1" "$2" | tee -a "$report" >&2
+}
+
+enqueue() {
+  local name=$1
+  [[ -n ${seen[$name]:-} ]] && return 0
+  seen[$name]=1
+  queue+=("$name")
+}
+
+while IFS= read -r name; do enqueue "$name"; done < <(read_list "$PKG_DIR/aur.packages")
+
+say "AUR: ${queue[*]}"
+i=0
+while ((i < ${#queue[@]})); do
+  name=${queue[i]}
+  i=$((i + 1))
+
+  base=$(aur_base_of "$name" || true)
+  if [[ -z $base ]]; then
+    fail "$name" "não encontrado no AUR"
+    continue
+  fi
+  dir=$aur_src/$base
+  if [[ -d $dir/.git ]]; then
+    git -C "$dir" fetch -q --depth 1 origin && git -C "$dir" reset -q --hard FETCH_HEAD
+  elif ! git clone -q --depth 1 "$aur_url/$base.git" "$dir"; then
+    fail "$name" "git clone de $aur_url/$base.git falhou"
+    continue
+  fi
+
+  # Dependências do AUR primeiro na fila (o repositório local precisa delas).
+  for dep in $(srcinfo_field "$dir/.SRCINFO" depends); do
+    in_repos "$dep" || enqueue "$dep"
+  done
+
+  # O que falta no host para compilar.
+  # shellcheck disable=SC2046 # uma dependência por palavra
+  mapfile -t missing < <(pacman -T $(srcinfo_field "$dir/.SRCINFO" makedepends) $(srcinfo_field "$dir/.SRCINFO" depends) 2>/dev/null || true)
+  makepkg_args=(--clean --cleanbuild --force --noconfirm --nocheck --noprogressbar)
+  if ((${#missing[@]})); then
+    if ((syncdeps)); then
+      makepkg_args+=(--syncdeps --rmdeps)
+    else
+      # Só as dependências de compilação importam; as de execução vêm no pacstrap.
+      # shellcheck disable=SC2046
+      mapfile -t missing_make < <(pacman -T $(srcinfo_field "$dir/.SRCINFO" makedepends) 2>/dev/null || true)
+      if ((${#missing_make[@]})); then
+        fail "$name" "faltam para compilar: ${missing_make[*]} (rode iso/build --syncdeps ou: sudo pacman -S --asdeps ${missing_make[*]})"
+        continue
+      fi
+      makepkg_args+=(--nodeps)
+    fi
+  fi
+
+  echo "-- $name ($base)"
+  rm -rf "${aur_pkg:?}/$base"
+  if (cd "$dir" && PKGDEST=$aur_pkg/$base makepkg "${makepkg_args[@]}" >"$work/aur/$base.log" 2>&1); then
+    pkgfile=$(find "$aur_pkg/$base" -name "$name-[0-9]*.pkg.tar.*" ! -name '*.sig' | sort | tail -1)
+    if [[ -z $pkgfile ]]; then
+      fail "$name" "makepkg terminou, mas o pacote $name não apareceu em $aur_pkg/$base"
+      continue
+    fi
+    cp "$pkgfile" "$aur_repo/"
+    built+=("$name")
+    printf 'ok      %s  %s\n' "$name" "$(basename "$pkgfile")" | tee -a "$report"
+  else
+    fail "$name" "makepkg falhou, veja $work/aur/$base.log"
+  fi
+done
+
+if ((${#built[@]})); then
+  repo-add -q "$aur_repo/$repo_name.db.tar.gz" "$aur_repo"/*.pkg.tar.*
+else
+  # Repositório vazio, para o instalador não quebrar.
+  repo-add -q "$aur_repo/$repo_name.db.tar.gz"
+fi
+# O instalador instala exatamente esta lista (o pacman resolve as dependências).
+printf '%s\n' "${built[@]}" >"$aur_repo/packages.txt"
+
+say "AUR: ${#built[@]} compilados, ${#failed[@]} com falha (relatório: $report)"
+
+# ---------------------------------------------------------------------------
+# 2. Perfil: releng + o que está em iso/profile + o Mk em /usr/share/mk.
+# ---------------------------------------------------------------------------
+profile=$work/profile
+say "montando o perfil em $profile (base: $releng)"
+rm -rf "$profile"
+cp -a "$releng" "$profile"
+rm -f "$profile/efiboot/loader/entries/01-archiso-linux.conf" \
+  "$profile/efiboot/loader/entries/02-archiso-speech-linux.conf"
+cp -a "$iso/profile/." "$profile/"
+rm -f "$profile/packages.mk"
+
+# Pacotes do live: os do releng mais os do Mk, sem repetir.
+sort -u "$releng/packages.x86_64" <(read_list "$iso/profile/packages.mk") >"$profile/packages.x86_64"
+
+# Menus de boot com o nome Mk.
+sed -i -e 's/Arch Linux install medium/Mk/g' -e 's/--class arch /--class mk /' \
+  "$profile"/grub/*.cfg "$profile"/efiboot/loader/entries/*.conf
+sed -i -e 's/the Arch Linux install medium/the Mk install medium/g' -e 's/Arch Linux install medium/Mk/g' \
+  -e 's/^MENU TITLE .*/MENU TITLE Mk/' -e 's/install Arch Linux/install Mk/g' \
+  -e 's/#9033ccff/#ffce5e32/' \
+  "$profile"/syslinux/*.cfg
+
+# O Mk no live: o repositório (sem .git e sem as saídas do build), o AUR já
+# compilado e o instalador.
+share=$profile/airootfs/usr/share/mk
+mkdir -p "$share"
+tar -C "$repo" --exclude=.git --exclude=./iso/work --exclude=./iso/out -cf - . | tar -C "$share" -xf -
+cp -a "$aur_repo" "$share/aur-repo"
+# A versão do Mk que vai no pendrive: "commit data" (o mk-update compara com o canal).
+printf '%s %s\n' "$(git -C "$repo" rev-parse --short=12 HEAD 2>/dev/null || echo dev)" \
+  "$(git -C "$repo" log -1 --format=%cs 2>/dev/null || date +%F)" >"$share/VERSION"
+install -Dm755 "$repo/installer/mk-install" "$profile/airootfs/usr/local/bin/mk-install"
+# "Welcome to Mk!" no boot do live: o gancho troca o os-release do Arch pelo do
+# Mk quando o pacstrap instala o filesystem (lê o arquivo de /usr/share/mk).
+install -Dm644 "$repo/system/mk/mk-os-release.hook" "$profile/airootfs/etc/pacman.d/hooks/mk-os-release.hook"
+
+if grep -rqs 'meu-os' "$repo/config" "$repo/shell" "$repo/bin/mk-session"; then
+  echo "AVISO: ainda há 'meu-os' em config/, shell/ ou bin/mk-session; o desktop instalado pode procurar caminhos antigos." >&2
+fi
+
+if ((prepare_only)); then
+  say "perfil pronto. Para gerar o ISO:"
+  echo "  sudo mkarchiso -v -r -w $work/mkarchiso -o $out $profile"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# 3. ISO (precisa de root).
+# ---------------------------------------------------------------------------
+say "mkarchiso (pede a sua senha do sudo)"
+mkdir -p "$out"
+sudo mkarchiso -v -r -w "$work/mkarchiso" -o "$out" "$profile"
+say "pronto: $(find "$out" -name 'mk-*.iso' -newer "$profile/profiledef.sh" | sort | tail -1)"
+if ((${#failed[@]})); then
+  echo "Pacotes do AUR que ficaram de fora: ${failed[*]} (veja $report)"
+fi

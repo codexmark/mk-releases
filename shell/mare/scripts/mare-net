@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Detalhes da conexão em uso, em JSON, para o painel de rede do Maré.
+# Saída: {"iface","type","conn","ip","gateway","dns":[..],"dnsMode"}
+#   type: wifi | ethernet | none
+#   dnsMode: auto (o DNS do roteador) | cloudflare | google | custom
+set -uo pipefail
+
+dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
+if [[ -z $dev ]]; then
+  echo '{"iface":"","type":"none","conn":"","ip":"","gateway":"","dns":[],"dnsMode":"auto"}'
+  exit 0
+fi
+
+type=ethernet
+[[ -d /sys/class/net/$dev/wireless ]] && type=wifi
+
+conn=$(nmcli -g GENERAL.CONNECTION dev show "$dev" 2>/dev/null)
+ip=$(nmcli -g IP4.ADDRESS dev show "$dev" 2>/dev/null | head -1 | cut -d' ' -f1)
+gateway=$(nmcli -g IP4.GATEWAY dev show "$dev" 2>/dev/null | head -1)
+dns=$(nmcli -t -f IP4.DNS dev show "$dev" 2>/dev/null | cut -d: -f2- | jq -Rn '[inputs | select(length > 0)]')
+
+# O modo vem da conexão: se ela ignora o DNS automático, é um dos fixos.
+mode=auto
+if [[ -n $conn ]]; then
+  ignore=$(nmcli -g ipv4.ignore-auto-dns con show "$conn" 2>/dev/null)
+  fixed=$(nmcli -g ipv4.dns con show "$conn" 2>/dev/null)
+  if [[ $ignore == yes && -n $fixed ]]; then
+    case $fixed in
+      *1.1.1.1*) mode=cloudflare ;;
+      *8.8.8.8*) mode=google ;;
+      *) mode=custom ;;
+    esac
+  fi
+fi
+
+jq -nc \
+  --arg iface "$dev" --arg type "$type" --arg conn "$conn" \
+  --arg ip "$ip" --arg gateway "$gateway" --argjson dns "$dns" --arg mode "$mode" \
+  '{iface: $iface, type: $type, conn: $conn, ip: $ip, gateway: $gateway, dns: $dns, dnsMode: $mode}'
