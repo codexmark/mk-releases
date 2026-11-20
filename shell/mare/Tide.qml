@@ -81,8 +81,24 @@ PanelWindow {
             if (tide.mode === "launcher" && kept.item) {
                 kept.item.opacity = 0;
                 kept.item.shown();
-                fadeIn.restart();
+                keptFade.restart();
             }
+        }
+    }
+
+    // O aparecer do conteúdo da busca. Tem a animação dela: a dos outros
+    // painéis aponta para "o painel em uso", que neste instante ainda é o anterior.
+    SequentialAnimation {
+        id: keptFade
+
+        PauseAnimation { duration: Motion.contentDelay }
+        NumberAnimation {
+            target: kept.item
+            property: "opacity"
+            to: 1
+            duration: Motion.content
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Motion.curve
         }
     }
 
@@ -127,8 +143,12 @@ PanelWindow {
         // Recolhido (fechado ou ainda carregando), os lados ficam onde estão.
         property real lastL: 0
         property real lastR: 0
-        readonly property real goL: pin ? cx : ready ? cx - half : lastL
-        readonly property real goR: pin ? cx : ready ? cx + half : lastR
+        // Nasce como uma gota pequena embaixo do item (não de um ponto: do
+        // zero, os primeiros instantes quase não andavam e a abertura parecia
+        // atrasada).
+        readonly property real seed: Math.min(half, 30)
+        readonly property real goL: pin ? cx - seed : ready ? cx - half : lastL
+        readonly property real goR: pin ? cx + seed : ready ? cx + half : lastR
         onGoLChanged: if (ready || pin) lastL = goL
         onGoRChanged: if (ready || pin) lastR = goR
 
@@ -150,15 +170,15 @@ PanelWindow {
         readonly property real edgeH: Math.min(fastH, slowH)   // os cantos de baixo
         readonly property real midH: Math.max(fastH, slowH)    // o meio do fundo
 
-        Behavior on neckL { enabled: sheet.moving; SpringAnimation { spring: 7.5 * sheet.k; damping: 0.62; epsilon: 0.2 } }
-        Behavior on neckR { enabled: sheet.moving; SpringAnimation { spring: 7.5 * sheet.k; damping: 0.62; epsilon: 0.2 } }
+        Behavior on neckL { enabled: sheet.moving; SpringAnimation { spring: 14 * sheet.k; damping: 0.66; epsilon: 0.2 } }
+        Behavior on neckR { enabled: sheet.moving; SpringAnimation { spring: 14 * sheet.k; damping: 0.66; epsilon: 0.2 } }
         // O corpo alarga quase junto com a descida: se ficasse muito atrás,
         // a altura chegava ao fim com a largura ainda no começo, e o painel
         // virava um fio comprido antes de engordar.
-        Behavior on bodyL { enabled: sheet.moving; SpringAnimation { spring: 4.6 * sheet.k; damping: 0.36; epsilon: 0.2 } }
-        Behavior on bodyR { enabled: sheet.moving; SpringAnimation { spring: 4.6 * sheet.k; damping: 0.36; epsilon: 0.2 } }
-        Behavior on fastH { enabled: sheet.moving; SpringAnimation { spring: 4.2 * sheet.k; damping: 0.36; epsilon: 0.2 } }
-        Behavior on slowH { enabled: sheet.moving; SpringAnimation { spring: 3.0 * sheet.k; damping: 0.44; epsilon: 0.2 } }
+        Behavior on bodyL { enabled: sheet.moving; SpringAnimation { spring: 9 * sheet.k; damping: 0.42; epsilon: 0.2 } }
+        Behavior on bodyR { enabled: sheet.moving; SpringAnimation { spring: 9 * sheet.k; damping: 0.42; epsilon: 0.2 } }
+        Behavior on fastH { enabled: sheet.moving; SpringAnimation { spring: 9 * sheet.k; damping: 0.4; epsilon: 0.2 } }
+        Behavior on slowH { enabled: sheet.moving; SpringAnimation { spring: 6 * sheet.k; damping: 0.46; epsilon: 0.2 } }
 
         // O conteúdo do painel demora um instante para carregar, e até lá a
         // largura-alvo é 0: só há o que desenhar quando ele tem tamanho.
@@ -187,7 +207,7 @@ PanelWindow {
         // (Com um mínimo de altura, o primeiro quadro era um fio; e é nesse
         // quadro que uma máquina lenta trava, desenhando o conteúdo pela
         // primeira vez. O fio ficava parado na tela.)
-        readonly property real reach: Math.sqrt(grown)
+        readonly property real reach: 0.35 + 0.65 * Math.sqrt(grown)
         readonly property real h: Math.max(0, edgeH) * reach
         readonly property real hm: Math.max(0, midH) * reach
         readonly property real fe: Math.min(tide.fillet, h / 2)
@@ -307,7 +327,7 @@ PanelWindow {
 
                 PauseAnimation { duration: Motion.contentDelay }
                 NumberAnimation {
-                    target: sheet.current
+                    target: content.item
                     property: "opacity"
                     to: 1
                     duration: Motion.content

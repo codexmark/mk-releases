@@ -9,6 +9,11 @@
 # e as variáveis do UEFI, onde fica a entrada "Mk" do boot. No live, rode
 # mk-install e escolha /dev/vda.
 #
+# A VM usa a placa de vídeo daqui (virtio-vga-gl + virgl), para o Mk rodar
+# com aceleração como numa máquina de verdade. Sem isso tudo é desenhado no
+# processador e as animações engasgam. Se a janela não abrir ou ficar preta:
+#   MK_VM_GL=0 iso/vm
+#
 # A porta 2222 daqui vai para o SSH da VM (ssh -p 2222 usuario@localhost),
 # e ~/.cache/mk-vm/monitor.sock é o monitor do QEMU, que tira capturas da
 # tela da VM: echo "screendump /tmp/vm.ppm" | socat - UNIX:~/.cache/mk-vm/monitor.sock
@@ -44,10 +49,17 @@ args=(
   -drive "file=$dir/disk.qcow2,if=virtio"
   -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:2222-:22"
   -monitor "unix:$dir/monitor.sock,server,nowait"
-  -device virtio-vga
   -device qemu-xhci -device usb-tablet
   -audiodev "pipewire,id=som" -device intel-hda -device "hda-duplex,audiodev=som"
 )
+
+if [[ ${MK_VM_GL:-1} == 1 ]] && qemu-system-x86_64 -device help 2>/dev/null | grep -q '"virtio-vga-gl"'; then
+  # Janela SDL: a GTK do QEMU não consegue OpenGL neste Wayland ("GtkGLArea
+  # console lacks DMABUF support" e o QEMU cai).
+  args+=(-device virtio-vga-gl -display "sdl,gl=on")
+else
+  args+=(-device virtio-vga)
+fi
 
 if [[ ${1:-disk} == iso ]]; then
   iso=""

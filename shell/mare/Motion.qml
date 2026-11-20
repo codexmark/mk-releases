@@ -12,8 +12,8 @@ Singleton {
     readonly property int fast: Math.round(120 * speed)
     readonly property int base: Math.round(260 * speed)
     readonly property int slow: Math.round(420 * speed)
-    readonly property int contentDelay: Math.round(90 * speed)
-    readonly property int content: Math.round(220 * speed)
+    readonly property int contentDelay: Math.round(30 * speed)
+    readonly property int content: Math.round(140 * speed)
 
     // Curva do perfil codexmark: cubic-bezier(.215, .61, .355, 1).
     readonly property var curve: [0.215, 0.61, 0.355, 1, 1, 1]
