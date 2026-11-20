@@ -54,6 +54,38 @@ PanelWindow {
         item: hit
     }
 
+    // A busca carrega a lista de apps e os ícones, e numa máquina lenta isso
+    // levava um segundo a cada toque no Super. Ela fica carregada desde o
+    // início, neste canto de 1 px (para os textos e ícones já estarem
+    // desenhados), e só muda de lugar para dentro do painel quando é aberta.
+    Item {
+        id: warm
+        width: 1
+        height: 1
+        clip: true
+        opacity: 0.02
+    }
+
+    Loader {
+        id: kept
+        parent: tide.mode === "launcher" ? body : warm
+        y: tide.mode === "launcher" ? tide.weld : 0
+        active: tide.active
+        focus: tide.mode === "launcher"
+        sourceComponent: launcherPanel
+    }
+
+    Connections {
+        target: tide
+        function onModeChanged() {
+            if (tide.mode === "launcher" && kept.item) {
+                kept.item.opacity = 0;
+                kept.item.shown();
+                fadeIn.restart();
+            }
+        }
+    }
+
     // ── o painel como líquido ────────────────────────────────────────────
     // A ilha escorre para o painel. Em vez de um retângulo que desliza, a
     // forma tem partes que se movem em tempos diferentes, cada uma numa mola:
@@ -68,8 +100,11 @@ PanelWindow {
         id: sheet
 
         // Largura do conteúdo + os filetes dos dois lados.
-        readonly property real targetW: content.item ? content.item.implicitWidth + 2 * tide.fillet : 0
-        readonly property real targetH: tide.open && content.item ? content.item.implicitHeight + tide.weld : 0
+        // O painel em uso: a busca fica sempre carregada (veja `kept`); os
+        // outros são carregados na hora.
+        readonly property Item current: tide.mode === "launcher" ? kept.item : content.item
+        readonly property real targetW: current ? current.implicitWidth + 2 * tide.fillet : 0
+        readonly property real targetH: tide.open && current ? current.implicitHeight + tide.weld : 0
         // Embaixo do item clicado (centro em Mare.originX; aberto por atalho,
         // no meio), mas sempre dentro da borda de baixo da ilha: o corpo do
         // painel não passa dos cantos arredondados dela.
@@ -266,7 +301,7 @@ PanelWindow {
                 id: content
 
                 y: tide.weld
-                focus: true
+                focus: tide.mode !== "launcher"
                 sourceComponent: {
                     switch (tide.mode) {
                     case "project": return projectPanel;
@@ -275,7 +310,6 @@ PanelWindow {
                     case "network": return networkPanel;
                     case "calendar": return calendarPanel;
                     case "picker": return pickerPanel;
-                    case "launcher": return launcherPanel;
                     case "switcher": return switcherPanel;
                     case "notifications": return notificationsPanel;
                     case "session": return sessionPanel;
@@ -301,7 +335,7 @@ PanelWindow {
 
                 PauseAnimation { duration: Motion.contentDelay }
                 NumberAnimation {
-                    target: content.item
+                    target: sheet.current
                     property: "opacity"
                     to: 1
                     duration: Motion.content

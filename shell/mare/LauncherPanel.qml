@@ -88,7 +88,11 @@ Item {
     implicitHeight: column.implicitHeight + 40
 
     onQueryChanged: sel = 0
-    Component.onCompleted: {
+    // A busca fica carregada o tempo todo (Tide.qml), para abrir na hora:
+    // cada vez que aparece, começa limpa e com o cursor no campo.
+    function shown() {
+        input.text = "";
+        sel = 0;
         Projects.refreshDirs();
         input.forceActiveFocus();
     }
