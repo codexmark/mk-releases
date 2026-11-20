@@ -105,10 +105,15 @@ Singleton {
         id: listDirs
         command: ["find", root.workDir, "-mindepth", "2", "-maxdepth", "4", "-name", ".git", "-prune", "-printf", "%h\\n"]
         stdout: StdioCollector {
-            onStreamFinished: root.dirs = text.split("\n")
-                .filter(s => s.length > 0)
-                .map(d => ({ name: d.substring(d.lastIndexOf("/") + 1), dir: d }))
-                .sort((a, b) => a.name.localeCompare(b.name))
+            onStreamFinished: {
+                // Só troca a lista se mudou: quem depende dela (a busca) refaz tudo.
+                const next = text.split("\n")
+                    .filter(s => s.length > 0)
+                    .map(d => ({ name: d.substring(d.lastIndexOf("/") + 1), dir: d }))
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                if (JSON.stringify(next) !== JSON.stringify(root.dirs))
+                    root.dirs = next;
+            }
         }
     }
 

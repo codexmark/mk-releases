@@ -91,7 +91,10 @@ Item {
     // A busca fica carregada o tempo todo (Tide.qml), para abrir na hora:
     // cada vez que aparece, começa limpa e com o cursor no campo.
     function shown() {
-        input.text = "";
+        // Só mexe no que mudou: trocar o texto refaz a lista de resultados,
+        // e refazer as linhas é o que pesa numa máquina lenta.
+        if (input.text !== "")
+            input.text = "";
         sel = 0;
         Projects.refreshDirs();
         input.forceActiveFocus();

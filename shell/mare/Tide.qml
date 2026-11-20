@@ -163,35 +163,7 @@ PanelWindow {
         // O conteúdo do painel demora um instante para carregar, e até lá a
         // largura-alvo é 0: só há o que desenhar quando ele tem tamanho.
         readonly property bool loaded: tide.open && targetW > 2 * tide.fillet && targetH > tide.weld
-        // Numa máquina lenta, carregar a busca (a lista de apps e os ícones)
-        // trava a tela por meio segundo. Se o painel começasse a escorrer
-        // antes, ficava congelado no primeiro quadro: um fio pendurado na
-        // ilha. Abrindo do repouso, ele só começa quando os quadros voltam a
-        // fluir (ou depois de meio segundo, de qualquer jeito). Trocando de
-        // painel não espera: o painel já está na tela.
-        property bool ready: false
-        onLoadedChanged: {
-            if (!loaded)
-                ready = false;
-            else if (slowH >= 1 || fastH >= 1 || Motion.speed <= 0)
-                ready = true;
-        }
-
-        FrameAnimation {
-            property int frames: 0
-            running: sheet.loaded && !sheet.ready
-            onRunningChanged: {
-                if (running) {
-                    frames = 0;
-                    reset();
-                }
-            }
-            onTriggered: {
-                frames += 1;
-                if ((frames >= 3 && frameTime < 0.05) || elapsedTime > 0.5)
-                    sheet.ready = true;
-            }
-        }
+        readonly property bool ready: loaded
 
         // Abrindo com o painel recolhido: nasce num ponto embaixo do item (sem
         // voar de onde fechou da última vez) e escorre a partir dali.
