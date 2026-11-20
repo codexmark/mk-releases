@@ -11,6 +11,8 @@ Singleton {
     // <pasta de imagens do sistema>/Wallpapers: ~/Imagens em português,
     // ~/Pictures em inglês (xdg-user-dir). Vazio até a pasta ser achada.
     property string dir: ""
+    // Os que vêm com o Mk (system/mk/art/make-wallpapers.py), ao lado do shell.
+    readonly property string bundled: Quickshell.shellPath("wallpapers")
     readonly property string storePath: Quickshell.statePath("wallpaper.json")
 
     property string current: ""
@@ -69,10 +71,15 @@ Singleton {
 
     Process {
         id: list
-        command: ["find", root.dir, "-maxdepth", "1", "-type", "f",
+        // Primeiro os seus, depois os do Mk.
+        command: ["find", root.dir, root.bundled, "-maxdepth", "1", "-type", "f",
             "(", "-iname", "*.jpg", "-o", "-iname", "*.jpeg", "-o", "-iname", "*.png", "-o", "-iname", "*.webp", ")"]
         stdout: StdioCollector {
-            onStreamFinished: root.files = text.split("\n").filter(s => s.length > 0).sort()
+            onStreamFinished: {
+                const all = text.split("\n").filter(s => s.length > 0);
+                const mine = all.filter(f => !f.startsWith(root.bundled + "/")).sort();
+                root.files = mine.concat(all.filter(f => f.startsWith(root.bundled + "/")).sort());
+            }
         }
     }
 
