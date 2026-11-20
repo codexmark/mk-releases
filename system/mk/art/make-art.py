@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Gera as imagens do Mk a partir das fontes (Fraunces) e da linguagem Folha:
-#   mark.png        o "Mk": M em osso, k itálico em cobre (boot, login)
 #   emblem.png      o desenho do fastfetch: arco, colunas, sol de cobre e o Mk
+#                   (a marca vem de mark.png, feita por make-logo.py: rode ele antes)
 #   grain.png       o grão que faz o preto nunca ser preto
 # Rode de novo só quando mudar o desenho: python3 system/mk/art/make-art.py
 import math, os, random
@@ -37,7 +37,16 @@ def font(path, size, weight=400, opsz=None):
 
 
 def mark(size):
-    """O Mk em tamanho `size` (altura da letra), fundo transparente."""
+    """A marca do Mk (mark.png, de make-logo.py) com `size` px de altura."""
+    im = Image.open(os.path.join(here, "mark.png")).convert("RGBA")
+    big = os.path.join(here, "logo", "mk-mark-2000.png")
+    if os.path.exists(big):
+        im = Image.open(big).convert("RGBA")
+    return im.resize((round(im.width * size / im.height), size), Image.LANCZOS)
+
+
+def old_mark(size):
+    """O Mk antigo (k itálico), desenhado pela fonte. Não usado; fica de referência."""
     fm, fk = font(FRAUNCES, size, 380), font(FRAUNCES_I, size, 420)
     w = int(size * 1.9)
     h = int(size * 1.35)
@@ -134,14 +143,12 @@ def emblem(S=1024):
 
     im = im.resize((S, S), Image.LANCZOS)
     # o Mk dentro do arco
-    m = mark(int(S * 0.15))
+    m = mark(int(S * 0.17))
     im.alpha_composite(m, (int(S * 0.5 - m.width / 2), int(S * 0.68 - m.height - S * 0.035)))
     return im
 
 
 if __name__ == "__main__":
-    mark(160).save(os.path.join(here, "mark.png"))
-    mark(48).save(os.path.join(here, "mark-small.png"))
     emblem().save(os.path.join(here, "emblem.png"))
     grain().save(os.path.join(here, "grain.png"))
     print("ok:", ", ".join(sorted(f for f in os.listdir(here) if f.endswith(".png"))))

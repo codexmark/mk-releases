@@ -188,38 +188,21 @@ PanelWindow {
                     }
                 }
 
-                // Marca "Mk": o M em osso e o k em cobre, como o "x" de
-                // codexmark no perfil. Abre o launcher (ou um toque no Super).
+                // Marca "Mk": o M em osso, o k em cobre e os eixos do logo (a
+                // forma compacta de system/mk/art/make-logo.py, em vetor).
+                // Abre o launcher (ou um toque no Super).
                 Item {
                     id: brand
                     anchors.verticalCenter: parent.verticalCenter
                     implicitWidth: mark.implicitWidth + 14
                     implicitHeight: 24
 
-                    Row {
+                    Image {
                         id: mark
                         anchors.centerIn: parent
-                        anchors.verticalCenterOffset: -1
-                        spacing: -1
-
-                        Text {
-                            anchors.baseline: kay.baseline
-                            text: "M"
-                            color: Theme.text
-                            font.family: Theme.serif
-                            font.pixelSize: 19
-                            font.weight: Font.Light
-                        }
-
-                        Text {
-                            id: kay
-                            text: "k"
-                            color: Theme.copper
-                            font.family: Theme.serif
-                            font.pixelSize: 19
-                            font.weight: Font.Light
-                            font.italic: true
-                        }
+                        source: Qt.resolvedUrl("assets/mark.svg")
+                        sourceSize.height: 20
+                        smooth: true
                     }
 
                     HoverHandler { cursorShape: Qt.PointingHandCursor }

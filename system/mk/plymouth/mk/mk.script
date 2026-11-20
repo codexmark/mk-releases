@@ -1,4 +1,5 @@
-# Boot do Mk. Fundo #0b0b0b, o Mk no centro, embaixo dele uma linha fina em
+# Boot do Mk. Fundo #0b0b0b, o logo no centro (o Mk sobre o plano
+# cartesiano, de system/mk/art/make-logo.py), embaixo dele uma linha fina em
 # osso onde a cópia em cobre avança com o boot. Com o disco criptografado, a
 # senha é pedida no mesmo lugar, com pontos no lugar das letras.
 
@@ -8,10 +9,10 @@ Window.SetBackgroundBottomColor(0.043, 0.043, 0.043);
 W = Window.GetWidth();
 H = Window.GetHeight();
 
-mark.image = Image("mark.png");
-scale = (H / 1080) * 0.55;
-if (scale < 0.35) scale = 0.35;
-mark.image = mark.image.Scale(mark.image.GetWidth() * scale, mark.image.GetHeight() * scale);
+mark.image = Image("logo.png");
+target = W * 0.26;
+if (target > 720) target = 720;
+mark.image = mark.image.Scale(target, target * mark.image.GetHeight() / mark.image.GetWidth());
 mark.sprite = Sprite(mark.image);
 mark.x = W / 2 - mark.image.GetWidth() / 2;
 mark.y = H / 2 - mark.image.GetHeight();

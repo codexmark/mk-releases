@@ -392,8 +392,9 @@ Item {
 
             Image {
                 anchors.right: parent.right
-                source: Qt.resolvedUrl("assets/mark.png")
-                height: 26 * root.s
+                source: Qt.resolvedUrl("assets/mark.svg")
+                sourceSize.height: Math.round(30 * root.s)
+                height: Math.round(30 * root.s)
                 fillMode: Image.PreserveAspectFit
                 mipmap: true
             }

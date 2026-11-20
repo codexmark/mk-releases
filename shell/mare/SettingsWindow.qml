@@ -313,16 +313,14 @@ PanelWindow {
                 Row {
                     spacing: 10
 
-                    Text {
+                    Image {
                         id: brand
-                        text: "M<font color=\"" + Theme.copper + "\"><i>k</i></font>"
-                        textFormat: Text.StyledText
-                        color: Theme.text
-                        font.family: Theme.serif
-                        font.pixelSize: 24
+                        source: Qt.resolvedUrl("assets/mark.svg")
+                        sourceSize.height: 26
                     }
                     Text {
-                        anchors.baseline: brand.baseline
+                        anchors.bottom: brand.bottom
+                        anchors.bottomMargin: 2
                         text: "ajustes"
                         color: Theme.textDim
                         font.family: Theme.serif
