@@ -93,9 +93,13 @@ PanelWindow {
         readonly property real clockOffset: bar.fillet + bar.pad + extra / 2
             + left.implicitWidth + bar.pad + clockBox.implicitWidth / 2
 
+        // Para onde a ilha vai (a largura e o x abaixo chegam lá animando).
+        readonly property real goalW: Math.min(bar.width, natural + extra)
+        readonly property real goalX: Math.max(0, Math.min(bar.width - goalW, bar.width / 2 - clockOffset))
+
         anchors.top: parent.top
-        width: Math.min(bar.width, natural + extra)
-        x: Math.max(0, Math.min(bar.width - width, bar.width / 2 - clockOffset))
+        width: goalW
+        x: goalX
         height: bar.barH
 
         Behavior on width {
@@ -113,8 +117,11 @@ PanelWindow {
             }
         }
 
-        Binding { target: Mare; property: "islandX"; value: island.x }
-        Binding { target: Mare; property: "islandW"; value: island.width }
+        // O painel se encaixa onde a ilha vai estar, não onde ela está a cada
+        // quadro: seguindo a ilha em movimento, o alvo do painel mudava a
+        // cada quadro e as molas dele recomeçavam sem sair do lugar.
+        Binding { target: Mare; property: "islandX"; value: island.goalX }
+        Binding { target: Mare; property: "islandW"; value: island.goalW }
 
         // Translúcida em repouso, sólida com um painel aberto (como no Ryoku).
         property real solidity: bar.panelOpen ? 1 : Settings.get("island.restOpacity")
