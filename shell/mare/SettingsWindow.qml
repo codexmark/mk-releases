@@ -98,7 +98,9 @@ PanelWindow {
         }
     }
 
-    // Fundo escurecido: clicar fora da folha fecha.
+    // Fundo escurecido: clicar fora da folha fecha. Um TapHandler não para o
+    // clique no item de cima, então este recebe também os cliques dados dentro
+    // da folha: só fecha se o ponto estiver fora dela.
     Rectangle {
         anchors.fill: parent
         color: Theme.ground
@@ -109,7 +111,13 @@ PanelWindow {
         }
 
         TapHandler {
-            onTapped: Mare.close()
+            onTapped: (point, button) => {
+                const p = point.position;
+                const inside = p.x >= sheet.x && p.x <= sheet.x + sheet.width
+                    && p.y >= sheet.y && p.y <= sheet.y + sheet.height;
+                if (!inside)
+                    Mare.close();
+            }
         }
     }
 
@@ -256,9 +264,6 @@ PanelWindow {
                 easing.bezierCurve: win.open ? Motion.enterCurve : Motion.exitCurve
             }
         }
-
-        // Cliques na folha não fecham.
-        TapHandler {}
 
         Keys.onEscapePressed: {
             if (win.query !== "") {
