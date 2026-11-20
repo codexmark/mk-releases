@@ -38,6 +38,8 @@ difftastic
 
 # Editor (a config LazyVim é aplicada por scripts/user/neovim.sh)
 neovim
+# 7zip: o extract do terminal do Mk abre .7z
+7zip
 tree-sitter-cli
 
 # Linguagens e gerenciadores de versão

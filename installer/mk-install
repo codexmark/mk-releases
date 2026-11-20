@@ -575,6 +575,7 @@ EOF
   place "$src/shell/mare" "$skel/.config/mk/shell"
   place "$src/config/fastfetch" "$skel/.config/mk/fastfetch"
   place "$src/config/bash" "$skel/.config/mk/bash"
+  install -Dm644 "$src/config/bash/seu.bash.exemplo" "$skel/.config/mk/seu.bash"
   mkdir -p "$skel/Work" "$skel/Pictures/Wallpapers"
   # O terminal do Mk: a ficha do fastfetch, o prompt e os atalhos.
   if ! grep -q 'mk/bash/mk.bash' "$skel/.bashrc" 2>/dev/null; then

@@ -1,0 +1,8 @@
+# O seu bash: carregado no fim do bash do Mk, e nenhuma atualização mexe.
+# Edite com:  mk seu
+#
+# Exemplos:
+# alias k='kubectl'
+# export EDITOR=nvim
+# export PATH="$HOME/.local/bin:$PATH"
+# MK_NO_FETCH=1        # sem a ficha do fastfetch ao abrir o terminal

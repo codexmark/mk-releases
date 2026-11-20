@@ -19,3 +19,7 @@ localsend-bin
 # Fraunces: a serifa do perfil codexmark (marca Mk, letras dos workspaces,
 # títulos). Só existe no AUR; sem ela o Maré usa a Noto Serif.
 ttf-fraunces-variable
+
+# ble.sh: no terminal do Mk, sugestões em cinza enquanto digita (Tab completa)
+# e cores de sintaxe. Só existe no AUR.
+blesh
