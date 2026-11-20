@@ -28,7 +28,7 @@ old_launcher=/usr/local/bin/meu-os-session
 old_session_file=/usr/share/wayland-sessions/meu-os.desktop
 
 # Pacotes sem os quais a sessão não funciona direito.
-needed=(quickshell hypridle hyprlock hyprsunset ghostty cliphist wl-clip-persist playerctl matugen qrencode brightnessctl otf-geist-mono-nerd ttf-space-mono-nerd adw-gtk-theme papirus-icon-theme qt6-imageformats)
+needed=(quickshell hypridle hyprlock hyprsunset ghostty cliphist wl-clip-persist playerctl matugen qrencode brightnessctl otf-geist-mono-nerd ttf-space-mono-nerd adw-gtk-theme papirus-icon-theme qt6-imageformats cava)
 
 # Apaga a instalação antiga do meu-os, só as partes que ela criou.
 remove_old() {

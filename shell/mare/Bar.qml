@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Bluetooth
@@ -21,7 +22,10 @@ PanelWindow {
         left: true
         right: true
     }
-    implicitHeight: barH
+    // A janela tem uma folga embaixo da ilha para a onda do som; o espaço
+    // reservado para as janelas continua sendo só a altura da ilha.
+    readonly property int waveRoom: 18
+    implicitHeight: barH + waveRoom
     exclusiveZone: barH
     color: "transparent"
     WlrLayershell.namespace: "mare-island"
@@ -156,11 +160,68 @@ PanelWindow {
                 ctx.closePath();
                 ctx.fillStyle = Qt.rgba(c.r, c.g, c.b, island.solidity);
                 ctx.fill();
-                ctx.beginPath();
-                path();
+                // A linha fina: os dois lados. O trecho reto de baixo é da
+                // onda (logo abaixo), que o desenha reto quando há silêncio.
                 ctx.strokeStyle = Theme.hairline;
                 ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, f, f, -Math.PI / 2, 0, false);
+                ctx.lineTo(f, h - r);
+                ctx.arc(f + r, h - r, r, Math.PI, Math.PI / 2, true);
                 ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(w - f - r, h);
+                ctx.arc(w - f - r, h - r, r, Math.PI / 2, 0, true);
+                ctx.lineTo(w - f, f);
+                ctx.arc(w, f, f, Math.PI, Math.PI * 1.5, false);
+                ctx.stroke();
+            }
+        }
+
+        // A ilha responde ao som: a borda de baixo ondula com o espectro do
+        // que está tocando (Sound.qml), graves à esquerda e agudos à direita,
+        // como se a música mexesse num líquido. Com um painel aberto, ou em
+        // silêncio, é uma linha reta.
+        Shape {
+            id: wave
+            x: bar.fillet + bar.corner
+            y: island.height - 1
+            width: island.width - 2 * (bar.fillet + bar.corner)
+            height: bar.waveRoom
+            preferredRendererType: Shape.CurveRenderer
+
+            readonly property real amp: (bar.waveRoom - 3) * Sound.presence * (bar.panelOpen ? 0 : 1)
+            // A curva: três pontos por faixa, suavizados, presos em zero nas pontas.
+            readonly property var curve: {
+                const pts = [Qt.point(0, 0)];
+                const lv = Sound.levels, n = Sound.bands, steps = n * 3;
+                if (wave.amp > 0.05 && lv.length === n && wave.width > 0) {
+                    for (let i = 1; i < steps; i++) {
+                        const t = i / steps, p = t * (n - 1), a = Math.floor(p), b = Math.min(n - 1, a + 1);
+                        const k = (1 - Math.cos((p - a) * Math.PI)) / 2;
+                        // A raiz levanta os sons fracos: a onda aparece mesmo com volume baixo.
+                        const v = Math.sqrt(lv[a] * (1 - k) + lv[b] * k);
+                        const edge = Math.sin(t * Math.PI);
+                        pts.push(Qt.point(t * wave.width, v * wave.amp * Math.pow(edge, 0.6)));
+                    }
+                }
+                pts.push(Qt.point(wave.width, 0));
+                return pts;
+            }
+
+            ShapePath {
+                fillColor: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, island.solidity)
+                strokeColor: "transparent"
+                PathPolyline { path: wave.curve }
+            }
+            ShapePath {
+                fillColor: "transparent"
+                // A linha esquenta para o cobre conforme o som enche.
+                strokeColor: Qt.tint(Theme.hairline, Qt.rgba(Theme.copper.r, Theme.copper.g, Theme.copper.b,
+                    Math.min(0.95, 0.45 + Sound.energy * 2.5) * Sound.presence * (bar.panelOpen ? 0 : 1)))
+                strokeWidth: 1 + 0.5 * Sound.presence
+                PathPolyline { path: wave.curve }
             }
         }
 
