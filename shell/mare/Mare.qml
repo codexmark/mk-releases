@@ -16,6 +16,16 @@ Singleton {
     readonly property var transients: ["toast", "osd"]
     property string mode: "rest"
 
+    // Quando um painel deu lugar a outro (e não abriu do repouso). O Monitor
+    // usa para não confundir essa troca com um clique fora.
+    property double switchedAt: 0
+    property string lastMode: "rest"
+    onModeChanged: {
+        if (mode !== "rest" && lastMode !== "rest")
+            switchedAt = Date.now();
+        lastMode = mode;
+    }
+
     // Onde o painel desce: o centro (em x, na tela) do item da ilha que foi
     // clicado. -1 = no meio (painéis abertos por atalho de teclado).
     property real originX: -1

@@ -89,8 +89,13 @@ PanelWindow {
         // painel nasce num fio embaixo do item, e não voando de onde fechou.
         property bool pin: false
         property bool snap: false
-        readonly property real goL: pin ? cx : cx - half
-        readonly property real goR: pin ? cx : cx + half
+        // Recolhido (fechado ou ainda carregando), os lados ficam onde estão.
+        property real lastL: 0
+        property real lastR: 0
+        readonly property real goL: pin ? cx : ready ? cx - half : lastL
+        readonly property real goR: pin ? cx : ready ? cx + half : lastR
+        onGoLChanged: if (ready || pin) lastL = goL
+        onGoRChanged: if (ready || pin) lastR = goR
 
         readonly property bool moving: Motion.speed > 0 && !snap
         // Velocidade dos Ajustes: mola mais dura = mais rápido.
@@ -100,14 +105,15 @@ PanelWindow {
         property real neckR: goR
         property real bodyL: goL
         property real bodyR: goR
-        // A altura em duas molas, uma mais rápida que a outra. Abrindo, o
-        // meio do fundo usa a rápida e desce antes dos cantos (a gota).
-        // Fechando é o contrário: os cantos sobem primeiro e o meio fica
-        // pendurado, sugado por último.
-        property real fastH: targetH
-        property real slowH: targetH
-        readonly property real edgeH: tide.open ? slowH : fastH   // os cantos de baixo
-        readonly property real midH: tide.open ? fastH : slowH    // o meio do fundo
+        // A altura em duas molas, uma mais rápida que a outra. O meio do
+        // fundo é sempre a mais baixa das duas e os cantos, a mais alta:
+        // crescendo, o meio desce na frente; encolhendo (ao fechar ou ao
+        // trocar para um painel menor), os cantos sobem primeiro e o meio
+        // fica pendurado. Nos dois casos o fundo é uma gota, nunca um arco.
+        property real fastH: ready ? targetH : 0
+        property real slowH: ready ? targetH : 0
+        readonly property real edgeH: Math.min(fastH, slowH)   // os cantos de baixo
+        readonly property real midH: Math.max(fastH, slowH)    // o meio do fundo
 
         Behavior on neckL { enabled: sheet.moving; SpringAnimation { spring: 7.5 * sheet.k; damping: 0.62; epsilon: 0.2 } }
         Behavior on neckR { enabled: sheet.moving; SpringAnimation { spring: 7.5 * sheet.k; damping: 0.62; epsilon: 0.2 } }
@@ -119,16 +125,18 @@ PanelWindow {
         Behavior on fastH { enabled: sheet.moving; SpringAnimation { spring: 4.2 * sheet.k; damping: 0.36; epsilon: 0.2 } }
         Behavior on slowH { enabled: sheet.moving; SpringAnimation { spring: 3.0 * sheet.k; damping: 0.44; epsilon: 0.2 } }
 
-        Connections {
-            target: tide
-            function onOpenChanged() {
-                // Abrindo com o painel recolhido: nasce no ponto novo.
-                if (tide.open && sheet.slowH < 1 && sheet.fastH < 1) {
-                    sheet.snap = true;
-                    sheet.pin = true;
-                    sheet.snap = false;
-                    sheet.pin = false;
-                }
+        // O conteúdo do painel demora um instante para carregar (mais ainda
+        // numa máquina lenta), e até lá a largura-alvo é 0. Só há o que
+        // desenhar, e para onde escorrer, quando ele tem tamanho.
+        readonly property bool ready: tide.open && targetW > 2 * tide.fillet && targetH > tide.weld
+        // Abrindo com o painel recolhido: nasce num ponto embaixo do item (sem
+        // voar de onde fechou da última vez) e escorre a partir dali.
+        onReadyChanged: {
+            if (ready && slowH < 1 && fastH < 1) {
+                snap = true;
+                pin = true;
+                snap = false;
+                pin = false;
             }
         }
 

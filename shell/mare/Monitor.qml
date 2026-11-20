@@ -35,7 +35,20 @@ Scope {
     HyprlandFocusGrab {
         windows: [tide, bar, settings]
         // O seletor e os passageiros (aviso, OSD) não prendem o foco.
-        active: scope.focused && Mare.mode !== "rest" && Mare.mode !== "picker" && !Mare.isTransient
-        onCleared: Mare.close()
+        active: scope.focused && Mare.mode !== "rest" && Mare.mode !== "picker" && !Mare.isTransient && !rearm.running
+        onCleared: {
+            // Sair de um painel com teclado (a busca) para um sem teclado solta
+            // o teclado, e o Hyprland desfaz o grab. Isso não é um clique fora:
+            // o painel novo fica aberto e o grab é armado de novo.
+            if (Date.now() - Mare.switchedAt < 400)
+                rearm.restart();
+            else
+                Mare.close();
+        }
+    }
+
+    Timer {
+        id: rearm
+        interval: 80
     }
 }
