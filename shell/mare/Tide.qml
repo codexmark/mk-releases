@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
 
@@ -50,9 +51,19 @@ PanelWindow {
 
     // Só o painel recebe cliques; o resto da janela é transparente ao mouse.
     mask: Region {
-        item: sheet
+        item: hit
     }
 
+    // ── o painel como líquido ────────────────────────────────────────────
+    // A ilha escorre para o painel. Em vez de um retângulo que desliza, a
+    // forma tem partes que se movem em tempos diferentes, cada uma numa mola:
+    //   pescoço (onde ela sai da ilha): rápido, quase sem balanço;
+    //   corpo (os lados lá embaixo):    mais mole, passa do ponto e volta;
+    //   fundo: o meio desce antes dos cantos, como uma gota, e balança.
+    // Ao abrir, nasce como um fio embaixo do item clicado e engorda. Ao trocar
+    // de item, o pescoço vai na frente e o corpo é puxado atrás, inclinado.
+    // Ao fechar, é sugada de volta para um ponto. Com o movimento desligado
+    // nos Ajustes, tudo vai direto para o lugar.
     Item {
         id: sheet
 
@@ -71,139 +82,184 @@ PanelWindow {
 
         Binding { target: Mare; property: "sheetW"; value: tide.open ? sheet.targetW : 0 }
 
-        x: targetX
-        y: tide.barH - tide.weld
-        width: targetW
-        height: targetH
-        visible: height > 0.5
-        clip: true
+        // Para onde o corpo vai: os lados de dentro (sem os filetes).
+        readonly property real half: Math.max(0, targetW / 2 - tide.fillet)
+        readonly property real cx: targetX + targetW / 2
+        // `pin` junta tudo num ponto e `snap` desliga as molas: é como o
+        // painel nasce num fio embaixo do item, e não voando de onde fechou.
+        property bool pin: false
+        property bool snap: false
+        readonly property real goL: pin ? cx : cx - half
+        readonly property real goR: pin ? cx : cx + half
 
-        Behavior on x {
-            NumberAnimation {
-                duration: Motion.spatial
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Motion.spatialCurve
-            }
-        }
-        Behavior on width {
-            NumberAnimation {
-                duration: Motion.spatial
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Motion.spatialCurve
-            }
-        }
-        Behavior on height {
-            NumberAnimation {
-                duration: tide.open ? Motion.enter : Motion.exit
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: tide.open ? Motion.enterCurve : Motion.exitCurve
-            }
-        }
+        readonly property bool moving: Motion.speed > 0 && !snap
+        // Velocidade dos Ajustes: mola mais dura = mais rápido.
+        readonly property real k: Motion.speed > 0 ? 1 / (Motion.speed * Motion.speed) : 1
 
-        onWidthChanged: shape.requestPaint()
-        onHeightChanged: shape.requestPaint()
+        property real neckL: goL
+        property real neckR: goR
+        property real bodyL: goL
+        property real bodyR: goR
+        // A altura em duas molas, uma mais rápida que a outra. Abrindo, o
+        // meio do fundo usa a rápida e desce antes dos cantos (a gota).
+        // Fechando é o contrário: os cantos sobem primeiro e o meio fica
+        // pendurado, sugado por último.
+        property real fastH: targetH
+        property real slowH: targetH
+        readonly property real edgeH: tide.open ? slowH : fastH   // os cantos de baixo
+        readonly property real midH: tide.open ? fastH : slowH    // o meio do fundo
 
-        // A forma: o mesmo desenho da ilha (filetes côncavos em cima, cantos
-        // arredondados embaixo), sólida, com a linha fina nos lados e embaixo.
-        Canvas {
-            id: shape
-            anchors.fill: parent
+        Behavior on neckL { enabled: sheet.moving; SpringAnimation { spring: 7.5 * sheet.k; damping: 0.62; epsilon: 0.2 } }
+        Behavior on neckR { enabled: sheet.moving; SpringAnimation { spring: 7.5 * sheet.k; damping: 0.62; epsilon: 0.2 } }
+        Behavior on bodyL { enabled: sheet.moving; SpringAnimation { spring: 3.0 * sheet.k; damping: 0.3; epsilon: 0.2 } }
+        Behavior on bodyR { enabled: sheet.moving; SpringAnimation { spring: 3.0 * sheet.k; damping: 0.3; epsilon: 0.2 } }
+        Behavior on fastH { enabled: sheet.moving; SpringAnimation { spring: 5.0 * sheet.k; damping: 0.34; epsilon: 0.2 } }
+        Behavior on slowH { enabled: sheet.moving; SpringAnimation { spring: 3.4 * sheet.k; damping: 0.42; epsilon: 0.2 } }
 
-            onPaint: {
-                const ctx = getContext("2d");
-                ctx.reset();
-                if (width < 2 * tide.fillet + 2 || height < 2)
-                    return;
-                const f = tide.fillet, w = width, h = height - 1;
-                const r = Math.min(tide.corner, Math.max(0, (h - f) / 2));
-                const path = () => {
-                    ctx.moveTo(0, 0);
-                    ctx.arc(0, f, f, -Math.PI / 2, 0, false);
-                    ctx.lineTo(f, h - r);
-                    ctx.arc(f + r, h - r, r, Math.PI, Math.PI / 2, true);
-                    ctx.lineTo(w - f - r, h);
-                    ctx.arc(w - f - r, h - r, r, Math.PI / 2, 0, true);
-                    ctx.lineTo(w - f, f);
-                    ctx.arc(w, f, f, Math.PI, Math.PI * 1.5, false);
-                };
-                ctx.beginPath();
-                path();
-                ctx.closePath();
-                ctx.fillStyle = Theme.surface;
-                ctx.fill();
-                ctx.beginPath();
-                path();
-                ctx.strokeStyle = Theme.hairline;
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
-        }
-
-        Image {
-            x: tide.fillet
-            width: parent.width - 2 * tide.fillet
-            height: parent.height
-            source: Qt.resolvedUrl("assets/grain.png")
-            fillMode: Image.Tile
-            opacity: 0.035
-        }
-
-        // Marca de cobre no canto, como os destaques das folhas do perfil.
-        Rectangle {
-            x: tide.fillet + 18
-            y: tide.weld + 6
-            width: 28
-            height: 2
-            color: Theme.copper
-            z: 2
-        }
-
-        Loader {
-            id: content
-
-            x: tide.fillet
-            y: tide.weld
-            focus: true
-            sourceComponent: {
-                switch (tide.mode) {
-                case "project": return projectPanel;
-                case "volume": return volumePanel;
-                case "power": return powerPanel;
-                case "network": return networkPanel;
-                case "calendar": return calendarPanel;
-                case "picker": return pickerPanel;
-                case "launcher": return launcherPanel;
-                case "switcher": return switcherPanel;
-                case "notifications": return notificationsPanel;
-                case "session": return sessionPanel;
-                case "toast": return toastView;
-                case "osd": return osdView;
-                case "media": return mediaPanel;
-                case "bluetooth": return bluetoothPanel;
-                case "display": return displayPanel;
-                case "system": return systemPanel;
-                case "clipboard": return clipboardPanel;
-                case "wallpaper": return wallpaperPanel;
-                default: return null;
+        Connections {
+            target: tide
+            function onOpenChanged() {
+                // Abrindo com o painel recolhido: nasce no ponto novo.
+                if (tide.open && sheet.slowH < 1 && sheet.fastH < 1) {
+                    sheet.snap = true;
+                    sheet.pin = true;
+                    sheet.snap = false;
+                    sheet.pin = false;
                 }
             }
-            onLoaded: {
-                item.opacity = 0;
-                fadeIn.restart();
+        }
+
+        // A forma, já com as medidas seguras para desenhar. Se os lados do
+        // corpo se cruzarem num balanço, viram um ponto no meio.
+        readonly property real bl: Math.min(bodyL, (bodyL + bodyR) / 2)
+        readonly property real br: Math.max(bodyR, (bodyL + bodyR) / 2)
+        readonly property real h: Math.max(0, edgeH)
+        readonly property real hm: Math.max(0, midH)
+        readonly property real fe: Math.min(tide.fillet, h / 2)
+        readonly property real re: Math.min(tide.corner, Math.max(0, (h - fe) / 2), (br - bl) / 2)
+        readonly property real sideY: fe + (h - re - fe) / 2
+
+        y: tide.barH - tide.weld
+        width: tide.width
+        height: tide.height - y
+        visible: h > 0.5 || hm > 0.5
+
+        // Onde o painel pousa: é o que recebe cliques (a máscara da janela).
+        Item {
+            id: hit
+            x: sheet.targetX
+            width: sheet.targetW
+            height: sheet.targetH
+        }
+
+        Shape {
+            id: shape
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+
+            // O corpo, preenchido.
+            ShapePath {
+                fillColor: Theme.surface
+                strokeColor: "transparent"
+                startX: sheet.neckL - sheet.fe
+                startY: 0
+                PathQuad { x: sheet.neckL; y: sheet.fe; controlX: sheet.neckL; controlY: 0 }
+                PathCubic { x: sheet.bl; y: sheet.h - sheet.re; control1X: sheet.neckL; control1Y: sheet.sideY; control2X: sheet.bl; control2Y: sheet.sideY }
+                PathQuad { x: sheet.bl + sheet.re; y: sheet.h; controlX: sheet.bl; controlY: sheet.h }
+                PathQuad { x: sheet.br - sheet.re; y: sheet.h; controlX: (sheet.bl + sheet.br) / 2; controlY: 2 * sheet.hm - sheet.h }
+                PathQuad { x: sheet.br; y: sheet.h - sheet.re; controlX: sheet.br; controlY: sheet.h }
+                PathCubic { x: sheet.neckR; y: sheet.fe; control1X: sheet.br; control1Y: sheet.sideY; control2X: sheet.neckR; control2Y: sheet.sideY }
+                PathQuad { x: sheet.neckR + sheet.fe; y: 0; controlX: sheet.neckR; controlY: 0 }
+            }
+
+            // A linha fina nos lados e embaixo (em cima fica a ilha).
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: Theme.hairline
+                strokeWidth: 1
+                startX: sheet.neckL - sheet.fe
+                startY: 0
+                PathQuad { x: sheet.neckL; y: sheet.fe; controlX: sheet.neckL; controlY: 0 }
+                PathCubic { x: sheet.bl; y: sheet.h - sheet.re; control1X: sheet.neckL; control1Y: sheet.sideY; control2X: sheet.bl; control2Y: sheet.sideY }
+                PathQuad { x: sheet.bl + sheet.re; y: sheet.h; controlX: sheet.bl; controlY: sheet.h }
+                PathQuad { x: sheet.br - sheet.re; y: sheet.h; controlX: (sheet.bl + sheet.br) / 2; controlY: 2 * sheet.hm - sheet.h }
+                PathQuad { x: sheet.br; y: sheet.h - sheet.re; controlX: sheet.br; controlY: sheet.h }
+                PathCubic { x: sheet.neckR; y: sheet.fe; control1X: sheet.br; control1Y: sheet.sideY; control2X: sheet.neckR; control2Y: sheet.sideY }
+                PathQuad { x: sheet.neckR + sheet.fe; y: 0; controlX: sheet.neckR; controlY: 0 }
             }
         }
 
-        SequentialAnimation {
-            id: fadeIn
+        // O conteúdo anda com o corpo e é cortado por ele.
+        Item {
+            id: body
+            x: sheet.bl
+            width: sheet.br - sheet.bl
+            height: Math.min(sheet.h, sheet.hm)
+            clip: true
 
-            PauseAnimation { duration: Motion.contentDelay }
-            NumberAnimation {
-                target: content.item
-                property: "opacity"
-                to: 1
-                duration: Motion.content
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Motion.curve
+            Image {
+                anchors.fill: parent
+                source: Qt.resolvedUrl("assets/grain.png")
+                fillMode: Image.Tile
+                opacity: 0.035
+            }
+
+            // Marca de cobre no canto, como os destaques das folhas do perfil.
+            Rectangle {
+                x: 18
+                y: tide.weld + 6
+                width: 28
+                height: 2
+                color: Theme.copper
+                z: 2
+            }
+
+            Loader {
+                id: content
+
+                y: tide.weld
+                focus: true
+                sourceComponent: {
+                    switch (tide.mode) {
+                    case "project": return projectPanel;
+                    case "volume": return volumePanel;
+                    case "power": return powerPanel;
+                    case "network": return networkPanel;
+                    case "calendar": return calendarPanel;
+                    case "picker": return pickerPanel;
+                    case "launcher": return launcherPanel;
+                    case "switcher": return switcherPanel;
+                    case "notifications": return notificationsPanel;
+                    case "session": return sessionPanel;
+                    case "toast": return toastView;
+                    case "osd": return osdView;
+                    case "media": return mediaPanel;
+                    case "bluetooth": return bluetoothPanel;
+                    case "display": return displayPanel;
+                    case "system": return systemPanel;
+                    case "clipboard": return clipboardPanel;
+                    case "wallpaper": return wallpaperPanel;
+                    default: return null;
+                    }
+                }
+                onLoaded: {
+                    item.opacity = 0;
+                    fadeIn.restart();
+                }
+            }
+
+            SequentialAnimation {
+                id: fadeIn
+
+                PauseAnimation { duration: Motion.contentDelay }
+                NumberAnimation {
+                    target: content.item
+                    property: "opacity"
+                    to: 1
+                    duration: Motion.content
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Motion.curve
+                }
             }
         }
     }
