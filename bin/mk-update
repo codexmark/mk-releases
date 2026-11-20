@@ -138,6 +138,17 @@ if [[ $mk_available == true && $mode != --after-mk ]]; then
   exec /usr/bin/mk-update --after-mk
 fi
 
+# Um pacman interrompido (terminal fechado, queda de luz) deixa a base de
+# dados travada, e tudo daqui para a frente falharia. Sem nenhum gerenciador
+# de pacotes rodando, a trava é sobra: oferece tirar.
+lock=/var/lib/pacman/db.lck
+if [[ -e $lock ]] && ! pgrep -x 'pacman|yay|makepkg|pamac' >/dev/null; then
+  say "o pacman ficou travado por uma atualização interrompida"
+  if ask "Destravar (remove $lock)?"; then
+    sudo rm -f "$lock"
+  fi
+fi
+
 # 2. Migrações: o que mudou no Mk fora de ~/.config/mk, cada uma uma vez.
 if ((${#pend[@]})); then
   say "ajustes do Mk no sistema"

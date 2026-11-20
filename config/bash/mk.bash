@@ -61,8 +61,8 @@ command -v fd >/dev/null && export FZF_DEFAULT_COMMAND='fd --type f --hidden --e
   FZF_CTRL_T_COMMAND='fd --type f --hidden --exclude .git' FZF_ALT_C_COMMAND='fd --type d --hidden --exclude .git'
 if command -v fzf >/dev/null; then
   if ((mk_ble)); then
-    ble-import -d integration/fzf-completion
-    ble-import -d integration/fzf-key-bindings
+    ble-import -d integration/fzf-completion 2>/dev/null || ble-import integration/fzf-completion 2>/dev/null
+    ble-import -d integration/fzf-key-bindings 2>/dev/null || ble-import integration/fzf-key-bindings 2>/dev/null
   else
     [[ -r /usr/share/fzf/key-bindings.bash ]] && source /usr/share/fzf/key-bindings.bash
     [[ -r /usr/share/fzf/completion.bash ]] && source /usr/share/fzf/completion.bash
@@ -136,41 +136,51 @@ mk() {
 complete -W "atualizar ajustes papel bloquear reiniciar-mare ficha versao seu ajuda" mk
 
 # ── cores do ble.sh na paleta Folha ───────────────────────────────────
+# Vale para o ble.sh 0.3 (o pacote blesh do AUR) e o 0.4: o 0.3 não tem o
+# comando ble-face nem algumas opções, então cada ajuste é tentado em silêncio.
 if ((mk_ble)); then
-  bleopt complete_auto_delay=80
+  mk_face() {
+    if declare -F ble-face >/dev/null; then
+      mk_face "$1" "$2"
+    else
+      ble-color-setface "$1" "$2"
+    fi 2>/dev/null
+  }
+  bleopt complete_auto_delay=80 2>/dev/null
   # O starship já mostra erro (› em vermelho) e tempo do comando.
-  bleopt exec_errexit_mark= exec_elapsed_mark=
-  ble-face -s syntax_default 'fg=#cdc4ba'
-  ble-face -s syntax_command 'fg=#ce5e32'
-  ble-face -s command_builtin 'fg=#ce5e32'
-  ble-face -s command_alias 'fg=#ce5e32'
-  ble-face -s command_function 'fg=#ce5e32'
-  ble-face -s command_file 'fg=#ce5e32'
-  ble-face -s command_keyword 'fg=#b0a9a0,bold'
-  ble-face -s command_jobs 'fg=#ce5e32'
-  ble-face -s syntax_function_name 'fg=#ce5e32,bold'
-  ble-face -s syntax_quoted 'fg=#b0a9a0'
-  ble-face -s syntax_quotation 'fg=#b0a9a0'
-  ble-face -s syntax_varname 'fg=#958f87'
+  bleopt exec_errexit_mark= 2>/dev/null
+  bleopt exec_elapsed_mark= 2>/dev/null
+  mk_face syntax_default 'fg=#cdc4ba'
+  mk_face syntax_command 'fg=#ce5e32'
+  mk_face command_builtin 'fg=#ce5e32'
+  mk_face command_alias 'fg=#ce5e32'
+  mk_face command_function 'fg=#ce5e32'
+  mk_face command_file 'fg=#ce5e32'
+  mk_face command_keyword 'fg=#b0a9a0,bold'
+  mk_face command_jobs 'fg=#ce5e32'
+  mk_face syntax_function_name 'fg=#ce5e32,bold'
+  mk_face syntax_quoted 'fg=#b0a9a0'
+  mk_face syntax_quotation 'fg=#b0a9a0'
+  mk_face syntax_varname 'fg=#958f87'
   # Variáveis de todo tipo (exportada, vetor, número, não definida...).
-  for mk_face in varname_array varname_empty varname_export varname_expr varname_hash \
+  for mk_name in varname_array varname_empty varname_export varname_expr varname_hash \
     varname_number varname_readonly varname_transform varname_unset; do
-    ble-face -s "$mk_face" 'fg=#958f87' 2>/dev/null
+    mk_face "$mk_name" 'fg=#958f87'
   done
-  unset mk_face
-  ble-face -s syntax_param_expansion 'fg=#958f87'
-  ble-face -s syntax_expr 'fg=#958f87'
-  ble-face -s syntax_glob 'fg=#ce5e32'
-  ble-face -s syntax_brace 'fg=#958f87'
-  ble-face -s syntax_delimiter 'fg=#807a73'
-  ble-face -s syntax_comment 'fg=#716b69,italic'
-  ble-face -s syntax_error 'fg=#ff5f40,bold'
-  ble-face -s filename_directory 'fg=#cdc4ba,underline'
-  ble-face -s filename_executable 'fg=#ce5e32'
-  ble-face -s filename_other 'fg=#b0a9a0'
-  ble-face -s auto_complete 'fg=#716b69'
-  ble-face -s region 'bg=#3a3632'
-  ble-face -s region_target 'bg=#3a3632'
+  unset mk_name
+  mk_face syntax_param_expansion 'fg=#958f87'
+  mk_face syntax_expr 'fg=#958f87'
+  mk_face syntax_glob 'fg=#ce5e32'
+  mk_face syntax_brace 'fg=#958f87'
+  mk_face syntax_delimiter 'fg=#807a73'
+  mk_face syntax_comment 'fg=#716b69,italic'
+  mk_face syntax_error 'fg=#ff5f40,bold'
+  mk_face filename_directory 'fg=#cdc4ba,underline'
+  mk_face filename_executable 'fg=#ce5e32'
+  mk_face filename_other 'fg=#b0a9a0'
+  mk_face auto_complete 'fg=#716b69'
+  mk_face region 'bg=#3a3632'
+  mk_face region_target 'bg=#3a3632'
 fi
 
 # ── o que é só seu ────────────────────────────────────────────────────
@@ -178,3 +188,4 @@ fi
 
 ((mk_ble)) && ble-attach
 unset mk_ble
+unset -f mk_face 2>/dev/null
