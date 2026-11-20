@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Gera o tema de ícones "Mk": o Papirus-Dark com as pastas em osso (a cor
+# "palebrown" do Papirus) no lugar do azul. Não copia ícone nenhum: é um tema
+# que herda do Papirus-Dark e só tem atalhos para as pastas na cor certa, do
+# jeito que o papirus-folders faz, mas sem mexer no pacote.
+#
+#   make-icons <destino>     ex.: /usr/share/icons/Mk  ou  ~/.local/share/icons/Mk
+set -euo pipefail
+
+dest=${1:?uso: make-icons <destino>}
+papirus=/usr/share/icons/Papirus
+color=palebrown
+[[ -d $papirus ]] || { echo "falta o papirus-icon-theme" >&2; exit 1; }
+
+rm -rf "${dest:?}"
+mkdir -p "$dest"
+dirs=()
+for places in "$papirus"/*/places; do
+  size=$(basename "$(dirname "$places")")
+  compgen -G "$places/folder-$color.svg" >/dev/null || continue
+  mkdir -p "$dest/$size/places"
+  # folder-palebrown-music.svg -> folder-music.svg (e user-palebrown-*).
+  for f in "$places"/folder-"$color"*.svg "$places"/user-"$color"*.svg; do
+    [[ -e $f ]] || continue
+    name=$(basename "$f")
+    ln -s "$f" "$dest/$size/places/${name/-$color/}"
+  done
+  # Os apelidos do Papirus (inode-directory, gtk-directory...) que apontam
+  # para uma pasta que trocamos passam a apontar para a nossa.
+  for f in "$places"/*.svg; do
+    [[ -L $f ]] || continue
+    name=$(basename "$f")
+    target=$(basename "$(readlink "$f")")
+    [[ -e $dest/$size/places/$name ]] && continue
+    [[ -e $dest/$size/places/$target ]] && ln -s "$target" "$dest/$size/places/$name"
+  done
+  dirs+=("$size/places")
+done
+
+{
+  echo "[Icon Theme]"
+  echo "Name=Mk"
+  echo "Comment=Papirus-Dark com as pastas em osso, para o Mk"
+  echo "Inherits=Papirus-Dark,Papirus,hicolor"
+  (IFS=,; echo "Directories=${dirs[*]}")
+  for d in "${dirs[@]}"; do
+    echo
+    # A seção do próprio Papirus para esse diretório (tamanho, tipo).
+    awk -v sec="[$d]" '$0 == sec { on = 1; print; next } /^\[/ { on = 0 } on && NF' "$papirus/index.theme"
+  done
+} >"$dest/index.theme"
+echo "ícones: $dest (${#dirs[@]} tamanhos)"

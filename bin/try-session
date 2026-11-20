@@ -28,7 +28,7 @@ old_launcher=/usr/local/bin/meu-os-session
 old_session_file=/usr/share/wayland-sessions/meu-os.desktop
 
 # Pacotes sem os quais a sessão não funciona direito.
-needed=(quickshell hypridle hyprlock hyprsunset ghostty cliphist wl-clip-persist playerctl matugen qrencode brightnessctl otf-geist-mono-nerd ttf-space-mono-nerd)
+needed=(quickshell hypridle hyprlock hyprsunset ghostty cliphist wl-clip-persist playerctl matugen qrencode brightnessctl otf-geist-mono-nerd ttf-space-mono-nerd adw-gtk-theme papirus-icon-theme)
 
 # Apaga a instalação antiga do meu-os, só as partes que ela criou.
 remove_old() {
@@ -107,6 +107,14 @@ case ${1:-status} in
     place "$repo/shell/mare" "$qs_dst"
     remove "$old_qs_dst"
     remove_old
+    # Tema GTK e ícones do Mk, só para este usuário (a sessão escolhe o tema
+    # por GTK_THEME; nada em ~/.config/gtk-* é tocado).
+    data=${XDG_DATA_HOME:-$HOME/.local/share}
+    place "$repo/system/mk/look/themes/Mk" "$data/themes/Mk"
+    if [[ ! -e $data/icons/Mk || -e $data/icons/Mk/$marker ]]; then
+      bash "$repo/system/mk/look/make-icons" "$data/icons/Mk" >/dev/null && touch "$data/icons/Mk/$marker" &&
+        echo "  copiado: $data/icons/Mk"
+    fi
     printf '%s %s\n' "$(git -C "$repo" rev-parse --short=12 HEAD 2>/dev/null || echo dev)" \
       "$(git -C "$repo" log -1 --format=%cs 2>/dev/null || date +%F)" >"$cfg/mk/VERSION"
     if Hyprland --verify-config -c "$hypr_dst/hyprland.lua" 2>&1 | grep -q '^config ok'; then
@@ -125,6 +133,8 @@ case ${1:-status} in
     remove "$ghostty_dst"
     remove "$cfg/mk/fastfetch"
     remove "$cfg/mk/bash"
+    remove "${XDG_DATA_HOME:-$HOME/.local/share}/themes/Mk"
+    remove "${XDG_DATA_HOME:-$HOME/.local/share}/icons/Mk"
     remove "$qs_dst"
     remove "$old_qs_dst"
     remove_old

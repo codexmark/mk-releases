@@ -589,6 +589,17 @@ EOF
   for m in "$src"/migrations/system/*.sh; do [[ -f $m ]] && touch "$target/var/lib/mk/migrations/$(basename "$m")"; done
   for m in "$src"/migrations/user/*.sh; do [[ -f $m ]] && touch "$skel/.local/state/mk/migrations/$(basename "$m")"; done
 
+  # Os apps na paleta Folha: tema GTK, ícones (pastas em osso), a fonte
+  # Space Grotesk (que só existe aqui) e as cores do Qt.
+  cp -r "$src/system/mk/look/themes/Mk" "$target/usr/share/themes/Mk"
+  arch-chroot "$target" bash /usr/share/mk/system/mk/look/make-icons /usr/share/icons/Mk >/dev/null ||
+    warn "ícones do Mk não gerados; depois rode: sudo bash /usr/share/mk/system/mk/look/make-icons /usr/share/icons/Mk"
+  install -Dm644 -t "$target/usr/share/fonts/mk" "$src"/system/mk/fonts/*.otf
+  install -Dm644 "$src/system/mk/fonts/OFL.txt" "$target/usr/share/licenses/mk-fonts/OFL.txt"
+  arch-chroot "$target" fc-cache -f >/dev/null 2>&1 || true
+  mkdir -p "$skel/.config/qt6ct"
+  cp -r "$src/system/mk/look/qt6ct/." "$skel/.config/qt6ct/"
+
   # Boot (plymouth) e entrada (sddm) com a cara do Mk.
   mkdir -p "$target/usr/share/plymouth/themes" "$target/usr/share/sddm/themes" "$target/etc/plymouth"
   cp -r "$src/system/mk/plymouth/mk" "$target/usr/share/plymouth/themes/mk"

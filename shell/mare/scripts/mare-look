@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# A cara dos apps na sessão do Mk: ícones, cursor e fontes (gsettings). O tema
+# GTK em si vem pela variável GTK_THEME=Mk (config/hypr/mare/env.lua), que só
+# vale dentro do Mk.
+#
+# O gsettings é da conta inteira, não da sessão. Para não desfazer a escolha de
+# outro desktop (ou a sua), cada chave só é escrita se ainda está no padrão de
+# fábrica ou se foi o próprio Mk que escreveu o valor atual.
+set -uo pipefail
+
+schema=org.gnome.desktop.interface
+state=${XDG_CONFIG_HOME:-$HOME/.config}/mk/.look
+touch "$state" 2>/dev/null || exit 0
+
+apply() {
+  local key=$1 want=$2 current unset_ mine
+  current=$(gsettings get "$schema" "$key" 2>/dev/null) || return 0
+  [[ $current == "$want" ]] && { remember "$key" "$want"; return 0; }
+  unset_=$(dconf read "/org/gnome/desktop/interface/$key" 2>/dev/null)
+  mine=$(grep -m1 "^$key=" "$state" | cut -d= -f2-)
+  # Versões antigas do Mk punham o tema Adwaita-dark direto, sem anotar.
+  [[ $key == gtk-theme && $current == "'Adwaita-dark'" ]] && mine=$current
+  if [[ -z $unset_ || $current == "$mine" ]]; then
+    gsettings set "$schema" "$key" "$want" && remember "$key" "$want"
+  fi
+}
+
+remember() {
+  grep -v "^$1=" "$state" >"$state.tmp" 2>/dev/null
+  echo "$1=$2" >>"$state.tmp"
+  mv "$state.tmp" "$state"
+}
+
+apply color-scheme "'prefer-dark'"
+apply gtk-theme "'adw-gtk3-dark'"
+apply icon-theme "'Mk'"
+apply cursor-theme "'Adwaita'"
+apply cursor-size "24"
+apply font-name "'Space Grotesk 10'"
+apply document-font-name "'Space Grotesk 10'"
+apply monospace-font-name "'SpaceMono Nerd Font 10'"

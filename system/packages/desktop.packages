@@ -50,6 +50,8 @@ gpu-screen-recorder
 # Tema
 gnome-themes-extra
 papirus-icon-theme
+# adw-gtk-theme: a base do tema GTK do Mk (GTK 3 igual ao libadwaita)
+adw-gtk-theme
 qt6ct
 gnome-keyring
 polkit

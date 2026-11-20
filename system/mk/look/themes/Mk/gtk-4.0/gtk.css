@@ -1,0 +1,121 @@
+/* Mk: os apps GTK na paleta Folha (preto quente, osso, cobre).
+   A base é o adw-gtk3-dark (pacote adw-gtk-theme), que desenha o GTK 3 igual
+   ao libadwaita e traz o CSS do libadwaita para o GTK 4; este arquivo só troca
+   as cores e aperta os cantos. A sessão do Mk escolhe o tema com GTK_THEME=Mk,
+   então outro desktop na mesma conta não é afetado. */
+@import url("file:///usr/share/themes/adw-gtk3-dark/gtk-4.0/gtk-dark.css");
+
+/* libadwaita 1.6+ lê as variáveis; o GTK 4 puro e versões antigas, as cores nomeadas. */
+:root {
+  --accent-bg-color: #ce5e32;
+  --accent-fg-color: #0b0b0b;
+  --accent-color: #e07a4f;
+  --destructive-bg-color: #c2452d;
+  --destructive-fg-color: #f3ede4;
+  --destructive-color: #ff7a5c;
+  --success-bg-color: #8f8a6a;
+  --success-fg-color: #0b0b0b;
+  --success-color: #b5b08e;
+  --warning-bg-color: #ce5e32;
+  --warning-fg-color: #0b0b0b;
+  --warning-color: #e07a4f;
+  --error-bg-color: #c2452d;
+  --error-fg-color: #f3ede4;
+  --error-color: #ff7a5c;
+  --window-bg-color: #0f0e0d;
+  --window-fg-color: #cdc4ba;
+  --view-bg-color: #141211;
+  --view-fg-color: #cdc4ba;
+  --headerbar-bg-color: #0f0e0d;
+  --headerbar-fg-color: #cdc4ba;
+  --headerbar-border-color: #cdc4ba;
+  --headerbar-backdrop-color: #0f0e0d;
+  --headerbar-shade-color: rgba(0,0,0,0.36);
+  --headerbar-darker-shade-color: rgba(0,0,0,0.9);
+  --sidebar-bg-color: #100f0e;
+  --sidebar-fg-color: #cdc4ba;
+  --sidebar-backdrop-color: #100f0e;
+  --sidebar-shade-color: rgba(0,0,0,0.25);
+  --sidebar-border-color: rgba(205,196,186,0.13);
+  --secondary-sidebar-bg-color: #121110;
+  --secondary-sidebar-fg-color: #cdc4ba;
+  --secondary-sidebar-backdrop-color: #121110;
+  --secondary-sidebar-shade-color: rgba(0,0,0,0.25);
+  --secondary-sidebar-border-color: rgba(205,196,186,0.13);
+  --card-bg-color: rgba(205,196,186,0.05);
+  --card-fg-color: #cdc4ba;
+  --card-shade-color: rgba(0,0,0,0.36);
+  --dialog-bg-color: #1b1917;
+  --dialog-fg-color: #cdc4ba;
+  --popover-bg-color: #1b1917;
+  --popover-fg-color: #cdc4ba;
+  --popover-shade-color: rgba(0,0,0,0.25);
+  --thumbnail-bg-color: #1b1917;
+  --thumbnail-fg-color: #cdc4ba;
+  --shade-color: rgba(0,0,0,0.36);
+  --scrollbar-outline-color: rgba(0,0,0,0.5);
+  --overview-bg-color: #0b0b0b;
+  --overview-fg-color: #cdc4ba;
+  --active-toggle-bg-color: rgba(205,196,186,0.2);
+  --active-toggle-fg-color: #cdc4ba;
+  --window-radius: 6px;
+}
+
+@define-color accent_bg_color #ce5e32;
+@define-color accent_fg_color #0b0b0b;
+@define-color accent_color #e07a4f;
+@define-color destructive_bg_color #c2452d;
+@define-color destructive_fg_color #f3ede4;
+@define-color destructive_color #ff7a5c;
+@define-color success_bg_color #8f8a6a;
+@define-color success_fg_color #0b0b0b;
+@define-color success_color #b5b08e;
+@define-color warning_bg_color #ce5e32;
+@define-color warning_fg_color #0b0b0b;
+@define-color warning_color #e07a4f;
+@define-color error_bg_color #c2452d;
+@define-color error_fg_color #f3ede4;
+@define-color error_color #ff7a5c;
+@define-color window_bg_color #0f0e0d;
+@define-color window_fg_color #cdc4ba;
+@define-color view_bg_color #141211;
+@define-color view_fg_color #cdc4ba;
+@define-color headerbar_bg_color #0f0e0d;
+@define-color headerbar_fg_color #cdc4ba;
+@define-color headerbar_border_color #cdc4ba;
+@define-color headerbar_backdrop_color #0f0e0d;
+@define-color headerbar_shade_color rgba(0,0,0,0.36);
+@define-color headerbar_darker_shade_color rgba(0,0,0,0.9);
+@define-color sidebar_bg_color #100f0e;
+@define-color sidebar_fg_color #cdc4ba;
+@define-color sidebar_backdrop_color #100f0e;
+@define-color sidebar_shade_color rgba(0,0,0,0.25);
+@define-color sidebar_border_color rgba(205,196,186,0.13);
+@define-color secondary_sidebar_bg_color #121110;
+@define-color secondary_sidebar_fg_color #cdc4ba;
+@define-color secondary_sidebar_backdrop_color #121110;
+@define-color secondary_sidebar_shade_color rgba(0,0,0,0.25);
+@define-color secondary_sidebar_border_color rgba(205,196,186,0.13);
+@define-color card_bg_color rgba(205,196,186,0.05);
+@define-color card_fg_color #cdc4ba;
+@define-color card_shade_color rgba(0,0,0,0.36);
+@define-color dialog_bg_color #1b1917;
+@define-color dialog_fg_color #cdc4ba;
+@define-color popover_bg_color #1b1917;
+@define-color popover_fg_color #cdc4ba;
+@define-color popover_shade_color rgba(0,0,0,0.25);
+@define-color thumbnail_bg_color #1b1917;
+@define-color thumbnail_fg_color #cdc4ba;
+@define-color shade_color rgba(0,0,0,0.36);
+@define-color scrollbar_outline_color rgba(0,0,0,0.5);
+@define-color overview_bg_color #0b0b0b;
+@define-color overview_fg_color #cdc4ba;
+@define-color active_toggle_bg_color rgba(205,196,186,0.2);
+@define-color active_toggle_fg_color #cdc4ba;
+
+/* Folha: cantos quase retos e seleção em cobre. */
+selection { background-color: alpha(@accent_bg_color, 0.35); color: @window_fg_color; }
+tooltip { background-color: #1b1917; color: #cdc4ba; border: 1px solid alpha(#cdc4ba, 0.26); border-radius: 2px; }
+
+button, entry, .card, popover > contents, .toolbar { border-radius: 3px; }
+window, dialog > sheet, .dialog-host > sheet { border-radius: 6px; }

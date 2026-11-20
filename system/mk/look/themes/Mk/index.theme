@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Mk
+Comment=Os apps GTK na paleta Folha do Mk
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=Mk
+IconTheme=Mk
+CursorTheme=Adwaita
