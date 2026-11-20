@@ -81,8 +81,12 @@ var rows = [
       min: 2, max: 15, step: 1, def: 5, unit: "s", kw: "notificação toast duração" },
 
     // Tela
-    { page: "tela", group: "TAMANHO", key: "hypr.scale", label: "Escala",
-      desc: "Em telas pequenas de alta resolução, 1,25 ou 1,5 deixa tudo legível", ctl: "choice", def: 1,
+    { page: "tela", group: "TAMANHO", key: "ui.scale", label: "Tamanho da interface",
+      desc: "Ilha, painéis e ajustes. Ao mudar, o Maré reinicia", ctl: "choice", def: 0.85,
+      options: [ { v: 0.75, label: "75%" }, { v: 0.85, label: "85%" }, { v: 1, label: "100%" }, { v: 1.15, label: "115%" } ],
+      kw: "tamanho fonte letra grande pequeno zoom interface barra" },
+    { page: "tela", group: "TAMANHO", key: "hypr.scale", label: "Escala da tela",
+      desc: "Tudo, inclusive as janelas. Para telas pequenas de alta resolução", ctl: "choice", def: 1,
       options: [ { v: 1, label: "100%" }, { v: 1.25, label: "125%" }, { v: 1.5, label: "150%" }, { v: 2, label: "200%" } ],
       hypr: "@monitor.scale", kw: "zoom tamanho hidpi dpi resolução monitor" },
     { page: "tela", group: "LUZ NOTURNA", key: "night.temperature", label: "Calor",

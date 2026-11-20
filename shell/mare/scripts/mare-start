@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Inicia o Maré no tamanho escolhido nos Ajustes (Tela > Tamanho da interface).
+# O tamanho vale para tudo de uma vez (ilha, painéis, ajustes, bloqueio) pela
+# escala do Qt, com o texto desenhado no tamanho final, sem borrar.
+#
+#   mare-start              inicia (o autostart do Hyprland chama assim)
+#   mare-start --restart    fecha o Maré que está rodando e inicia de novo
+set -uo pipefail
+
+shell=$(cd "$(dirname "$0")/.." && pwd)
+root=$(dirname "$shell")
+log=${XDG_CACHE_HOME:-$HOME/.cache}/mk
+mkdir -p "$log"
+
+scale=$(jq -r '."ui.scale" // empty' "$root/ajustes.json" 2>/dev/null)
+[[ $scale =~ ^[0-9.]+$ ]] || scale=0.85
+
+if [[ ${1:-} == --restart ]]; then
+  qs kill -p "$shell" >/dev/null 2>&1
+  sleep 0.4
+fi
+QT_SCALE_FACTOR=$scale exec qs -p "$shell" >"$log/mare.log" 2>&1

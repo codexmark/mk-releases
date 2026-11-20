@@ -44,6 +44,9 @@ Singleton {
             hyprTimer.restart();
         if (key.startsWith("idle."))
             idleDirty = true;
+        // O tamanho da interface é a escala do Qt: só vale num Maré novo.
+        if (key === "ui.scale")
+            restartTimer.restart();
     }
 
     function reset(page) {
@@ -104,6 +107,14 @@ Singleton {
                 idleRestart.running = true;
             }
         }
+    }
+
+    // Reinicia o Maré depois de gravar o ajustes.json (o mare-start lê de lá).
+    // Roda fora do Maré, porque o próprio Maré vai fechar.
+    Timer {
+        id: restartTimer
+        interval: 700
+        onTriggered: Quickshell.execDetached(["setsid", "bash", Quickshell.shellPath("scripts/mare-start"), "--restart"])
     }
 
     // O Hyprland muda na hora: o mesmo hl.config do ajustes.lua, por eval.

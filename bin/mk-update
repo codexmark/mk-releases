@@ -130,9 +130,7 @@ if [[ $mk_available == true && $mode != --after-mk ]]; then
   if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && command -v qs >/dev/null; then
     # O Hyprland relê a config inteira (e limpa um aviso de erro da troca).
     hyprctl reload >/dev/null 2>&1 || true
-    qs kill -p "$cfg/shell" >/dev/null 2>&1 || true
-    log=${XDG_CACHE_HOME:-$HOME/.cache}/mk
-    hyprctl dispatch "hl.dsp.exec_cmd(\"qs -p '$cfg/shell' > '$log/mare.log' 2>&1\")" >/dev/null
+    hyprctl dispatch "hl.dsp.exec_cmd(\"bash '$cfg/shell/scripts/mare-start' --restart\")" >/dev/null
   fi
   note "Mk em $version. O Hyprland pega a config nova no próximo login."
   # O resto (migrações, pacotes) com a versão nova do mk-update.

@@ -5,7 +5,8 @@
 local paths = require("mare.paths")
 
 hl.on("hyprland.start", function()
-    hl.exec_cmd("mkdir -p '" .. paths.log .. "' && exec qs -p '" .. paths.shell .. "' > '" .. paths.log .. "/mare.log' 2>&1")
+    -- O Maré, no tamanho escolhido nos Ajustes (scripts/mare-start lê e aplica).
+    hl.exec_cmd("bash '" .. paths.shell .. "/scripts/mare-start'")
     -- Os tempos da página Energia dos Ajustes, quando você já mexeu neles.
     local idle = paths.root .. "hypridle.conf"
     if not package.searchpath("hypridle", paths.root .. "?.conf") then
