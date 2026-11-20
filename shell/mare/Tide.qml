@@ -43,10 +43,16 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "mare-tide"
-    // Launcher, Alt+Tab e área de transferência precisam do teclado. OnDemand
-    // (e não Exclusive): quem entrega o teclado é o HyprlandFocusGrab do
-    // Monitor.qml; Exclusive brigava com ele e o grab fechava o painel na hora.
-    WlrLayershell.keyboardFocus: tide.active && Mare.wantsKeyboard
+    // Os painéis recebem o teclado (a busca para digitar; todos para o Esc).
+    // Quem entrega é o HyprlandFocusGrab do Monitor.qml, e ele só consegue
+    // focar uma janela que já aceita teclado. Por isso a janela aceita
+    // (OnDemand) desde antes, e não só a partir do instante em que o painel
+    // abre: pedir o teclado e armar o grab ao mesmo tempo era uma corrida, e
+    // quando o grab ganhava o que se digitava ia para a janela de baixo.
+    // Fechada, a janela não tem área de clique, então não rouba o foco. Só
+    // larga o teclado para os Ajustes (outra janela) e para os passageiros.
+    // (OnDemand e não Exclusive: Exclusive brigava com o grab.)
+    WlrLayershell.keyboardFocus: tide.active && !Mare.sheetMode && !Mare.isTransient
         ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     // Só o painel recebe cliques; o resto da janela é transparente ao mouse.
