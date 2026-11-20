@@ -8,7 +8,9 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property string dir: Quickshell.env("HOME") + "/Pictures/Wallpapers"
+    // <pasta de imagens do sistema>/Wallpapers: ~/Imagens em português,
+    // ~/Pictures em inglês (xdg-user-dir). Vazio até a pasta ser achada.
+    property string dir: ""
     readonly property string storePath: Quickshell.statePath("wallpaper.json")
 
     property string current: ""
@@ -31,14 +33,28 @@ Singleton {
     }
 
     function refresh() {
-        list.running = true;
+        if (dir !== "")
+            list.running = true;
     }
 
     function save() {
         store.setText(JSON.stringify({ path: current, primary: primary }, null, 2) + "\n");
     }
 
-    Component.onCompleted: refresh()
+    Component.onCompleted: where.running = true
+
+    Process {
+        id: where
+        command: ["sh", "-c", "d=$(xdg-user-dir PICTURES 2>/dev/null); "
+            + "{ [ -n \"$d\" ] && [ \"$d\" != \"$HOME\" ]; } || d=$HOME/Pictures; "
+            + "mkdir -p \"$d/Wallpapers\"; printf %s \"$d/Wallpapers\""]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.dir = text.trim();
+                root.refresh();
+            }
+        }
+    }
 
     Process {
         id: palette

@@ -185,6 +185,9 @@ if [[ -s $share/aur-pendentes.txt ]] && command -v yay >/dev/null; then
   if ask "Instalar agora?"; then
     yay -S --needed --answerclean None --answerdiff None --removemake "${aur_pend[@]}" &&
       sudo rm -f "$share/aur-pendentes.txt"
+    # Os ganchos do limine reescrevem o menu de boot: garante que ele ainda
+    # inicia sozinho.
+    [[ -f $share/system/mk/boot/limine-default ]] && sudo bash "$share/system/mk/boot/limine-default" || true
   fi
 fi
 

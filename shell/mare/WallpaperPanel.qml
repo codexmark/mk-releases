@@ -1,7 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
-// Papéis de parede de ~/Pictures/Wallpapers, 12 por página.
+// Papéis de parede de <imagens>/Wallpapers (Wallpaper.dir), 12 por página.
 // Clique aplica; a interface toma o matiz da imagem escolhida.
 Item {
     id: panel
@@ -113,7 +114,7 @@ Item {
 
         Text {
             visible: Wallpaper.files.length === 0
-            text: "Coloque imagens em ~/Pictures/Wallpapers."
+            text: "Coloque imagens em " + Wallpaper.dir.replace(Quickshell.env("HOME"), "~") + "."
             color: Theme.textDim
             font.family: Theme.sans
             font.pixelSize: 13

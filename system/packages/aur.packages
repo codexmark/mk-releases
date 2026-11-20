@@ -21,5 +21,6 @@ localsend-bin
 ttf-fraunces-variable
 
 # ble.sh: no terminal do Mk, sugestões em cinza enquanto digita (Tab completa)
-# e cores de sintaxe. Só existe no AUR.
-blesh
+# e cores de sintaxe. Só existe no AUR. A versão -git é a 0.4, que tem as
+# cores por tipo que o Mk usa; o pacote "blesh" ainda é o 0.3.
+blesh-git

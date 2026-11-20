@@ -384,7 +384,10 @@ Rectangle {
         Repeater {
             model: [
                 { k: "sessão", v: root.sessions.length > 0 ? (root.sessions[root.sessionIndex] || "") : "", act: "session" },
-                { k: "teclado", v: keyboard.layouts.length > 0 ? keyboard.layouts[keyboard.currentLayout].shortName : "", act: "layout" },
+                // A lista do sddm diz "us" mesmo com o X em outro layout; com
+                // um layout só, vale o do sistema (theme.conf.user, do instalador).
+                { k: "teclado", v: keyboard.layouts.length <= 1 && config.layout ? config.layout
+                    : keyboard.layouts.length > 0 ? keyboard.layouts[keyboard.currentLayout].shortName : "", act: "layout" },
                 { k: "reiniciar", v: "󰜉", act: "reboot", icon: true },
                 { k: "desligar", v: "󰐥", act: "poweroff", icon: true }
             ]

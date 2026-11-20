@@ -576,7 +576,9 @@ EOF
   place "$src/config/fastfetch" "$skel/.config/mk/fastfetch"
   place "$src/config/bash" "$skel/.config/mk/bash"
   install -Dm644 "$src/config/bash/seu.bash.exemplo" "$skel/.config/mk/seu.bash"
-  mkdir -p "$skel/Work" "$skel/Pictures/Wallpapers"
+  # A pasta de papéis de parede fica dentro da pasta de imagens do sistema
+  # (Imagens, em português); o Maré cria quando abre.
+  mkdir -p "$skel/Work"
   # O terminal do Mk: a ficha do fastfetch, o prompt e os atalhos.
   if ! grep -q 'mk/bash/mk.bash' "$skel/.bashrc" 2>/dev/null; then
     printf '\n# Mk: ficha do fastfetch, prompt e atalhos\n[[ -f ~/.config/mk/bash/mk.bash ]] && source ~/.config/mk/bash/mk.bash\n' >>"$skel/.bashrc"
@@ -605,6 +607,8 @@ EOF
   cp -r "$src/system/mk/plymouth/mk" "$target/usr/share/plymouth/themes/mk"
   printf '[Daemon]\nTheme=mk\nShowDelay=0\n' >"$target/etc/plymouth/plymouthd.conf"
   cp -r "$src/system/mk/sddm/mk" "$target/usr/share/sddm/themes/mk"
+  # O teclado que a entrada mostra (a lista do próprio sddm diz sempre "us").
+  printf '[General]\nlayout=%s\n' "${KEYMAP%%-*}" >"$target/usr/share/sddm/themes/mk/theme.conf.user"
   mkdir -p "$target/etc/sddm.conf.d"
   printf '[Theme]\nCurrent=mk\n' >"$target/etc/sddm.conf.d/20-mk-theme.conf"
 }
@@ -740,6 +744,9 @@ finish_boot() {
   fi
   limine_conf_ok "$conf" || die "o limine.conf não aponta para um kernel que exista em /boot"
   note "limine: ${conf#"$target"}"
+  # O menu inicia sozinho pela primeira entrada que inicia de verdade (com os
+  # ganchos do limine a entrada 1 é um grupo).
+  arch-chroot "$target" bash /usr/share/mk/system/mk/boot/limine-default >/dev/null 2>&1 || true
 
   if [[ -d /sys/firmware/efi/efivars ]] && ! efibootmgr 2>/dev/null | grep -q ' Mk'; then
     efibootmgr --create --disk "$DISK" --part 1 --label Mk --loader '\EFI\limine\BOOTX64.EFI' >/dev/null ||
