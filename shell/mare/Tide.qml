@@ -125,10 +125,39 @@ PanelWindow {
         Behavior on fastH { enabled: sheet.moving; SpringAnimation { spring: 4.2 * sheet.k; damping: 0.36; epsilon: 0.2 } }
         Behavior on slowH { enabled: sheet.moving; SpringAnimation { spring: 3.0 * sheet.k; damping: 0.44; epsilon: 0.2 } }
 
-        // O conteúdo do painel demora um instante para carregar (mais ainda
-        // numa máquina lenta), e até lá a largura-alvo é 0. Só há o que
-        // desenhar, e para onde escorrer, quando ele tem tamanho.
-        readonly property bool ready: tide.open && targetW > 2 * tide.fillet && targetH > tide.weld
+        // O conteúdo do painel demora um instante para carregar, e até lá a
+        // largura-alvo é 0: só há o que desenhar quando ele tem tamanho.
+        readonly property bool loaded: tide.open && targetW > 2 * tide.fillet && targetH > tide.weld
+        // Numa máquina lenta, carregar a busca (a lista de apps e os ícones)
+        // trava a tela por meio segundo. Se o painel começasse a escorrer
+        // antes, ficava congelado no primeiro quadro: um fio pendurado na
+        // ilha. Abrindo do repouso, ele só começa quando os quadros voltam a
+        // fluir (ou depois de meio segundo, de qualquer jeito). Trocando de
+        // painel não espera: o painel já está na tela.
+        property bool ready: false
+        onLoadedChanged: {
+            if (!loaded)
+                ready = false;
+            else if (slowH >= 1 || fastH >= 1 || Motion.speed <= 0)
+                ready = true;
+        }
+
+        FrameAnimation {
+            property int frames: 0
+            running: sheet.loaded && !sheet.ready
+            onRunningChanged: {
+                if (running) {
+                    frames = 0;
+                    reset();
+                }
+            }
+            onTriggered: {
+                frames += 1;
+                if ((frames >= 3 && frameTime < 0.05) || elapsedTime > 0.5)
+                    sheet.ready = true;
+            }
+        }
+
         // Abrindo com o painel recolhido: nasce num ponto embaixo do item (sem
         // voar de onde fechou da última vez) e escorre a partir dali.
         onReadyChanged: {
