@@ -9,7 +9,9 @@ cp -r "$share/system/mk/plymouth/mk" /usr/share/plymouth/themes/mk
 rm -rf /usr/share/sddm/themes/mk
 cp -r "$share/system/mk/sddm/mk" /usr/share/sddm/themes/mk
 if [[ -d /etc/skel/.config/mk/fastfetch ]]; then
-  cp "$share/config/fastfetch/emblem.png" /etc/skel/.config/mk/fastfetch/emblem.png
+  rm -rf /etc/skel/.config/mk/fastfetch
+  cp -r "$share/config/fastfetch" /etc/skel/.config/mk/fastfetch
+  touch /etc/skel/.config/mk/fastfetch/.instalado-pelo-mk
 fi
 # O logo do boot vai dentro do initramfs.
 mkinitcpio -P
