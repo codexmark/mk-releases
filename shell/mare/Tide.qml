@@ -264,9 +264,12 @@ PanelWindow {
             }
         }
 
-        // O conteúdo anda com o corpo e é cortado por ele.
+        // O conteúdo anda com o corpo e é cortado por ele. Esc fecha o painel
+        // (os que têm campo de texto tratam o Esc eles mesmos, antes daqui).
         Item {
             id: body
+            focus: true
+            Keys.onEscapePressed: Mare.close()
             x: sheet.bl
             width: sheet.br - sheet.bl
             height: Math.min(sheet.h, sheet.hm)

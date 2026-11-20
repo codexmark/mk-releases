@@ -431,11 +431,19 @@ PanelWindow {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Motion.curve
         }
+        // A camada de baixo recebe a imagem nova; a de cima só some quando
+        // a de baixo terminou de carregar (ela carrega em segundo plano: se a
+        // de cima sumisse já, aparecia o papel de parede antigo).
         ScriptAction {
-            script: {
-                shown.source = incoming.source;
+            script: shown.source = incoming.source
+        }
+    }
+
+    Connections {
+        target: shown
+        function onStatusChanged() {
+            if (shown.status === Image.Ready && shown.source === incoming.source && !crossfade.running)
                 incoming.opacity = 0;
-            }
         }
     }
 

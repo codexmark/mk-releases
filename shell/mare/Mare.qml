@@ -48,7 +48,10 @@ Singleton {
     readonly property bool isTransient: transients.indexOf(mode) >= 0
 
     // Painéis que recebem o teclado enquanto abertos.
-    readonly property bool wantsKeyboard: mode === "launcher" || mode === "switcher" || mode === "clipboard"
+    // Todo painel aberto recebe o teclado: é o que faz o Esc fechá-lo (antes
+    // só a busca, o Alt+Tab e a área de transferência recebiam, e nos outros
+    // o Esc ia para a janela de baixo). Os passageiros (aviso, OSD), não.
+    readonly property bool wantsKeyboard: mode !== "rest" && mode !== "picker" && !isTransient && !sheetMode
 
     // Para uma janela ignorar o espaço reservado da ilha (ficar por cima ou
     // por trás dela), o protocolo pede a zona exclusiva -1. Com o tamanho da
@@ -164,6 +167,7 @@ Singleton {
         function close(): void {
             root.close();
         }
+
 
         // Bloqueia a tela (Super + L, hypridle, antes de suspender).
         function lock(): void {
