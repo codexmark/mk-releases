@@ -162,8 +162,9 @@ if ((mk_ble)); then
   mk_face syntax_quoted 'fg=#b0a9a0'
   mk_face syntax_quotation 'fg=#b0a9a0'
   mk_face syntax_varname 'fg=#958f87'
-  # Variáveis de todo tipo (exportada, vetor, número, não definida...).
-  for mk_name in varname_array varname_empty varname_export varname_expr varname_hash \
+  # Variáveis de todo tipo (exportada, vetor, número, não definida...): só
+  # no 0.4; o 0.3 não tem essas faces e reclama delas mais tarde.
+  declare -F ble-face >/dev/null && for mk_name in varname_array varname_empty varname_export varname_expr varname_hash \
     varname_number varname_readonly varname_transform varname_unset; do
     mk_face "$mk_name" 'fg=#958f87'
   done
