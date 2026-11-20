@@ -111,10 +111,13 @@ PanelWindow {
 
         Behavior on neckL { enabled: sheet.moving; SpringAnimation { spring: 7.5 * sheet.k; damping: 0.62; epsilon: 0.2 } }
         Behavior on neckR { enabled: sheet.moving; SpringAnimation { spring: 7.5 * sheet.k; damping: 0.62; epsilon: 0.2 } }
-        Behavior on bodyL { enabled: sheet.moving; SpringAnimation { spring: 3.0 * sheet.k; damping: 0.3; epsilon: 0.2 } }
-        Behavior on bodyR { enabled: sheet.moving; SpringAnimation { spring: 3.0 * sheet.k; damping: 0.3; epsilon: 0.2 } }
-        Behavior on fastH { enabled: sheet.moving; SpringAnimation { spring: 5.0 * sheet.k; damping: 0.34; epsilon: 0.2 } }
-        Behavior on slowH { enabled: sheet.moving; SpringAnimation { spring: 3.4 * sheet.k; damping: 0.42; epsilon: 0.2 } }
+        // O corpo alarga quase junto com a descida: se ficasse muito atrás,
+        // a altura chegava ao fim com a largura ainda no começo, e o painel
+        // virava um fio comprido antes de engordar.
+        Behavior on bodyL { enabled: sheet.moving; SpringAnimation { spring: 4.6 * sheet.k; damping: 0.36; epsilon: 0.2 } }
+        Behavior on bodyR { enabled: sheet.moving; SpringAnimation { spring: 4.6 * sheet.k; damping: 0.36; epsilon: 0.2 } }
+        Behavior on fastH { enabled: sheet.moving; SpringAnimation { spring: 4.2 * sheet.k; damping: 0.36; epsilon: 0.2 } }
+        Behavior on slowH { enabled: sheet.moving; SpringAnimation { spring: 3.0 * sheet.k; damping: 0.44; epsilon: 0.2 } }
 
         Connections {
             target: tide
@@ -133,8 +136,12 @@ PanelWindow {
         // corpo se cruzarem num balanço, viram um ponto no meio.
         readonly property real bl: Math.min(bodyL, (bodyL + bodyR) / 2)
         readonly property real br: Math.max(bodyR, (bodyL + bodyR) / 2)
-        readonly property real h: Math.max(0, edgeH)
-        readonly property real hm: Math.max(0, midH)
+        // Quanto do corpo já abriu (0 a 1). A altura desenhada acompanha: um
+        // corpo estreito é uma gota curta, nunca um fio até lá embaixo.
+        readonly property real grown: half > 0 ? Math.max(0, Math.min(1, (br - bl) / (2 * half))) : 1
+        readonly property real reach: 0.18 + 0.82 * Math.sqrt(grown)
+        readonly property real h: Math.max(0, edgeH) * reach
+        readonly property real hm: Math.max(0, midH) * reach
         readonly property real fe: Math.min(tide.fillet, h / 2)
         readonly property real re: Math.min(tide.corner, Math.max(0, (h - fe) / 2), (br - bl) / 2)
         readonly property real sideY: fe + (h - re - fe) / 2
