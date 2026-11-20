@@ -17,7 +17,9 @@ PanelWindow {
         left: true
         right: true
     }
-    exclusionMode: ExclusionMode.Ignore
+    // A tela inteira, também atrás da ilha (veja Mare.ignoreZone).
+    exclusionMode: ExclusionMode.Normal
+    exclusiveZone: Mare.ignoreZone
     color: Theme.ground
     WlrLayershell.layer: WlrLayer.Background
     WlrLayershell.namespace: "mare-backdrop"

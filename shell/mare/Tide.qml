@@ -35,7 +35,9 @@ PanelWindow {
         left: true
         right: true
     }
-    exclusionMode: ExclusionMode.Ignore
+    // Por cima da ilha, colado nela (veja Mare.ignoreZone).
+    exclusionMode: ExclusionMode.Normal
+    exclusiveZone: Mare.ignoreZone
     implicitHeight: 720
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay

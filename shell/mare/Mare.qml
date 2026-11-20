@@ -40,6 +40,15 @@ Singleton {
     // Painéis que recebem o teclado enquanto abertos.
     readonly property bool wantsKeyboard: mode === "launcher" || mode === "switcher" || mode === "clipboard"
 
+    // Para uma janela ignorar o espaço reservado da ilha (ficar por cima ou
+    // por trás dela), o protocolo pede a zona exclusiva -1. Com o tamanho da
+    // interface diferente de 100% (QT_SCALE_FACTOR) o valor é multiplicado
+    // pela escala, e -1 virava 0 ("fique abaixo da ilha"): os painéis desciam
+    // e o fundo parava antes do alto. Este é o valor que, depois da escala,
+    // dá -1. Use com exclusionMode: ExclusionMode.Normal.
+    readonly property real uiScale: Number(Quickshell.env("QT_SCALE_FACTOR")) || 1
+    readonly property int ignoreZone: -Math.ceil(1 / uiScale)
+
     // Os Ajustes são uma folha no meio da tela (SettingsWindow), não descem da ilha.
     readonly property bool sheetMode: mode === "settings"
     property string settingsPage: "ilha"
