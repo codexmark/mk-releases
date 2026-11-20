@@ -18,9 +18,14 @@
   },
   "modules": [
     "break",
+    // Quem e onde. Linha própria em vez do módulo "title", que some quando
+    // a imagem (kitty) está ligada em algumas versões do fastfetch.
     {
-      "type": "title",
-      "format": "{#1;38;2;205;196;186}{user-name}{#}{#38;2;113;107;105} @ {#}{#1;38;2;205;196;186}{host-name}{#}"
+      "type": "command",
+      "key": " ",
+      "keyWidth": 1,
+      "text": "printf '%s @ %s' \"$USER\" \"$(cat /etc/hostname 2>/dev/null || uname -n)\"",
+      "format": "\u001b[1;38;2;205;196;186m{}\u001b[0m"
     },
     {
       "type": "command",
