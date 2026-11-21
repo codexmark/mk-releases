@@ -1,2 +1,1 @@
-Corrige as issues da primeira instalação em máquina real
-Documentação refeita contra o código atual
+Migração do boot: mantém as subentradas dos ganchos e exige um kernel

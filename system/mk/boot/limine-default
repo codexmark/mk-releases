@@ -6,8 +6,9 @@
 # um grupo com "linux" e "Snapshots" dentro, e um grupo só abre e fecha. A
 # contagem acabava e nada iniciava.
 #
-# O que este script faz: acha a primeira entrada que inicia de verdade (tem
-# "protocol:" e não tem filhos), abre os grupos acima dela ("/Mk" vira "/+Mk",
+# O que este script faz: acha a primeira entrada que inicia o Linux (tem
+# "protocol: linux" e não tem filhos; a "EFI fallback" só carrega o limine
+# de novo), abre os grupos acima dela ("/Mk" vira "/+Mk",
 # que o limine mostra já aberto) e grava em default_entry a posição dela
 # entre as entradas visíveis. O limine só conta o que está visível: com o
 # grupo fechado, a entrada 2 seria a de baixo ("EFI fallback"), não o linux.
@@ -40,7 +41,7 @@ while IFS= read -r line || [[ -n $line ]]; do
     rest=${trimmed#"$slashes"}
     if [[ $rest == +* ]]; then opens[n]=1; else opens[n]=0; fi
     protos[n]=0
-  elif [[ $trimmed == protocol:* && $n -gt 0 ]]; then
+  elif [[ $trimmed =~ ^protocol:[[:space:]]*linux[[:space:]]*$ && $n -gt 0 ]]; then
     protos[n]=1
   fi
 done <"$conf"

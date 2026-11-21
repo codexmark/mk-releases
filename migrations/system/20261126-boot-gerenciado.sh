@@ -22,7 +22,7 @@ command -v limine-update >/dev/null || exit 0
 # Só mexe se a entrada fixa do instalador está lá.
 grep -q '^[[:space:]]*path: boot():/vmlinuz-linux[[:space:]]*$' "$conf" || exit 0
 
-# Toda entrada aponta para arquivos que existem na ESP? (o "#resumo" no fim
+# Toda entrada aponta para arquivos que existem na ESP, e há kernel? (o "#resumo" no fim
 # do caminho é da verificação do limine, não do nome)
 conf_ok() {
   local file n=0
@@ -31,7 +31,8 @@ conf_ok() {
     [[ -f $boot/$file ]] || return 1
     n=$((n + 1))
   done < <(sed -n 's/^[[:space:]]*\(path\|module_path\|image_path\|kernel_path\): *boot():\/*//p' "$1")
-  ((n > 0))
+  # E há pelo menos uma entrada de Linux (a "EFI fallback" sozinha não serve).
+  ((n > 0)) && grep -q '^[[:space:]]*protocol: linux[[:space:]]*$' "$1"
 }
 
 cp -a "$conf" "$conf.mk-antes"
@@ -41,19 +42,21 @@ back() {
   exit 0
 }
 
-# Tira as entradas de primeiro nível "/Mk" e "/Mk (fallback)" que apontam
-# para /vmlinuz-linux; o resto do arquivo (cabeçalho, outras entradas) fica.
+# Dentro de "/Mk" e "/Mk (fallback)", tira as linhas da entrada fixa (as que
+# vêm antes da primeira subentrada "//"). Se o grupo já tem subentradas dos
+# ganchos, elas ficam; se não sobra nada, o título sai junto e o
+# limine-update escreve o grupo. O resto do arquivo não muda.
 awk '
-  function flush() { if (held != "" && !drop) printf "%s", held; held = ""; drop = 0 }
-  /^\/[^\/]/ { flush(); inblock = 1; mine = ($0 ~ /^\/\+?Mk( \(fallback\))?[[:space:]]*$/) }
-  /^\/\// { }
+  function flush() { if (head != "" && (!mine || kept)) printf "%s", head; printf "%s", body; head = ""; body = ""; kept = 0 }
+  /^\/[^\/]/ { flush(); head = $0 "\n"; mine = ($0 ~ /^\/\+?Mk( \(fallback\))?[[:space:]]*$/); top = 1; next }
+  head == "" { print; next }
   {
-    if (inblock) {
-      held = held $0 "\n"
-      if (mine && $0 ~ /^[[:space:]]*path: boot\(\):\/vmlinuz-linux[[:space:]]*$/) drop = 1
-    } else {
-      printf "%s\n", $0
+    if (mine && top && $0 ~ /^[[:space:]]*\/\//) top = 0
+    if (mine && top) {
+      if ($0 ~ /^[[:space:]]*(protocol|path|module_path|cmdline|kernel_cmdline|comment):/ || $0 ~ /^[[:space:]]*$/) next
     }
+    body = body $0 "\n"
+    if ($0 !~ /^[[:space:]]*$/) kept = 1
   }
   END { flush() }
 ' "$conf.mk-antes" >"$conf"
