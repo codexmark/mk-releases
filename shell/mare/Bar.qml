@@ -24,6 +24,14 @@ PanelWindow {
     }
     // A janela tem uma folga embaixo da ilha para a onda do som; o espaço
     // reservado para as janelas continua sendo só a altura da ilha.
+    // O que o Monitor.qml liga ao painel deste monitor: de que largura o
+    // painel aberto precisa (a ilha alarga), para onde a ilha vai (o painel se
+    // encaixa onde ela vai estar, não onde está a cada quadro: seguindo a
+    // ilha em movimento, as molas dele recomeçavam sem sair do lugar).
+    property real sheetW: 0
+    readonly property real islandX: island.goalX
+    readonly property real islandW: island.goalW
+
     readonly property int waveRoom: 34
     implicitHeight: barH + waveRoom
     exclusiveZone: barH
@@ -92,7 +100,7 @@ PanelWindow {
         // Um painel mais largo que a ilha a alarga (dos dois lados) para caber
         // inteiro dentro da borda de baixo (ombros + cantos de cada lado).
         readonly property real extra: Math.max(0,
-            (Mare.sheetW > 0 ? Mare.sheetW + 2 * (bar.fillet + bar.corner) : 0) - natural)
+            (bar.sheetW > 0 ? bar.sheetW + 2 * (bar.fillet + bar.corner) : 0) - natural)
         // Distância da borda esquerda da ilha até o centro do relógio.
         readonly property real clockOffset: bar.fillet + bar.pad + extra / 2
             + left.implicitWidth + bar.pad + clockBox.implicitWidth / 2
@@ -121,11 +129,6 @@ PanelWindow {
             }
         }
 
-        // O painel se encaixa onde a ilha vai estar, não onde ela está a cada
-        // quadro: seguindo a ilha em movimento, o alvo do painel mudava a
-        // cada quadro e as molas dele recomeçavam sem sair do lugar.
-        Binding { target: Mare; property: "islandX"; value: island.goalX }
-        Binding { target: Mare; property: "islandW"; value: island.goalW }
 
         // Translúcida em repouso, sólida com um painel aberto (como no Ryoku).
         property real solidity: bar.panelOpen ? 1 : Settings.get("island.restOpacity")

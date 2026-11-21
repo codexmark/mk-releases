@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# O controle Xbox e o driver xone, para a página Controle dos Ajustes.
+#
+# O kernel traz o xpad, que cuida só dos botões de um controle Xbox ligado
+# por cabo: o fone plugado no controle não aparece como dispositivo de som.
+# O xone (xone-dkms, do AUR) assume também o áudio, mas é um módulo fora do
+# kernel: compila de novo a cada kernel novo, marca o kernel como "tainted" e
+# baixa um firmware da Microsoft (licença própria) para o adaptador sem fio.
+# Por isso é uma escolha sua, não vem instalado.
+#
+#   mare-gamepad status      JSON com o estado (não muda nada)
+#   mare-gamepad install     instala (interativo: rode num terminal)
+#   mare-gamepad remove      remove (interativo, pede a senha do sudo)
+set -uo pipefail
+
+# Um controle da Microsoft (045e) ligado por USB, pelo nome do produto.
+controllers() {
+  local d vendor product
+  for d in /sys/bus/usb/devices/*; do
+    [[ -r $d/idVendor && -r $d/product ]] || continue
+    read -r vendor <"$d/idVendor"
+    [[ $vendor == 045e ]] || continue
+    read -r product <"$d/product"
+    [[ ${product,,} == *controller* || ${product,,} == *xbox* ]] && printf '%s\n' "$product"
+  done
+}
+
+status() {
+  local installed=false loaded=false yay=false
+  pacman -Qq xone-dkms >/dev/null 2>&1 && installed=true
+  [[ -d /sys/module/xone_gip || -d /sys/module/xone_wired || -d /sys/module/xone_dongle ]] && loaded=true
+  command -v yay >/dev/null 2>&1 && yay=true
+  controllers | jq -R . | jq -sc --argjson installed "$installed" --argjson loaded "$loaded" \
+    --argjson yay "$yay" '{ installed: $installed, loaded: $loaded, yay: $yay, controllers: . }'
+}
+
+case ${1:-status} in
+  status) status ;;
+  install)
+    command -v yay >/dev/null || { echo "falta o yay (o xone-dkms é do AUR)"; read -rp 'Enter fecha.' _; exit 1; }
+    # Os cabeçalhos do kernel e o dkms já são do Mk; --needed não reinstala.
+    yay -S --needed linux-headers dkms xone-dkms
+    echo
+    read -rp 'Enter fecha. Tire e ponha o cabo do controle (ou reinicie) para o driver novo assumir. ' _
+    ;;
+  remove)
+    sudo pacman -Rns xone-dkms
+    echo
+    read -rp 'Enter fecha. O controle volta ao driver do kernel no próximo reinício. ' _
+    ;;
+  *)
+    echo "uso: mare-gamepad status | install | remove" >&2
+    exit 2
+    ;;
+esac

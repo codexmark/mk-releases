@@ -105,6 +105,8 @@ cópia do shell, manda os comandos de IPC que você der e mostra os erros do log
 
 ```bash
 bin/dev-shot <saida.png> "settings monitores"
+# duas telas de larguras diferentes, uma tecla dentro do aninhado, e a captura da tela virtual
+MK_DEV_HEADLESS=1080x1920 bin/dev-shot <saida.png> "toggle launcher" "tecla -k Escape" "state"
 ```
 
 Cada argumento depois do arquivo é o que viria depois de `ipc call mare`. Sai

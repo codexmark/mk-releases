@@ -36,8 +36,10 @@ bash ~/.config/mk/shell/scripts/mare-start --restart
   singleton que ninguém cita não existe).
 
 `Monitor.qml` monta, para a sua tela, `Backdrop`, `Bar`, `Tide`,
-`SettingsWindow` e `WelcomeWindow`, mais um `HyprlandFocusGrab` que fecha o
-painel aberto quando você clica fora. `Tide`, `SettingsWindow` e
+`SettingsWindow` e `WelcomeWindow`, mais uma janela transparente
+(`mare-outside`) que fecha o painel aberto quando você clica fora dele e da
+ilha. É também ali que a ilha e o painel de cada tela são ligados
+(`bar.islandX`/`islandW` → `Tide`, `tide.sheetW` → `Bar`). `Tide`, `SettingsWindow` e
 `WelcomeWindow` recebem `active: focused`: os painéis só abrem no monitor em
 foco. Com mais de uma tela isso nunca foi testado em hardware.
 
@@ -49,7 +51,7 @@ Instalado, o shell fica em `~/.config/mk/shell`, e não em
 | Arquivo | Camada (namespace) | O que é |
 |---|---|---|
 | `Backdrop.qml` | Background (`mare-backdrop`) | O fundo: a folha de desenho, a letra do workspace e, por cima, o papel de parede escurecido. |
-| `Bar.qml` | padrão (`mare-island`) | A ilha. Reserva 34 px (`barH`) para as janelas; a janela é mais alta para caber a onda do som. Publica `Mare.islandX`/`islandW` e abre painéis com `Mare.openAt(painel, x)`. |
+| `Bar.qml` | padrão (`mare-island`) | A ilha. Reserva 34 px (`barH`) para as janelas; a janela é mais alta para caber a onda do som. Expõe `islandX`/`islandW` (para onde ela vai) e recebe `sheetW`; abre painéis com `Mare.openAt(painel, x)`. |
 | `Tide.qml` | Overlay (`mare-tide`) | O painel líquido que desce da ilha. Carrega o conteúdo do painel em `Mare.mode`. |
 | `SettingsWindow.qml` | Overlay (`mare-settings`) | Os Ajustes: uma folha no meio da tela, não um painel da ilha. Aberta quando `Mare.mode === "settings"`. |
 | `PolkitDialog.qml` | Overlay (`mare-polkit`) | O pedido de senha de administrador: o Maré é o agente de polkit da sessão (só um registra; o `hyprpolkitagent` fica instalado, de reserva). Cancela o pedido se a tela estiver bloqueada. |
@@ -115,7 +117,7 @@ Cada arquivo com `pragma Singleton` é dono de um pedaço do estado.
 
 | Singleton | Estado que guarda |
 |---|---|
-| `Mare` | O modo da ilha (`mode`), a posição de onde o painel desce (`originX`), o encaixe ilha/painel (`islandX`, `islandW`, `sheetW`), o índice do Alt+Tab, o OSD, a página dos Ajustes, `uiScale`/`ignoreZone`. Tem o IPC. |
+| `Mare` | O modo da ilha (`mode`), a posição de onde o painel desce (`originX`), o índice do Alt+Tab, o OSD, a página dos Ajustes, `uiScale`/`ignoreZone`. Tem o IPC. |
 | `Settings` | Os ajustes (`values` sobre `defaults`), o que a máquina tem (`caps`), o último erro (`lastError`) e os arquivos gerados. Veja "Ajustes". |
 | `Theme` | Cores, famílias de fonte e a letra grega de cada workspace. Só leitura. |
 | `Motion` | Durações e curvas, multiplicadas por `motion.speed`. Só leitura. |
@@ -269,6 +271,7 @@ administrador, pelo `pkexec`, quando o CUPS recusa uma ação.
 | `mare-emoji` | `pick` copia (e digita, com `wtype`) o emoji; `tem-wtype`; `gerar` refaz o `Emoji.js`. | `EmojiPanel.qml`; `gerar` é para quem mantém o Mk |
 | `mare-monitors` | `list` lê as telas; `trial` grava o `monitores.lua`, recarrega o Hyprland e deixa um vigia; `keep` e `revert` respondem ao vigia. | `Monitors.qml` |
 | `mare-default-apps` | Apps padrão: `list`, `set`, `terminal`, `open`. | `SettingsAppsPage.qml`; `binds.lua` (`open navegador`) |
+| `mare-gamepad` | O controle Xbox e o driver xone: `status` (JSON), `install` e `remove` (interativos, num terminal). | `SettingsGamepadPage.qml` |
 | `mare-printers` | Impressoras do CUPS: `status`, `find`, `add` e as outras ações da página. | `SettingsPrintersPage.qml` |
 | `mare-updates` | Procura atualizações do Mk, do Arch e do AUR e responde em JSON. | `Updates.qml`, `bin/mk-update` |
 
@@ -510,16 +513,17 @@ janela em uso fica sem o teclado até um clique. Por isso o `mare-start
 você reiniciar o Maré de outro jeito (`qs kill` e `qs -p` à mão), isso não
 acontece.
 
-**Teclado nos painéis.** Quem entrega o teclado a um painel é o
-`HyprlandFocusGrab` do `Monitor.qml`, e ele só foca uma janela que já aceita
-teclado. Por isso o `Tide` fica em `WlrKeyboardFocus.OnDemand` desde antes de
-abrir, e não `Exclusive` (que brigava com o grab). Pedir o teclado só na hora
-de abrir era uma corrida: o que se digitava ia para a janela de baixo.
+**Teclado nos painéis.** O painel pede o teclado ele mesmo: o `Tide` fica em
+`WlrKeyboardFocus.Exclusive` enquanto um painel está aberto no seu monitor
+(`tide.open && Mare.wantsKeyboard`), e os Ajustes, enquanto a folha está
+aberta. Antes quem entregava era um `HyprlandFocusGrab`, mas o Hyprland dá o
+foco a uma janela qualquer da lista do grab, e quando caía na ilha o que se
+digitava não chegava a ninguém.
 
-**Trocar de painel não é clicar fora.** Pelo comentário do `Monitor.qml`, sair de um
-painel com teclado para um sem teclado solta o teclado, e o Hyprland desfaz o
-grab. O `Monitor.qml` olha `Mare.switchedAt`: se a
-troca foi há menos de 400 ms, arma o grab de novo em vez de fechar.
+**Nada de geometria de tela no `Mare`.** O singleton é um só para todas as
+telas; a `Bar` e o `Tide` são um por tela. Posição e largura da ilha e do
+painel moram no `Monitor.qml`. Com isso no singleton, em telas de larguras
+diferentes o painel abria com a posição da ilha da outra tela.
 
 **O primeiro quadro do painel.** O conteúdo leva um instante para carregar, e
 até lá a largura-alvo é 0. O `Tide` só desenha quando o conteúdo tem tamanho

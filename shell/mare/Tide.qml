@@ -11,6 +11,11 @@ PanelWindow {
     id: tide
 
     property bool active: true
+    // A ilha deste monitor (quem liga é o Monitor.qml): onde ela vai estar.
+    property real islandX: 0
+    property real islandW: 0
+    // De que largura o painel aberto precisa; a ilha deste monitor alarga.
+    readonly property real sheetW: open ? sheet.targetW : 0
     // O painel do projeto só existe num workspace ligado a um projeto.
     readonly property string mode: {
         const m = active ? Mare.mode : "rest";
@@ -43,17 +48,11 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "mare-tide"
-    // Os painéis recebem o teclado (a busca para digitar; todos para o Esc).
-    // Quem entrega é o HyprlandFocusGrab do Monitor.qml, e ele só consegue
-    // focar uma janela que já aceita teclado. Por isso a janela aceita
-    // (OnDemand) desde antes, e não só a partir do instante em que o painel
-    // abre: pedir o teclado e armar o grab ao mesmo tempo era uma corrida, e
-    // quando o grab ganhava o que se digitava ia para a janela de baixo.
-    // Fechada, a janela não tem área de clique, então não rouba o foco. Só
-    // larga o teclado para os Ajustes (outra janela) e para os passageiros.
-    // (OnDemand e não Exclusive: Exclusive brigava com o grab.)
-    WlrLayershell.keyboardFocus: tide.active && !Mare.sheetMode && !Mare.isTransient
-        ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // Os painéis recebem o teclado (a busca para digitar; todos para o Esc), e
+    // quem pede é a própria janela, só enquanto um painel está aberto neste
+    // monitor. O seletor (Alt + Tab) e os passageiros (aviso, OSD) não pedem.
+    WlrLayershell.keyboardFocus: tide.open && Mare.wantsKeyboard
+        ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // Só o painel recebe cliques; o resto da janela é transparente ao mouse.
     mask: Region {
@@ -132,12 +131,11 @@ PanelWindow {
         // painel não passa dos cantos arredondados dela.
         readonly property real targetX: {
             const center = Mare.originX >= 0 ? Mare.originX : tide.width / 2;
-            const lo = Mare.islandW > 0 ? Mare.islandX + tide.islandInset : tide.edge;
-            const hi = Mare.islandW > 0 ? Mare.islandX + Mare.islandW - tide.islandInset - targetW : tide.width - targetW - tide.edge;
+            const lo = tide.islandW > 0 ? tide.islandX + tide.islandInset : tide.edge;
+            const hi = tide.islandW > 0 ? tide.islandX + tide.islandW - tide.islandInset - targetW : tide.width - targetW - tide.edge;
             return Math.max(lo, Math.min(Math.max(lo, hi), center - targetW / 2));
         }
 
-        Binding { target: Mare; property: "sheetW"; value: tide.open ? sheet.targetW : 0 }
 
         // Para onde o corpo vai: os lados de dentro (sem os filetes).
         readonly property real half: Math.max(0, targetW / 2 - tide.fillet)

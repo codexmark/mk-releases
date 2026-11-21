@@ -29,14 +29,15 @@ var groups = [
         { key: "som", name: "Som", num: "08" },
         { key: "entrada", name: "Teclado e mouse", num: "09" },
         { key: "energia", name: "Energia", num: "10" },
-        { key: "impressoras", name: "Impressoras", num: "11" } ] },
+        { key: "impressoras", name: "Impressoras", num: "11" },
+        { key: "controle", name: "Controle", num: "12" } ] },
     { name: "REDE", items: [
-        { key: "vpn", name: "VPN", num: "12" } ] },
+        { key: "vpn", name: "VPN", num: "13" } ] },
     { name: "SISTEMA", items: [
-        { key: "apps", name: "Apps padrão", num: "13" },
-        { key: "atualizacoes", name: "Atualizações", num: "14" },
-        { key: "atalhos", name: "Atalhos", num: "15" },
-        { key: "sobre", name: "Sobre o Mk", num: "16" } ] }
+        { key: "apps", name: "Apps padrão", num: "14" },
+        { key: "atualizacoes", name: "Atualizações", num: "15" },
+        { key: "atalhos", name: "Atalhos", num: "16" },
+        { key: "sobre", name: "Sobre o Mk", num: "17" } ] }
 ];
 
 var blurbs = {
@@ -52,6 +53,7 @@ var blurbs = {
     "atualizacoes": "O Mk, os pacotes do Arch e os do AUR. Cada atualização cria um snapshot antes: se algo quebrar, dá para voltar pelo menu do boot.",
     "monitores": "Cada tela ligada: resolução, taxa, escala, posição e rotação.",
     "impressoras": "As impressoras deste computador e as que a rede oferece.",
+    "controle": "O controle Xbox (gamepad) e o fone (headset) plugado nele, pelo driver xone.",
     "vpn": "Conexões privadas (WireGuard e OpenVPN) pelo NetworkManager.",
     "apps": "Que app abre cada tipo de coisa: páginas, arquivos, texto, imagens, vídeos, música, PDF, e-mail. E o terminal do Mk.",
     "atalhos": "Os atalhos do Mk. Clique num para trocar a tecla; Super sozinho abre a busca.",

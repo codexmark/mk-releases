@@ -31,6 +31,7 @@ PanelWindow {
         "monitores": "SettingsMonitorsPage",
         "apps": "SettingsAppsPage",
         "impressoras": "SettingsPrintersPage",
+        "controle": "SettingsGamepadPage",
         "vpn": "SettingsVpnPage",
         "atalhos": "SettingsKeybindsPage"
     })
@@ -51,7 +52,7 @@ PanelWindow {
     visible: open || sheet.opacity > 0
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "mare-settings"
-    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     function go(key, rowKey) {
         Mare.settingsPage = key;

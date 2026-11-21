@@ -9,6 +9,13 @@
 #   hyprctl eval 'hl.window_rule({ match = { class = "^aquamarine$" }, workspace = "special:mkdev silent" })'
 #   ex.: bin/dev-shot /tmp/x.png "settings monitores"
 #        bin/dev-shot /tmp/x.png "toggle launcher" "close" "toggleAt volume 800"
+# Um "comando" que começa com "tecla " não é IPC: o resto vai para o wtype
+# DENTRO do aninhado (nunca na sua sessão), para testar o teclado:
+#        bin/dev-shot /tmp/x.png "toggle launcher" "tecla -k Escape" "state"
+# "hypr <lua>" manda um dispatch ao Hyprland aninhado (trocar de monitor etc.).
+# MK_DEV_HEADLESS=1080x1920 cria uma segunda tela, virtual, desse tamanho: ela
+# desenha mesmo com a janela escondida, e a captura sai dela (<saida>-2.png).
+# MK_DEV_EXEC="ghostty" abre um app dentro do aninhado (uma janela em foco).
 # Variáveis: MK_DEV_SHELL (pasta do shell; padrão shell/mare do repositório),
 # MK_DEV_WAIT (segundos depois de cada comando; padrão 1.5), MK_DEV_SIZE (1600x900).
 # Sai com 1 se o log do Maré tiver erro de QML.
@@ -27,8 +34,10 @@ cat >"$tmp/hypr/h.lua" <<EOF2
 hl.monitor({ output = "", mode = "${MK_DEV_SIZE:-1600x900}@60", position = "auto", scale = 1 })
 -- As curvas do Mk: os Ajustes mandam animações que usam os nomes delas.
 dofile("$repo/config/hypr/mare/motion.lua")
+hl.monitor({ output = "HEADLESS-1", mode = "${MK_DEV_HEADLESS:-1080x1920}@60", position = "auto-right", scale = 1 })
 hl.config({ misc = { disable_hyprland_logo = true, disable_splash_rendering = true, background_color = 0x0B0B0B } })
 hl.on("hyprland.start", function()
+    if "${MK_DEV_EXEC:-}" ~= "" then hl.exec_cmd("${MK_DEV_EXEC:-}") end
     hl.exec_cmd("QT_SCALE_FACTOR=0.85 qs -p '$tmp/shell' > '$tmp/qs.log' 2>&1")
 end)
 EOF2
@@ -48,14 +57,29 @@ for _ in $(seq 1 40); do
   [[ -n $sig && -S ${XDG_RUNTIME_DIR}/$wd ]] && break
   sleep 0.25
 done
-[[ -n $sig ]] || { echo "dev-shot: o Hyprland aninhado não subiu" >&2; tail -5 "$tmp/hypr.log" >&2; exit 2; }
+[[ -n $sig && -n $wd ]] || { echo "dev-shot: o Hyprland aninhado não subiu" >&2; tail -5 "$tmp/hypr.log" >&2; exit 2; }
 
 for _ in $(seq 1 40); do
   grep -q "Configuration Loaded" "$tmp/qs.log" 2>/dev/null && break
   sleep 0.25
 done
 sleep 1
+if [[ -n ${MK_DEV_HEADLESS:-} ]]; then
+  hyprctl -i "$sig" output create headless >/dev/null
+  sleep 1.5
+fi
 for cmd in "$@"; do
+  if [[ $cmd == hypr\ * ]]; then
+    hyprctl -i "$sig" dispatch "${cmd#hypr }" 2>&1 | sed 's/^/hypr: /'
+    sleep "${MK_DEV_WAIT:-1.5}"
+    continue
+  fi
+  if [[ $cmd == tecla\ * ]]; then
+    # shellcheck disable=SC2086
+    WAYLAND_DISPLAY=$wd wtype ${cmd#tecla } 2>&1 | sed 's/^/tecla: /'
+    sleep "${MK_DEV_WAIT:-1.5}"
+    continue
+  fi
   # shellcheck disable=SC2086
   WAYLAND_DISPLAY=$wd qs -p "$tmp/shell" ipc call mare $cmd 2>&1 | grep -v -i 'locale\|utf-8\|reconfigure\|information' | sed 's/^/ipc: /'
   sleep "${MK_DEV_WAIT:-1.5}"
@@ -63,6 +87,11 @@ done
 # A janela do aninhado fica escondida, e um compositor escondido não desenha
 # quadros novos: a captura só sai se a janela estiver visível. Sem captura, o
 # log ainda vale.
+if [[ -n ${MK_DEV_HEADLESS:-} ]]; then
+  for o in $(hyprctl -i "$sig" monitors -j | jq -r '.[].name'); do
+    WAYLAND_DISPLAY=$wd timeout 4 grim -o "$o" "${out%.png}-$o.png" 2>/dev/null && echo "captura: ${out%.png}-$o.png"
+  done
+fi
 if WAYLAND_DISPLAY=$wd timeout 4 grim "$out" 2>/dev/null; then
   echo "captura: $out"
 else

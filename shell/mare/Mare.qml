@@ -30,12 +30,9 @@ Singleton {
     // clicado. -1 = no meio (painéis abertos por atalho de teclado).
     property real originX: -1
 
-    // Encaixe entre ilha e painel: a ilha publica onde está, o painel publica
-    // de que largura precisa. O painel fica dentro da borda de baixo da ilha,
-    // e a ilha alarga quando o painel é mais largo que ela.
-    property real islandX: 0
-    property real islandW: 0
-    property real sheetW: 0
+    // Nada de geometria de tela mora aqui além de originX: este singleton é
+    // um só para todos os monitores, e cada monitor tem a sua ilha e o seu
+    // painel. O encaixe entre os dois é ligado no Monitor.qml.
 
     // Posição no Alt+Tab; o painel faz o módulo pelo número de janelas.
     property int switchIndex: 0
