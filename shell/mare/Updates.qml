@@ -36,6 +36,15 @@ Singleton {
         return !info.applied || info.checked - info.applied >= 7 * 86400;
     }
 
+    // O mk-update rodado num terminal qualquer grava o resumo ao terminar:
+    // a página e a ilha se atualizam sem esperar a próxima procura.
+    FileView {
+        path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/mk/ultima-atualizacao.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: root.check()
+    }
+
     function check() {
         if (!checking) {
             checking = true;

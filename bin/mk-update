@@ -57,7 +57,7 @@ if [[ -z ${MK_UPDATE_LOG:-} && $mode != --check && -t 0 && -t 1 ]] && command -v
   if [[ -r $summary && $(jq -r '.log // ""' "$summary" 2>/dev/null) == "$log" ]]; then
     # Limpa para ler depois: fica o fim de cada barra de progresso e as cores.
     sed -i -e '1{/\[COMMAND=/d}' -e '${/\[COMMAND_EXIT_CODE=/d}' -e 's/\r*$//' -e 's/.*\r//' \
-      -e 's/\x1b\[[0-9;?]*[A-Za-ln-z]//g' -e 's/\x1b\][^\x07]*\x07//g' "$log" || true
+      -e 's/\x1b\[[0-9;?]*[A-Za-ln-z]//g' -e 's/\x1b\][^\x07\x1b]*\(\x07\|\x1b\\\)//g' "$log" || true
   else
     # Nada foi aplicado (tudo em dia, ou você disse não): sem registro.
     rm -f "$log"

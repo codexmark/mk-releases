@@ -18,5 +18,14 @@ scale=$(jq -r '."ui.scale" // empty' "$root/ajustes.json" 2>/dev/null)
 if [[ ${1:-} == --restart ]]; then
   qs kill -p "$shell" >/dev/null 2>&1
   sleep 0.4
+  # Quando as camadas do Maré renascem, a janela em uso fica sem o teclado
+  # até um clique (visto no meio do mk-update, na hora da senha): devolve.
+  (
+    for wait in 1.5 2; do
+      sleep "$wait"
+      win=$(hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty')
+      [[ $win == 0x* ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$win\" })" >/dev/null 2>&1
+    done
+  ) &
 fi
 QT_SCALE_FACTOR=$scale exec qs -p "$shell" >"$log/mare.log" 2>&1
