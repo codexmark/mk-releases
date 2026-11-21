@@ -12,7 +12,7 @@ Singleton {
 
     readonly property var panels: ["project", "volume", "power", "network", "calendar", "picker",
         "launcher", "switcher", "notifications", "session", "media", "bluetooth", "display", "system",
-        "clipboard", "wallpaper", "settings"]
+        "clipboard", "wallpaper", "settings", "capture"]
     readonly property var transients: ["toast", "osd"]
     property string mode: "rest"
 
@@ -168,6 +168,17 @@ Singleton {
             root.close();
         }
 
+
+        // Captura direta, sem painel: shot copiar | area | janela | tela
+        function shot(mode: string): void {
+            root.close();
+            Capture.shot(mode);
+        }
+
+        // Começa ou para a gravação da tela.
+        function record(): void {
+            Capture.toggleRecording();
+        }
 
         // Bloqueia a tela (Super + L, hypridle, antes de suspender).
         function lock(): void {

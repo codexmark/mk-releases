@@ -66,8 +66,10 @@ hl.bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 
 -- Captura de tela: área para a área de transferência / tela inteira para arquivo
-hl.bind("PRINT", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"))
-hl.bind("SHIFT + PRINT", hl.dsp.exec_cmd("grim \"$(xdg-user-dir PICTURES)/$(date +%F_%H-%M-%S).png\""))
+hl.bind("PRINT", shell("shot copiar"))
+hl.bind("SHIFT + PRINT", shell("shot tela"))
+hl.bind(mod .. " + PRINT", shell("toggle capture"))
+hl.bind(mod .. " + SHIFT + R", shell("record"))
 
 -- Teclas de mídia: passam pelo Maré, que mostra o OSD na linha
 hl.bind("XF86AudioRaiseVolume", shell("volume +5"), { locked = true, repeating = true })

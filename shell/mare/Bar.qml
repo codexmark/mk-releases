@@ -24,7 +24,7 @@ PanelWindow {
     }
     // A janela tem uma folga embaixo da ilha para a onda do som; o espaço
     // reservado para as janelas continua sendo só a altura da ilha.
-    readonly property int waveRoom: 18
+    readonly property int waveRoom: 34
     implicitHeight: barH + waveRoom
     exclusiveZone: barH
     color: "transparent"
@@ -197,11 +197,21 @@ PanelWindow {
                 const pts = [Qt.point(0, 0)];
                 const lv = Sound.levels, n = Sound.bands, steps = n * 3;
                 if (wave.amp > 0.05 && lv.length === n && wave.width > 0) {
+                    // Contraste: a faixa mais fraca do momento fica perto de
+                    // zero e a mais forte usa a altura toda. Sem isso, com
+                    // todas as faixas soando, a borda só descia por igual.
+                    let lo = 1, hi = 0;
+                    for (let i = 0; i < n; i++) {
+                        lo = Math.min(lo, lv[i]);
+                        hi = Math.max(hi, lv[i]);
+                    }
+                    const floor = lo * 0.85, span = Math.max(0.08, hi - floor);
+                    const gain = 0.55 + 0.45 * Math.min(1, hi * 1.6);
                     for (let i = 1; i < steps; i++) {
                         const t = i / steps, p = t * (n - 1), a = Math.floor(p), b = Math.min(n - 1, a + 1);
                         const k = (1 - Math.cos((p - a) * Math.PI)) / 2;
-                        // A raiz levanta os sons fracos: a onda aparece mesmo com volume baixo.
-                        const v = Math.sqrt(lv[a] * (1 - k) + lv[b] * k);
+                        const raw = lv[a] * (1 - k) + lv[b] * k;
+                        const v = Math.pow(Math.max(0, (raw - floor) / span), 0.6) * gain;
                         const edge = Math.sin(t * Math.PI);
                         pts.push(Qt.point(t * wave.width, v * wave.amp * Math.pow(edge, 0.6)));
                     }
@@ -487,6 +497,17 @@ PanelWindow {
                         item: modelData
                         barWindow: bar
                     }
+                }
+
+                // Gravando a tela: o tempo, em cobre. Um clique para.
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Capture.recording
+                    icon: "󰑊"
+                    text: Capture.clock()
+                    iconColor: Theme.copper
+                    textColor: Theme.copper
+                    onClicked: Capture.toggleRecording()
                 }
 
                 // Atualizações pendentes: só aparece quando há alguma.

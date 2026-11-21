@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Captura de tela do Mk. Salva em <Imagens>/Capturas, copia para a área de
+# transferência e avisa.
+#   mare-shot copiar    escolhe uma área e só copia
+#   mare-shot area      escolhe uma área e salva
+#   mare-shot janela    a janela em foco
+#   mare-shot tela      a tela inteira
+#   mare-shot pasta     imprime a pasta das capturas
+set -euo pipefail
+
+pics=$(xdg-user-dir PICTURES 2>/dev/null || true)
+[[ -n $pics && $pics != "$HOME" ]] || pics=$HOME/Pictures
+dir=$pics/Capturas
+[[ ${1:-} == pasta ]] && { echo "$dir"; exit 0; }
+mkdir -p "$dir"
+file=$dir/$(date +%F_%H-%M-%S).png
+
+case ${1:-area} in
+  copiar)
+    geo=$(slurp -b 0b0b0b66 -c ce5e32 -w 1) || exit 0
+    grim -g "$geo" - | wl-copy --type image/png
+    notify-send -a Mk "Captura copiada" "A área está na área de transferência."
+    exit 0 ;;
+  area)
+    geo=$(slurp -b 0b0b0b66 -c ce5e32 -w 1) || exit 0
+    grim -g "$geo" "$file" ;;
+  janela)
+    geo=$(hyprctl -j activewindow | jq -r 'select(.at != null) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
+    [[ -n $geo ]] || { notify-send -a Mk "Sem janela em foco" "Nada foi capturado."; exit 1; }
+    grim -g "$geo" "$file" ;;
+  tela)
+    grim "$file" ;;
+  *)
+    echo "uso: mare-shot copiar | area | janela | tela | pasta" >&2
+    exit 2 ;;
+esac
+wl-copy --type image/png <"$file"
+notify-send -a Mk -i "$file" "Captura salva" "${file/#$HOME/\~}"

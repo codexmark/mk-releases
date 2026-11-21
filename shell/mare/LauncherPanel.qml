@@ -1,4 +1,5 @@
 import QtQuick
+import "Calc.js" as Calc
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
@@ -42,6 +43,7 @@ Item {
     // Painéis do Maré que não têm botão na barra.
     readonly property var shellCommands: [
         { title: "ajustes", detail: "ilha, fundo, janelas, teclado e mouse", glyph: "󰒓", panel: "settings" },
+        { title: "capturar a tela", detail: "área, janela, tela inteira ou vídeo", glyph: "󰄀", panel: "capture" },
         { title: "papel de parede", detail: "trocar a imagem e as cores", glyph: "󰸉", panel: "wallpaper" },
         { title: "área de transferência", detail: "histórico do que você copiou", glyph: "󰅌", panel: "clipboard" },
         { title: "sistema", detail: "CPU, memória, temperatura, rede", glyph: "󰍛", panel: "system" },
@@ -75,12 +77,25 @@ Item {
         const all = projectCommands.concat(shellCommands, projects, apps);
         if (q === "")
             return all.slice(0, rows);
-        return all
+        const found = all
             .map(item => ({ item: item, score: Math.max(score(q, item.title), score(q, item.detail) * 0.5) }))
             .filter(r => r.score > 0)
             .sort((a, b) => b.score - a.score)
             .slice(0, rows)
             .map(r => r.item);
+        // Uma conta? O resultado vem primeiro; Enter copia.
+        const value = Calc.evaluate(query);
+        if (value === null)
+            return found;
+        const shown = Calc.format(value);
+        return [{
+            title: "= " + shown,
+            detail: "enter copia o resultado",
+            icon: "",
+            glyph: "󰃬",
+            accent: Theme.copper,
+            run: () => Quickshell.execDetached(["wl-copy", shown.replace("−", "-")])
+        }].concat(found).slice(0, rows);
     }
 
     implicitWidth: 620

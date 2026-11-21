@@ -15,8 +15,52 @@ Item {
     readonly property var networks: wifi
         ? wifi.networks.values.slice()
             .sort((a, b) => (b.connected - a.connected) || (b.signalStrength - a.signalStrength))
-            .slice(0, 4)
+            .slice(0, 6)
         : []
+
+    // Entrar numa rede nova: a rede que está pedindo senha, e o que deu errado.
+    property var asking: null
+    property string wifiError: ""
+
+    function pick(network) {
+        wifiError = "";
+        if (network.connected || network.stateChanging)
+            return;
+        if (network.known || network.security === WifiSecurityType.Open) {
+            asking = null;
+            network.connect();
+        } else {
+            asking = network;
+            secret.text = "";
+            secret.forceActiveFocus();
+        }
+    }
+
+    function join() {
+        if (!asking || secret.text.length < 8) {
+            wifiError = "a senha tem pelo menos 8 caracteres";
+            return;
+        }
+        wifiError = "";
+        // A senha vai para o NetworkManager pelo D-Bus, não por linha de comando.
+        asking.connectWithPsk(secret.text);
+        secret.text = "";
+    }
+
+    Connections {
+        target: panel.asking
+        ignoreUnknownSignals: true
+        function onConnectedChanged() {
+            if (panel.asking && panel.asking.connected) {
+                panel.asking = null;
+                netProc.running = true;
+            }
+        }
+        function onConnectionFailed(reason) {
+            panel.wifiError = "não conectou: confira a senha";
+            secret.forceActiveFocus();
+        }
+    }
 
     // Detalhes da conexão (scripts/mare-net).
     property var net: ({ iface: "", type: "none", conn: "", ip: "", gateway: "", dns: [], dnsMode: "auto" })
@@ -431,7 +475,8 @@ Item {
                     }
 
                     Text {
-                        text: row.modelData.connected ? "conectado" : row.modelData.stateChanging ? "conectando…" : row.modelData.known ? "salva" : ""
+                        text: row.modelData.connected ? "conectado" : row.modelData.stateChanging ? "conectando…" : row.modelData.known ? "salva"
+                            : row.modelData.security === WifiSecurityType.Open ? "aberta" : "󰌾"
                         color: Theme.textDim
                         font.family: Theme.mono
                         font.pixelSize: 10
@@ -442,13 +487,87 @@ Item {
 
                 HoverHandler {
                     id: hover
-                    cursorShape: row.modelData.known && !row.modelData.connected ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    cursorShape: row.modelData.connected ? Qt.ArrowCursor : Qt.PointingHandCursor
                 }
 
                 TapHandler {
-                    onTapped: if (row.modelData.known && !row.modelData.connected) row.modelData.connect()
+                    onTapped: panel.pick(row.modelData)
                 }
             }
+        }
+
+        // A senha da rede escolhida.
+        ColumnLayout {
+            visible: panel.asking !== null && !panel.showQr
+            Layout.fillWidth: true
+            spacing: 6
+
+            Text {
+                text: "senha de " + (panel.asking ? panel.asking.name : "")
+                color: Theme.textFaint
+                font.family: Theme.mono
+                font.pixelSize: 9
+                font.capitalization: Font.AllUppercase
+                font.letterSpacing: 1.6
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                Item {
+                    Layout.fillWidth: true
+                    implicitHeight: 32
+
+                    TextInput {
+                        id: secret
+                        anchors.fill: parent
+                        anchors.bottomMargin: 5
+                        verticalAlignment: TextInput.AlignVCenter
+                        echoMode: reveal.selected ? TextInput.Normal : TextInput.Password
+                        passwordCharacter: "•"
+                        color: Theme.text
+                        selectionColor: Theme.copper
+                        font.family: Theme.mono
+                        font.pixelSize: 14
+                        clip: true
+                        cursorDelegate: Rectangle {
+                            width: 2
+                            color: Theme.copper
+                            visible: secret.activeFocus
+                        }
+                        Keys.onReturnPressed: panel.join()
+                        Keys.onEnterPressed: panel.join()
+                        Keys.onEscapePressed: panel.asking = null
+                    }
+
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: 1
+                        color: panel.wifiError !== "" ? Theme.copper : secret.activeFocus ? Theme.line : Theme.hairline
+                    }
+                }
+
+                PillButton {
+                    id: reveal
+                    text: selected ? "ocultar" : "mostrar"
+                    onClicked: selected = !selected
+                }
+                PillButton {
+                    primary: true
+                    text: "entrar"
+                    onClicked: panel.join()
+                }
+            }
+        }
+
+        Text {
+            visible: panel.wifiError !== ""
+            text: panel.wifiError
+            color: Theme.copper
+            font.family: Theme.mono
+            font.pixelSize: 11
         }
 
         RowLayout {

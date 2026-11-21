@@ -322,6 +322,7 @@ PanelWindow {
                     case "system": return systemPanel;
                     case "clipboard": return clipboardPanel;
                     case "wallpaper": return wallpaperPanel;
+                    case "capture": return capturePanel;
                     default: return null;
                     }
                 }
@@ -347,6 +348,7 @@ PanelWindow {
         }
     }
 
+    Component { id: capturePanel; CapturePanel {} }
     Component { id: projectPanel; ProjectPanel {} }
     Component { id: volumePanel; VolumePanel {} }
     Component { id: powerPanel; PowerPanel {} }

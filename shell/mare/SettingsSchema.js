@@ -200,6 +200,8 @@ var shortcuts = [
     { group: "TELA", items: [
         ["Print", "recortar e copiar"],
         ["Shift + Print", "salvar a tela inteira"],
+        ["Super + Print", "painel de captura (área, janela, vídeo)"],
+        ["Super + Shift + R", "gravar a tela / parar"],
         ["Super + Shift + Enter", "terminal de emergência"],
         ["Super + Shift + Esc", "sair do Hyprland"] ] }
 ];
