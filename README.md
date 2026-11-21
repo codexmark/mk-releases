@@ -136,6 +136,12 @@ por último e são seus. Antes de instalar, valide:
 Hyprland --verify-config -c "$PWD/config/hypr/hyprland.lua"
 ```
 
+Os atalhos abaixo são os de fábrica. Dá para trocar cada um em Ajustes
+(`Super+,`) › Atalhos: as trocas ficam em `~/.config/mk/atalhos.lua`, que o
+`binds.lua` lê ao criar os atalhos, e valem na hora. A lista mora em
+`config/hypr/mare/binds.lua` e é espelhada em `shell/mare/Keybinds.js`
+(`bin/check-keybinds` confere os dois).
+
 | Atalho | Ação |
 |---|---|
 | `Super+Espaço` | launcher |

@@ -114,6 +114,7 @@ mk() {
     ajustes | settings) qs -p "$shell" ipc call mare settings "${2:-}" >/dev/null ;;
     papel | wallpaper) qs -p "$shell" ipc call mare toggle wallpaper >/dev/null ;;
     bloquear | lock) qs -p "$shell" ipc call mare lock >/dev/null ;;
+    boas-vindas | welcome) qs -p "$shell" ipc call mare welcome abrir >/dev/null ;;
     reiniciar-mare) bash "$shell/scripts/mare-start" --restart >/dev/null 2>&1 & disown ;;
     ficha | fetch) mk-fetch ;;
     versao | version)
@@ -126,6 +127,7 @@ mk() {
         "mk ajustes [página]" "abre os Ajustes (ilha, tela, som, energia...)" \
         "mk papel" "papel de parede" \
         "mk bloquear" "bloqueia a tela" \
+        "mk boas-vindas" "o passeio pelo Mk, de novo" \
         "mk reiniciar-mare" "reinicia a ilha e os painéis" \
         "mk ficha" "a ficha do fastfetch" \
         "mk versao" "a versão do Mk instalada" \
@@ -133,7 +135,7 @@ mk() {
       ;;
   esac
 }
-complete -W "atualizar ajustes papel bloquear reiniciar-mare ficha versao seu ajuda" mk
+complete -W "atualizar ajustes papel bloquear boas-vindas reiniciar-mare ficha versao seu ajuda" mk
 
 # ── cores do ble.sh na paleta Folha ───────────────────────────────────
 # Vale para o ble.sh 0.3 (o pacote blesh do AUR) e o 0.4: o 0.3 não tem o

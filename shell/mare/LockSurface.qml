@@ -432,7 +432,12 @@ Item {
                     }
                     Keys.onReturnPressed: Lock.submit()
                     Keys.onEnterPressed: Lock.submit()
-                    Keys.onEscapePressed: Lock.password = ""
+                    Keys.onEscapePressed: {
+                        if (Lock.busy)
+                            Lock.cancel();
+                        else
+                            Lock.password = "";
+                    }
 
                     // Agulha de cobre no lugar do cursor.
                     Rectangle {
@@ -500,6 +505,20 @@ Item {
                     label: input.text !== "" ? "desbloquear" : ""
                     visible: input.text !== ""
                     onClicked: Lock.submit()
+                }
+
+                // Caps Lock ligado e, com mais de um layout, qual está valendo.
+                // Pendurado embaixo da linha, fora da coluna: vazio, não mexe
+                // no painel.
+                Text {
+                    anchors.right: parent.right
+                    anchors.top: parent.bottom
+                    anchors.topMargin: 6 * root.s
+                    text: [Lock.capsLock ? "CAPS LOCK" : "", Lock.layout].filter(t => t !== "").join("  ·  ")
+                    color: Lock.capsLock ? Theme.textDim : Theme.textFaint
+                    font.family: Theme.mono
+                    font.pixelSize: 10
+                    font.letterSpacing: 3
                 }
             }
         }

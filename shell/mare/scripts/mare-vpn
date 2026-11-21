@@ -1,0 +1,478 @@
+#!/usr/bin/env bash
+# VPNs do NetworkManager (WireGuard, OpenVPN e os outros plugins), em JSON,
+# para a página VPN dos Ajustes, a ilha e o painel de rede do Maré.
+#
+#   mare-vpn list                 {"plugins":{...},"connections":[...]}
+#   mare-vpn status               {"up","count","name","kind","iface","ip"} (barato: a ilha chama sempre)
+#   mare-vpn up <uuid>            {"ok","error","needsSecrets"}
+#   mare-vpn down <uuid>          {"ok","error"}
+#   mare-vpn delete <uuid>        {"ok","error"}
+#   mare-vpn autoconnect <uuid> yes|no
+#   mare-vpn check <arquivo>      {"ok","kind","name","path","error"}: só confere, não importa
+#   mare-vpn import <arquivo>     {"ok","kind","name","uuid","error"}
+#   mare-vpn ask <uuid>           interativo, para rodar NUM TERMINAL: pede usuário e senha
+#   mare-vpn watch                fica aberto e solta uma linha a cada mudança (nmcli monitor)
+#
+# Cada conexão: {"name","uuid","type","kind","device","active","state",
+#                "autoconnect","iface","ip","secrets","username"}
+#   type:  vpn | wireguard                 (o tipo do NetworkManager)
+#   kind:  wireguard | openvpn | openconnect | ... (o plugin, para os tipo vpn)
+#   state: on | connecting | disconnecting | off
+#   secrets: a conexão pede senha a um agente; sem agente gráfico, só `ask` resolve
+#
+# Senhas nunca passam por linha de comando: quem pergunta é o `nmcli --ask`,
+# dentro do terminal. Importar não deixa nada ligado: quem liga é a pessoa
+# (o WireGuard sobe sozinho ao entrar e é desligado logo em seguida).
+#
+# Testes: MARE_VPN_FIXTURES=<pasta> troca o nmcli por arquivos dessa pasta.
+#   con-list        saída de `nmcli -t -f UUID,TYPE,DEVICE,ACTIVE,STATE,AUTOCONNECT,NAME con show`
+#   con-list.rc     código de saída dele (diferente de 0 = NetworkManager parado)
+#   con-<uuid>      saída de `nmcli -t -f vpn.service-type,vpn.data,GENERAL.DEVICES,IP4.ADDRESS,IP6.ADDRESS con show uuid <uuid>`
+#   ip-addr         saída de `ip -o addr show`
+#   VPN/            a pasta de plugins (nm-openvpn-service.name ...)
+#   <verbo>.out e <verbo>.rc   resposta dos comandos que mudam algo (up, down,
+#                   delete, autoconnect, import, username); cada chamada fica em calls.log
+set -uo pipefail
+
+fx=${MARE_VPN_FIXTURES:-}
+
+# nm <chave> <args do nmcli...>: a chave só escolhe o arquivo nos testes.
+nm() {
+  local key=$1
+  shift
+  if [[ -n $fx ]]; then
+    printf '%s\n' "nmcli $*" >>"$fx/calls.log"
+    [[ -f $fx/$key ]] && cat "$fx/$key"
+    [[ -f $fx/$key.out ]] && cat "$fx/$key.out" >&2
+    [[ -f $fx/$key.rc ]] && return "$(<"$fx/$key.rc")"
+    return 0
+  fi
+  LC_ALL=C nmcli "$@"
+}
+
+ip_addrs() {
+  if [[ -n $fx ]]; then
+    [[ -f $fx/ip-addr ]] && cat "$fx/ip-addr"
+    return 0
+  fi
+  ip -o addr show 2>/dev/null
+}
+
+# O NetworkManager acha um plugin pelo arquivo .name dele.
+has_plugin() {
+  local dir
+  if [[ -n $fx ]]; then
+    [[ -f $fx/VPN/nm-$1-service.name ]]
+    return
+  fi
+  for dir in /usr/lib/NetworkManager/VPN /etc/NetworkManager/VPN; do
+    [[ -f $dir/nm-$1-service.name ]] && return 0
+  done
+  return 1
+}
+
+bool() {
+  if "$@"; then echo true; else echo false; fi
+}
+
+valid_uuid() {
+  [[ ${1:-} =~ ^[0-9a-fA-F-]{36}$ ]]
+}
+
+# Lê as conexões uma vez. con_ok diz se o NetworkManager respondeu: com ele
+# parado o nmcli existe, mas falha, e isso não é o mesmo que "nenhuma vpn".
+con_raw="" con_ok=true
+load_cons() {
+  con_ok=true
+  con_raw=$(nm con-list -t -f UUID,TYPE,DEVICE,ACTIVE,STATE,AUTOCONNECT,NAME con show 2>/dev/null) || con_ok=false
+}
+
+# As linhas de `nmcli -t`: os seis primeiros campos não têm ":" e o nome, que
+# vem por último, tem os dele escapados ("\:" e "\\"). A linha é cortada
+# inteira (um `IFS=: read` comeria o ":" do fim de um nome). Saem separadas
+# por \x1f (um tab juntaria os campos vazios na leitura).
+con_lines() {
+  local line name i out
+  local re='^([^:]*):([^:]*):([^:]*):([^:]*):([^:]*):([^:]*):(.*)$'
+  while IFS= read -r line; do
+    [[ $line =~ $re ]] || continue
+    [[ ${BASH_REMATCH[2]} == vpn || ${BASH_REMATCH[2]} == wireguard ]] || continue
+    # Desescapa da esquerda para a direita: "\\:" é uma barra e um ":" de
+    # verdade, não uma barra seguida de "\:".
+    name=${BASH_REMATCH[7]} out=""
+    for ((i = 0; i < ${#name}; i++)); do
+      if [[ ${name:i:1} == "\\" && $((i + 1)) -lt ${#name} ]]; then
+        i=$((i + 1))
+      fi
+      out+=${name:i:1}
+    done
+    printf '%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" \
+      "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" "${BASH_REMATCH[5]}" "${BASH_REMATCH[6]}" "$out"
+  done <<<"$con_raw"
+}
+
+# Um item do vpn.data ("chave = valor, chave = valor").
+data_item() {
+  sed -n "s/^$2 = //p" <<<"${1//, /$'\n'}" | head -1
+}
+
+# Preenche kind, iface, ip, secrets e username da conexão $1 (tipo $2,
+# device $3, estado do nmcli $4).
+details() {
+  local uuid=$1 type=$2 dev=$3 state=${4:-} out service data ctype flags addr
+  kind=$type iface="" ip="" secrets=false username=""
+  out=$(nm "con-$uuid" -t -f vpn.service-type,vpn.data,GENERAL.DEVICES,IP4.ADDRESS,IP6.ADDRESS con show uuid "$uuid" 2>/dev/null)
+  if [[ $type == vpn ]]; then
+    service=$(sed -n 's/^vpn\.service-type://p' <<<"$out" | head -1)
+    kind=${service##*.}
+    [[ -n $kind ]] || kind=vpn
+    data=$(sed -n 's/^vpn\.data://p' <<<"$out" | head -1)
+    data=${data//\\:/:}
+    username=$(data_item "$data" username)
+    # Senha guardada no sistema (flags 0) não precisa de ninguém; 1 (do
+    # agente) e 2 (perguntar sempre) precisam, e o Mk não tem agente gráfico.
+    ctype=$(data_item "$data" connection-type)
+    flags=$(data_item "$data" password-flags)
+    if [[ $ctype == *password* && ($flags == 1 || $flags == 2) ]]; then
+      secrets=true
+    fi
+  fi
+  ip=$(sed -n 's/^IP4\.ADDRESS\[1\]://p' <<<"$out" | head -1)
+  # Túnel só com IPv6: o primeiro endereço que não é o de enlace (fe80).
+  # (O nmcli solta os ":" do endereço crus; o sed é para o caso de escapar.)
+  if [[ -z $ip ]]; then
+    ip=$(sed -n 's/^IP6\.ADDRESS\[[0-9]*\]://p' <<<"$out" | sed 's/\\:/:/g' | grep -vi '^fe80:' | head -1)
+  fi
+  if [[ -n $ip ]]; then
+    # Numa VPN de plugin o device da conexão é o da rede por baixo (wlan0);
+    # a interface do túnel é a que tem o IP dela.
+    addr=${ip%%/*}
+    iface=$(ip_addrs | awk -v a="$addr" '$3 == "inet" || $3 == "inet6" { split($4, p, "/"); if (p[1] == a) { print $2; exit } }')
+  fi
+  # Ligada e sem IP achado (ou ainda sem IP): vale o device da conexão.
+  if [[ -z $iface && ($state == activated || -n $ip) ]]; then
+    iface=$(sed -n 's/^GENERAL\.DEVICES://p' <<<"$out" | head -1)
+    [[ -n $iface ]] || iface=$dev
+  fi
+}
+
+state_of() {
+  case $1 in
+    activated) echo on ;;
+    activating) echo connecting ;;
+    deactivating) echo disconnecting ;;
+    *) echo off ;;
+  esac
+}
+
+cmd_list() {
+  local rows=() uuid type dev active state auto name
+  local kind iface ip secrets username
+  load_cons
+  while IFS=$'\x1f' read -r uuid type dev active state auto name; do
+    [[ -n $uuid ]] || continue
+    details "$uuid" "$type" "$dev" "$state"
+    rows+=("$(jq -nc \
+      --arg name "$name" --arg uuid "$uuid" --arg type "$type" --arg kind "$kind" \
+      --arg device "$dev" --arg state "$(state_of "$state")" --arg iface "$iface" --arg ip "$ip" \
+      --arg username "$username" \
+      --argjson active "$(bool test "$active" = yes)" --argjson auto "$(bool test "$auto" = yes)" \
+      --argjson secrets "$secrets" \
+      '{name: $name, uuid: $uuid, type: $type, kind: $kind, device: $device, active: $active,
+        state: $state, autoconnect: $auto, iface: $iface, ip: $ip, secrets: $secrets, username: $username}')")
+  done < <(con_lines)
+
+  jq -nc \
+    --argjson openvpn "$(bool has_plugin openvpn)" \
+    --argjson openconnect "$(bool has_plugin openconnect)" \
+    --argjson nm "$con_ok" \
+    --slurpfile rows <(printf '%s\n' "${rows[@]:-}" | sed '/^$/d') \
+    '{ plugins: { wireguard: true, openvpn: $openvpn, openconnect: $openconnect },
+       nm: $nm,
+       connections: ($rows | sort_by([(.state == "off"), (.name | ascii_downcase)])) }'
+}
+
+# Só o que a ilha precisa: há VPN ligada? Qual? Uma chamada do nmcli quando
+# não há nenhuma, duas quando há.
+cmd_status() {
+  local uuid type dev active state auto name count=0
+  local first_uuid="" first_type="" first_dev="" first_name=""
+  local kind="" iface="" ip="" secrets=false username=""
+  load_cons
+  while IFS=$'\x1f' read -r uuid type dev active state auto name; do
+    [[ $state == activated ]] || continue
+    count=$((count + 1))
+    if [[ -z $first_uuid ]]; then
+      first_uuid=$uuid first_type=$type first_dev=$dev first_name=$name
+    fi
+  done < <(con_lines)
+  if [[ -n $first_uuid ]]; then
+    details "$first_uuid" "$first_type" "$first_dev" activated
+    [[ -n $iface ]] || iface=$first_dev
+  fi
+  jq -nc --argjson count "$count" --arg name "$first_name" --arg kind "$kind" --arg iface "$iface" --arg ip "$ip" \
+    '{up: ($count > 0), count: $count, name: $name, kind: $kind, iface: $iface, ip: $ip}'
+}
+
+# O erro do nmcli (em inglês, LC_ALL=C) numa frase curta em português.
+explain() {
+  local msg=$1
+  msg=${msg#Error: }
+  msg=${msg#Connection activation failed: }
+  case $msg in
+    # "Invalid secrets" é o que o nmcli diz quando o servidor recusa o login.
+    *"Invalid secrets"* | *"Authentication to the server failed"* | *[Ll]ogin\ failed* | *login-failed*)
+      echo "usuário ou senha recusados" ;;
+    *[Ss]ecrets*) echo "precisa de usuário e senha" ;;
+    *"was not installed"* | *"failed to find VPN plugin"* | *"failed to load VPN plugin"* | *"unknown VPN plugin"*)
+      echo "falta o plugin dessa vpn no networkmanager" ;;
+    *"did not start in time"* | *"failed to start"* | *"stopped unexpectedly"* | *"service providing the VPN"*)
+      echo "o serviço da vpn não subiu" ;;
+    *"invalid configuration"*) echo "o servidor devolveu uma configuração inválida" ;;
+    *"IP configuration could not be reserved"*) echo "o servidor não entregou um endereço ip" ;;
+    *"base network connection"*) echo "a rede por baixo caiu" ;;
+    *"timed out"* | *[Tt]imeout*) echo "o servidor não respondeu a tempo" ;;
+    *"Not authorized"* | *"not authorized"* | *"Insufficient privileges"*) echo "sem permissão para mexer nas conexões" ;;
+    *"NetworkManager is not running"*) echo "o networkmanager não está rodando" ;;
+    *"unknown connection"* | *"Unknown connection"* | *"no such connection"* | *"connection was removed"*) echo "essa conexão não existe mais" ;;
+    *"base connection"* | *"no active connection"* | *"No suitable device"*) echo "sem rede por baixo: conecte o wi-fi ou o cabo antes" ;;
+    "") echo "o nmcli falhou sem dizer por quê" ;;
+    *) tr '\n' ' ' <<<"$msg" | sed 's/ *$//; s/\.$//' ;;
+  esac
+}
+
+# Roda um comando do nmcli que muda algo e responde em JSON.
+act() {
+  local key=$1 err rc
+  shift
+  err=$(nm "$key" "$@" 2>&1 >/dev/null)
+  rc=$?
+  if ((rc == 0)); then
+    echo '{"ok":true,"error":"","needsSecrets":false}'
+  else
+    jq -nc --arg error "$(explain "$err")" --argjson secrets "$(bool grep -qi secrets <<<"$err")" \
+      '{ok: false, error: $error, needsSecrets: $secrets}'
+  fi
+}
+
+need_uuid() {
+  valid_uuid "${1:-}" && return 0
+  echo '{"ok":false,"error":"conexão inválida","needsSecrets":false}'
+  exit 2
+}
+
+# Confere um arquivo antes de importar. Preenche chk_path, chk_kind, chk_name
+# e chk_error (vazio = pode importar).
+check_file() {
+  local path=$1 base stem
+  chk_kind="" chk_name="" chk_error=""
+  path=${path#file://}
+  # shellcheck disable=SC2088
+  [[ $path == "~/"* ]] && path=$HOME/${path#"~/"}
+  chk_path=$path
+  if [[ -z $path ]]; then
+    chk_error="escreva o caminho de um arquivo .conf ou .ovpn"
+    return 1
+  fi
+  if [[ -d $path ]]; then
+    chk_error="isso é uma pasta, não um arquivo"
+    return 1
+  fi
+  if [[ ! -e $path ]]; then
+    chk_error="esse arquivo não existe"
+    return 1
+  fi
+  if [[ ! -f $path || ! -r $path ]]; then
+    chk_error="não dá para ler esse arquivo"
+    return 1
+  fi
+  if (($(stat -c %s "$path" 2>/dev/null || echo 0) > 1048576)); then
+    chk_error="grande demais para ser uma configuração de vpn"
+    return 1
+  fi
+  base=${path##*/}
+  stem=${base%.*}
+  chk_name=$stem
+  # Pelo conteúdo, não só pela extensão: há OpenVPN em .conf também.
+  if grep -qiE '^[[:space:]]*\[Interface\]' "$path" && grep -qiE '^[[:space:]]*PrivateKey[[:space:]]*=' "$path"; then
+    chk_kind=wireguard
+  elif grep -qE '^[[:space:]]*(remote|client|dev[[:space:]]+(tun|tap))([[:space:]]|$)' "$path"; then
+    chk_kind=openvpn
+  else
+    case ${base##*.} in
+      conf) chk_error="não parece uma configuração do wireguard (falta [Interface] e PrivateKey)" ;;
+      ovpn) chk_error="não parece uma configuração do openvpn (falta a linha remote)" ;;
+      *) chk_error="só arquivos .conf (wireguard) ou .ovpn (openvpn)" ;;
+    esac
+    return 1
+  fi
+  if [[ $chk_kind == openvpn ]] && ! has_plugin openvpn; then
+    chk_error="falta o plugin do openvpn (pacote networkmanager-vpn-plugin-openvpn)"
+    return 1
+  fi
+  return 0
+}
+
+cmd_check() {
+  local chk_path chk_kind chk_name chk_error
+  check_file "${1:-}"
+  jq -nc --arg kind "$chk_kind" --arg name "$chk_name" --arg path "$chk_path" --arg error "$chk_error" \
+    '{ok: ($error == ""), kind: $kind, name: $name, path: $path, error: $error}'
+}
+
+# A pasta da cópia do .conf (tem a chave privada): some na saída, aconteça o
+# que acontecer.
+import_tmp=""
+import_cleanup() {
+  [[ -n $import_tmp && -d $import_tmp ]] && rm -rf "${import_tmp:?}"
+  import_tmp=""
+}
+
+cmd_import() {
+  local chk_path chk_kind chk_name chk_error
+  local file tmp="" out rc uuid name
+  # Fechar os Ajustes no meio mata este script (SIGTERM). Importar, tirar o
+  # "conectar sozinha" e desligar têm de ir até o fim juntos, senão sobra um
+  # túnel aberto sem ninguém saber; os sinais ficam ignorados (o nmcli herda).
+  trap '' TERM HUP INT
+  trap import_cleanup EXIT
+  if ! check_file "${1:-}"; then
+    jq -nc --arg error "$chk_error" '{ok: false, kind: "", name: "", uuid: "", error: $error}'
+    return 1
+  fi
+  file=$chk_path
+  # O WireGuard usa o nome do arquivo como nome da interface: até 15
+  # caracteres, sem espaço. Um "Minha VPN (casa).conf" entra por uma cópia de
+  # nome arrumado, numa pasta que só o usuário lê (o arquivo tem a chave).
+  # O nmcli também só aceita o arquivo se ele terminar em ".conf": um wg.txt
+  # (ou wg0.conf.txt) entra pela mesma cópia.
+  if [[ $chk_kind == wireguard && ($file != *.conf || ! $chk_name =~ ^[A-Za-z0-9_=+.-]{1,15}$) ]]; then
+    name=${chk_name%.conf}
+    if [[ ! $name =~ ^[A-Za-z0-9_=+.-]{1,15}$ ]]; then
+      name=$(tr -c 'A-Za-z0-9_-' '-' <<<"$name" | sed 's/-\+/-/g; s/^-//; s/-$//' | cut -c1-15)
+      name=${name%-}
+    fi
+    [[ -n $name ]] || name=wg0
+    tmp=$(umask 077 && mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/mare-vpn.XXXXXX") || {
+      echo '{"ok":false,"kind":"","name":"","uuid":"","error":"não deu para preparar o arquivo"}'
+      return 1
+    }
+    import_tmp=$tmp
+    (umask 077 && cp -- "$file" "$tmp/$name.conf")
+    file=$tmp/$name.conf
+  fi
+  out=$(nm import con import type "$chk_kind" file "$file" 2>&1)
+  rc=$?
+  import_cleanup
+  if ((rc != 0)); then
+    jq -nc --arg kind "$chk_kind" --arg error "$(explain "$out")" '{ok: false, kind: $kind, name: "", uuid: "", error: $error}'
+    return 1
+  fi
+  # "Connection 'wg0' (uuid) successfully added."
+  uuid=$(grep -oE '\([0-9a-f-]{36}\)' <<<"$out" | head -1 | tr -d '()')
+  name=$(sed -n "s/^Connection '\(.*\)' ([0-9a-f-]\{36\}).*/\1/p" <<<"$out" | head -1)
+  # Uma conexão importada nasce com "conectar sozinha" ligado. No WireGuard
+  # isso vale de verdade: o NetworkManager já sobe o túnel na hora. Importar
+  # não é conectar: desliga as duas coisas. (Nas de plugin o autoconnect não
+  # faz nada, e elas não sobem sozinhas.)
+  if valid_uuid "$uuid"; then
+    nm autoconnect con mod uuid "$uuid" connection.autoconnect no >/dev/null 2>&1
+    if [[ $chk_kind == wireguard ]]; then
+      nm down con down uuid "$uuid" >/dev/null 2>&1
+    fi
+  fi
+  jq -nc --arg kind "$chk_kind" --arg name "${name:-$chk_name}" --arg uuid "$uuid" \
+    '{ok: true, kind: $kind, name: $name, uuid: $uuid, error: ""}'
+}
+
+# Dentro de um terminal: o nmcli pergunta o que faltar (usuário, senha, senha
+# da chave). O usuário do OpenVPN não é segredo e fica guardado na conexão; a
+# senha só é guardada se a conexão disser que pode.
+cmd_ask() {
+  local uuid=$1 kind iface ip secrets username name user rc
+  name=$(nm "name-$uuid" -g connection.id con show uuid "$uuid" 2>/dev/null | head -1)
+  details "$uuid" vpn "" ""
+  printf '\n  vpn: %s\n\n' "${name:-$uuid}"
+  if [[ $secrets == true && -z $username ]]; then
+    read -r -p "  usuário: " user
+    # O vpn.data é uma lista "chave = valor, chave = valor": um usuário com
+    # vírgula ou espaço não cabe nela, e sem usuário o servidor recusa o login
+    # sem dizer por quê. Melhor parar aqui e avisar.
+    if [[ $user == *,* || $user == *[[:space:]]* ]]; then
+      echo
+      echo "  usuário com espaço ou vírgula não dá para guardar por aqui."
+      echo "  ajuste a conexão pelo nmtui (campo de usuário) e ligue de novo."
+      echo
+      read -r -n 1 -s -p "  aperte uma tecla para fechar."
+      echo
+      return 1
+    fi
+    if [[ -n $user ]]; then
+      nm username con mod uuid "$uuid" +vpn.data "username=$user" >/dev/null ||
+        echo "  não deu para guardar o usuário; o servidor pode recusar o login"
+    fi
+  fi
+  if [[ -n $fx ]]; then
+    nm up --ask con up uuid "$uuid"
+  else
+    nmcli --ask con up uuid "$uuid"
+  fi
+  rc=$?
+  echo
+  if ((rc == 0)); then
+    echo "  conectada. esta janela fecha sozinha."
+    sleep 1.5
+  else
+    read -r -n 1 -s -p "  não conectou. aperte uma tecla para fechar."
+    echo
+  fi
+  return "$rc"
+}
+
+case ${1:-} in
+  list) cmd_list ;;
+  status) cmd_status ;;
+  up)
+    need_uuid "${2:-}"
+    act up --wait 45 con up uuid "$2"
+    ;;
+  down)
+    need_uuid "${2:-}"
+    act down --wait 20 con down uuid "$2"
+    ;;
+  delete)
+    need_uuid "${2:-}"
+    act delete con delete uuid "$2"
+    ;;
+  autoconnect)
+    need_uuid "${2:-}"
+    case ${3:-} in
+      yes | no) act autoconnect con mod uuid "$2" connection.autoconnect "$3" ;;
+      *)
+        echo '{"ok":false,"error":"uso: mare-vpn autoconnect <uuid> yes|no","needsSecrets":false}'
+        exit 2
+        ;;
+    esac
+    ;;
+  check) cmd_check "${2:-}" ;;
+  import) cmd_import "${2:-}" ;;
+  ask)
+    valid_uuid "${2:-}" || { echo "uso: mare-vpn ask <uuid>" >&2; exit 2; }
+    cmd_ask "$2"
+    ;;
+  watch)
+    if [[ -n $fx ]]; then
+      exec sleep infinity
+    fi
+    # Se o Maré morrer sem fechar este processo (queda, kill), o nmcli ficaria
+    # órfão até o próximo aviso da rede: o pdeathsig o leva junto.
+    if command -v setpriv >/dev/null 2>&1; then
+      LC_ALL=C exec setpriv --pdeathsig TERM nmcli monitor
+    fi
+    LC_ALL=C exec nmcli monitor
+    ;;
+  *)
+    echo "uso: mare-vpn list | status | up|down|delete <uuid> | autoconnect <uuid> yes|no | check|import <arquivo> | ask <uuid> | watch" >&2
+    exit 2
+    ;;
+esac

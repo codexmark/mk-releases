@@ -46,18 +46,20 @@ Item {
         { title: "capturar a tela", detail: "área, janela, tela inteira ou vídeo", glyph: "󰄀", panel: "capture" },
         { title: "papel de parede", detail: "trocar a imagem e as cores", glyph: "󰸉", panel: "wallpaper" },
         { title: "área de transferência", detail: "histórico do que você copiou", glyph: "󰅌", panel: "clipboard" },
+        { title: "emoji", detail: "procurar, copiar e colar na janela", glyph: "󰇲", panel: "emoji" },
         { title: "sistema", detail: "CPU, memória, temperatura, rede", glyph: "󰍛", panel: "system" },
         { title: "tela", detail: "brilho e luz noturna", glyph: "󰃠", panel: "display" },
         { title: "rede", detail: "Wi-Fi e Ethernet", glyph: "󰖩", panel: "network" },
         { title: "bluetooth", detail: "aparelhos e pareamento", glyph: "󰂯", panel: "bluetooth" },
-        { title: "sessão", detail: "bloquear, sair, reiniciar, desligar", glyph: "󰐥", panel: "session" }
+        { title: "sessão", detail: "bloquear, sair, reiniciar, desligar", glyph: "󰐥", panel: "session" },
+        { title: "boas-vindas", detail: "o passeio pelo Mk, de novo", glyph: "\u{f02d7}", welcome: true }
     ].map(c => ({
         title: c.title,
         detail: c.detail,
         icon: "",
         glyph: c.glyph,
         accent: Projects.accent,
-        run: () => Mare.open(c.panel)
+        run: () => c.welcome ? Welcome.open() : Mare.open(c.panel)
     }))
 
     readonly property var projects: Projects.dirs.map(d => {

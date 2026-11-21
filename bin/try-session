@@ -20,6 +20,9 @@ old_qs_dst=$cfg/quickshell/mare
 launcher=/usr/local/bin/mk-session
 session_file=/usr/share/wayland-sessions/mk.desktop
 marker=.instalado-pelo-mk
+# As migrações de usuário feitas (veja migrations/README.md). O Maré só mostra
+# as boas-vindas sozinho quando a delas consta aqui (shell/mare/Welcome.qml).
+state=${XDG_STATE_HOME:-$HOME/.local/state}/mk/migrations
 # Antes de virar Mk, o projeto se chamava meu-os: config em ~/.config/meu-os,
 # lançador /usr/local/bin/meu-os-session e a entrada "meu-os" no login.
 old_root=$cfg/meu-os
@@ -100,6 +103,9 @@ root_steps() {
 case ${1:-status} in
   install)
     echo "Instalando a sessão do Mk:"
+    # Primeira vez neste usuário: é um novato, como numa instalação nova.
+    first=0
+    [[ -e $qs_dst ]] || first=1
     place "$repo/config/hypr" "$hypr_dst"
     place "$repo/config/ghostty" "$ghostty_dst"
     place "$repo/config/fastfetch" "$cfg/mk/fastfetch"
@@ -107,6 +113,12 @@ case ${1:-status} in
     place "$repo/shell/mare" "$qs_dst"
     remove "$old_qs_dst"
     remove_old
+    if ((first)); then
+      mkdir -p "$state"
+      for m in "$repo"/migrations/user/*.sh; do [[ -f $m ]] && touch "$state/$(basename "$m")"; done
+      touch "$state/.pelo-try-session"
+      echo "  marcado: $state"
+    fi
     # Tema GTK e ícones do Mk, só para este usuário (a sessão escolhe o tema
     # por GTK_THEME; nada em ~/.config/gtk-* é tocado).
     data=${XDG_DATA_HOME:-$HOME/.local/share}
@@ -138,6 +150,12 @@ case ${1:-status} in
     remove "$qs_dst"
     remove "$old_qs_dst"
     remove_old
+    # Só as marcas que este script fez.
+    if [[ -e $state/.pelo-try-session ]]; then
+      for m in "$repo"/migrations/user/*.sh; do rm -f "$state/$(basename "$m")"; done
+      rm -f "$state/.pelo-try-session"
+    fi
+    rmdir "$state" "$(dirname "$state")" 2>/dev/null || true
     rmdir "$cfg/mk" 2>/dev/null || true
     if [[ -f $session_file || -f $launcher ]]; then
       echo

@@ -1,0 +1,416 @@
+#!/usr/bin/env bash
+# Emoji do Mk (painel EmojiPanel.qml).
+#   mare-emoji pick <emoji> <colar|copiar> [nome]
+#       copia o emoji e avisa; com "colar", depois que o painel fecha e o
+#       teclado volta para a janela de antes, também o digita nela (wtype)
+#   mare-emoji tem-wtype      sai com 0 se dá para digitar na janela
+#   mare-emoji gerar [saída]  refaz o Emoji.js (só para quem mantém o Mk)
+#
+# `gerar` não baixa nada. Os nomes e as palavras de busca em português vêm do
+# CLDR que o GTK 3 instala (/usr/share/gtk-3.0/emoji/pt.gresource; "pt" no CLDR
+# é o português do Brasil). A ordem, os nomes em inglês e as formas completas
+# (com U+FE0F) vêm do emoji-test.txt do Unicode: o do pacote unicode-emoji, ou
+# o caminho em MK_EMOJI_TEST. Só entra o que a Noto Color Emoji instalada
+# desenha. Precisa de python-gobject e python-fonttools.
+set -uo pipefail
+
+case ${1:-} in
+  pick)
+    emoji=${2:-}
+    [[ -n $emoji ]] || exit 1
+    name=${4:-}
+    # Pela entrada padrão: nada do que foi escolhido vira opção do wl-copy.
+    if ! printf '%s' "$emoji" | wl-copy; then
+      notify-send -a Mk -h boolean:transient:true -- "Não deu para copiar" "$name" >/dev/null 2>&1 || true
+      exit 1
+    fi
+    done_=copiado
+    if [[ ${3:-copiar} == colar ]] && command -v wtype >/dev/null; then
+      # O painel fecha e o Hyprland devolve o teclado à janela de antes.
+      sleep "${MK_EMOJI_DELAY:-0.35}"
+      # Sem janela em foco (área de trabalho vazia) o wtype digitaria no nada
+      # e ainda sairia com 0: aí o aviso diz só "copiado".
+      if hyprctl -j activewindow 2>/dev/null | jq -e '(.address // "") != ""' >/dev/null 2>&1 \
+        && wtype -- "$emoji"; then
+        done_="colado e copiado"
+      fi
+    fi
+    # Um aviso só: cada emoji troca o aviso do anterior (-r), para dez emoji
+    # numa conversa não virarem dez linhas no sino.
+    idfile=${XDG_RUNTIME_DIR:-/tmp}/mk-emoji-aviso
+    last=$(cat "$idfile" 2>/dev/null || true)
+    swap=()
+    [[ $last =~ ^[1-9][0-9]*$ ]] && swap=(-r "$last")
+    id=$(notify-send -a Mk -p "${swap[@]}" -h boolean:transient:true -- "$emoji  $done_" "$name" 2>/dev/null) || true
+    if [[ $id =~ ^[0-9]+$ ]]; then printf '%s\n' "$id" >"$idfile"; fi
+    ;;
+  tem-wtype)
+    command -v wtype >/dev/null
+    ;;
+  gerar)
+    here=$(cd "$(dirname "$0")" && pwd)
+    out=${2:-$here/../Emoji.js}
+    exec python3 -I - "$out" "${MK_EMOJI_TEST:-/usr/share/unicode/emoji/emoji-test.txt}" <<'PY'
+import json, re, sys, unicodedata
+from gi.repository import Gio, GLib
+from fontTools.ttLib import TTFont
+
+out, test_path = sys.argv[1], sys.argv[2]
+FONT = "/usr/share/fonts/noto/NotoColorEmoji.ttf"
+GTK = "/usr/share/gtk-3.0/emoji/pt.gresource"
+TONES = [0x1F3FB, 0x1F3FC, 0x1F3FD, 0x1F3FE, 0x1F3FF]
+FE0F = 0xFE0F
+# Os grupos do Unicode, na ordem do emoji-test.txt (o 2 são os componentes).
+GROUPS = ["Smileys & Emotion", "People & Body", "Component", "Animals & Nature", "Food & Drink",
+          "Travel & Places", "Activities", "Objects", "Symbols", "Flags"]
+KEYS = ["rostos", "gente", None, "natureza", "comida", "lugares", "lazer", "objetos", "simbolos", "bandeiras"]
+
+
+def bare(seq):
+    return tuple(c for c in seq if c != FE0F)
+
+
+# emoji-test.txt: forma completa, grupo, nome em inglês e a ordem do teclado.
+full, order, group = {}, [], None
+for line in open(test_path, encoding="utf-8"):
+    m = re.match(r"# group: (.+)", line)
+    if m:
+        group = GROUPS.index(m.group(1).strip())
+        continue
+    m = re.match(r"([0-9A-F ]+?)\s*; fully-qualified\s*# \S+ E[\d.]+ (.+)", line)
+    if not m:
+        continue
+    seq = tuple(int(c, 16) for c in m.group(1).split())
+    full[bare(seq)] = (seq, m.group(2).strip(), group)
+    order.append(bare(seq))
+
+# O que a fonte desenha: um código sozinho está no cmap; uma sequência é uma
+# ligadura do GSUB (procurada com e sem o U+FE0F).
+font = TTFont(FONT)
+cmap = font.getBestCmap()
+ligs = set()
+for lookup in font["GSUB"].table.LookupList.Lookup:
+    for sub in lookup.SubTable:
+        sub = getattr(sub, "ExtSubTable", sub)
+        for first, items in (getattr(sub, "ligatures", None) or {}).items():
+            for lig in items:
+                ligs.add((first,) + tuple(lig.Component))
+
+
+def drawn(seq):
+    if any(c not in cmap for c in seq if c != FE0F):
+        return False
+    b = bare(seq)
+    if len(b) == 1:
+        return True
+    return any(tuple(cmap[c] for c in s if c in cmap) in ligs for s in (seq, b))
+
+
+def text(seq):
+    return "".join(chr(c) for c in seq)
+
+
+def clean(s):
+    return re.sub(r"\s+", " ", s.replace("|", " ")).strip()
+
+
+def fold(s):
+    return "".join(c for c in unicodedata.normalize("NFD", s.lower()) if not unicodedata.combining(c))
+
+
+# O CLDR do GTK: (sequência, nome, palavras, grupo); o 0 na sequência é onde
+# entra o tom de pele.
+res = Gio.Resource.load(GTK)
+blob = res.lookup_data("/org/gtk/libgtk/emoji/pt.data", 0)
+gtk = GLib.Variant.new_from_bytes(GLib.VariantType.new("a(ausasu)"), blob, False).unpack()
+
+# Quatro duplas que o GTK guarda numa forma só dele (para o tom de cada
+# pessoa); aqui voltam à sequência do Unicode, sem tom.
+ALIAS = {
+    (0x1F468, 0x200D, 0x1F430, 0x200D, 0x1F468): (0x1F46F, 0x200D, 0x2642),
+    (0x1F469, 0x200D, 0x1F430, 0x200D, 0x1F469): (0x1F46F, 0x200D, 0x2640),
+    (0x1F468, 0x200D, 0x1FAEF, 0x200D, 0x1F468): (0x1F93C, 0x200D, 0x2642),
+    (0x1F469, 0x200D, 0x1FAEF, 0x200D, 0x1F469): (0x1F93C, 0x200D, 0x2640),
+}
+
+# O que se digita no Brasil e o CLDR não traz: palavras a mais, por emoji.
+EXTRA = {
+    "👍": "joinha legal beleza blz positivo curti sim valeu top",
+    "👎": "negativo ruim não curti",
+    "🙏": "valeu obrigado obrigada por favor amém gratidão rezar",
+    "😂": "kkk kkkk rsrs haha chorando de rir",
+    "🤣": "kkk kkkk rsrs haha rolando de rir",
+    "😅": "ufa sem graça kkk",
+    "😍": "apaixonado apaixonada amei lindo linda",
+    "🥰": "amei fofo fofa carinho",
+    "😭": "chorando buá triste demais",
+    "😉": "piscadinha piscada",
+    "😎": "óculos escuros daora maneiro estiloso",
+    "🤔": "hum sei lá dúvida pensando",
+    "🙄": "aff revirando os olhos",
+    "😴": "sono dormindo zzz",
+    "🥳": "parabéns aniversário comemorar",
+    "🎉": "parabéns comemorar eba viva",
+    "🔥": "top quente lacrou",
+    "💪": "força bora treino muque",
+    "👏": "palmas parabéns aplausos boa",
+    "🤝": "fechado combinado acordo",
+    "👌": "beleza perfeito tranquilo",
+    "🤙": "hang loose valeu me liga",
+    "✌️": "paz e amor tchau",
+    "❤️": "amor amo te amo",
+    "💔": "coração partido fossa",
+    "✅": "feito certo pronto concluído visto",
+    "❌": "errado não xis cancelar",
+    "⚠️": "atenção cuidado alerta",
+    "🚀": "lançar bora decolar deploy",
+    "🐛": "bug erro inseto",
+    "💡": "ideia dica",
+    "☕": "cafezinho café",
+    "🍺": "breja cerveja chope",
+    "🍻": "brinde saúde breja",
+    "⚽": "futebol bola pelada",
+    "💰": "dinheiro grana",
+    "💸": "grana gastar pix",
+    "🤡": "palhaçada",
+    "💀": "morri caveira",
+    "👀": "de olho olhando vendo",
+    "🫶": "amo coração com as mãos",
+    "🇧🇷": "brasil brasileiro brasileira",
+    "🇺🇸": "eua usa américa americano americana",
+    "🇬🇧": "uk britânico britânica grã-bretanha",
+    "🇵🇹": "português portuguesa",
+}
+
+GLUE = {"de", "e", "os", "as", "me", "te", "por", "com", "la"}
+
+pt, skipped = {}, 0
+for seq, name, kws, grp in gtk:
+    key = tuple(c for c in seq if c not in (0, FE0F))
+    if key in ALIAS:
+        key = seq = ALIAS[key]
+    if grp == 2 or not key or key not in full:
+        skipped += 1
+        continue
+    # A forma completa, com "~" onde o tom entra. Um tom só vale se as cinco
+    # variantes existem no Unicode e a fonte as desenha.
+    fq = full[key][0]
+    toned = False
+    if 0 in seq:
+        bases = [seq[i - 1] for i, c in enumerate(seq) if c == 0]
+        variants = []
+        for tone in TONES:
+            v, left = [], list(bases)
+            for c in key:
+                v.append(c)
+                if left and c == left[0]:
+                    left.pop(0)
+                    v.append(tone)
+            variants.append(tuple(v))
+        toned = all(v in full and drawn(full[v][0]) for v in variants)
+    if toned:
+        marked, left = "", list(bases)
+        for c in fq:
+            marked += chr(c)
+            if left and c == left[0]:
+                left.pop(0)
+                marked += "~"
+    else:
+        marked = text(fq)
+    name = clean(name)
+    # As palavras à mão (e o código ISO, que toda bandeira de país leva: o CLDR
+    # do GTK só traz alguns) vão num campo à parte, que a busca pesa mais.
+    extra = EXTRA.pop(marked.replace("~", ""), "").split()
+    if len(key) == 2 and all(0x1F1E6 <= c <= 0x1F1FF for c in key):
+        extra.append("".join(chr(c - 0x1F1E6 + ord("A")) for c in key))
+    in_name = set(re.split(r"[\s:]+", fold(name)))
+    extra = [w for w in extra if fold(w) not in in_name]
+    # As palavrinhas de ligação ("de olho", "paz e amor") ficam com as comuns.
+    small = [w for w in extra if fold(w) in GLUE]
+    extra = [w for w in extra if fold(w) not in GLUE]
+    seen, words = fold(name), []
+    mine = {fold(w) for w in extra}
+    for kw in kws:
+        kw = clean(kw)
+        if kw and fold(kw) not in seen and fold(kw) not in mine:
+            words.append(kw)
+            seen += " " + fold(kw)
+    pt[key] = (marked, name, " ".join(words + small), " ".join(extra))
+
+# Na ordem do Unicode. O que o CLDR do GTK ainda não tem (emoji novos) entra
+# só com o nome em inglês; variantes de tom não são linhas, são o "~".
+tone_set = set(TONES)
+lists = {k: [] for k in KEYS if k}
+total = english = undrawn = 0
+for key in order:
+    seq, en, grp = full[key]
+    if grp == 2 or tone_set & set(key):
+        continue
+    if not drawn(seq):
+        undrawn += 1
+        continue
+    marked, name, words, extra = pt.get(key, (text(seq), "", "", ""))
+    if key not in pt:
+        english += 1
+    lists[KEYS[grp]].append("|".join([marked, name, words, clean(en)] + ([extra] if extra else [])))
+    total += 1
+
+if EXTRA:
+    sys.exit("EXTRA sem emoji correspondente: " + " ".join(EXTRA))
+
+head = """.pragma library
+
+// Os emoji do painel (EmojiPanel.qml), como dados. GERADO: não edite à mão,
+// rode `scripts/mare-emoji gerar` (lá diz de onde cada coisa vem).
+// %d emoji; %d só com o nome em inglês (o CLDR do GTK ainda não os tem).
+// Cada linha: emoji|nome em português|palavras de busca|nome em inglês, e às
+// vezes um quinto campo: palavras postas à mão (gírias, o código do país).
+// Um "~" no emoji marca onde entra o tom de pele (veja withTone).
+
+var groups = [
+    { key: "rostos", name: "rostos" },
+    { key: "gente", name: "gente" },
+    { key: "natureza", name: "natureza" },
+    { key: "comida", name: "comida" },
+    { key: "lugares", name: "lugares" },
+    { key: "lazer", name: "lazer" },
+    { key: "objetos", name: "objetos" },
+    { key: "simbolos", name: "símbolos" },
+    { key: "bandeiras", name: "bandeiras" }
+];
+
+var raw = {
+""" % (total, english)
+
+tail = r"""};
+
+var tones = ["", "🏻", "🏼", "🏽", "🏾", "🏿"];
+
+// Minúsculas e sem acento, como a busca dos Ajustes (Schema.fold).
+function fold(s) {
+    return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+// O emoji pronto para copiar: sem tom (0) ou com um dos cinco (1 a 5). Com
+// tom, o U+FE0F que vinha depois da base sai, como manda o Unicode.
+function withTone(c, tone) {
+    var t = tones[tone] || "";
+    return t === "" ? c.replace(/~/g, "") : c.replace(/~️?/g, t);
+}
+
+// As linhas viram objetos na primeira vez que alguém pergunta:
+//   c  o emoji, com "~" onde entra o tom     s  o mesmo, sem tom
+//   n  o nome para mostrar                   tone  aceita tom de pele
+//   g  a categoria                           fn, fk, fe  textos da busca
+//   fx  as palavras postas à mão, entre espaços (para achar uma inteira)
+var all = null;
+var byGroup = {};
+var byChar = {};
+
+function load() {
+    if (all !== null)
+        return;
+    all = [];
+    for (var gi = 0; gi < groups.length; gi++) {
+        var g = groups[gi].key, lines = raw[g], list = [];
+        for (var i = 0; i < lines.length; i++) {
+            var p = lines[i].split("|");
+            var e = { c: p[0], s: p[0].replace(/~/g, ""), n: p[1] || p[3], g: g, tone: p[0].indexOf("~") >= 0,
+                      fn: fold(p[1]), fk: fold(p[2] + (p[4] ? " " + p[4] : "")), fe: p[3].toLowerCase(),
+                      fx: p[4] ? " " + fold(p[4]) + " " : "" };
+            list.push(e);
+            all.push(e);
+            byChar[e.s] = e;
+        }
+        byGroup[g] = list;
+    }
+    raw = null;
+}
+
+function list(group) {
+    load();
+    return byGroup[group] || [];
+}
+
+// Os recentes guardam só o emoji (sem tom); aqui voltam a ser linhas.
+function fromChars(chars) {
+    load();
+    var out = [];
+    for (var i = 0; i < (chars || []).length; i++)
+        if (byChar[chars[i]])
+            out.push(byChar[chars[i]]);
+    return out;
+}
+
+// Quanto `w` casa com um texto: no começo, no começo de uma palavra, ou no meio.
+function hit(text, w, start, word, inside) {
+    var i = text.indexOf(w);
+    if (i < 0)
+        return 0;
+    if (i === 0)
+        return start;
+    while (i > 0) {
+        if (text[i - 1] === " " || text[i - 1] === "-")
+            return word;
+        i = text.indexOf(w, i + 1);
+    }
+    return inside;
+}
+
+// O nome começa com a palavra inteira ("café", e não "cafeteira")?
+function leads(name, w) {
+    return name.lastIndexOf(w, 0) === 0 && (name.length === w.length || name[w.length] === " ");
+}
+
+// Todas as palavras digitadas têm de casar. O nome em português pesa mais
+// que as palavras de busca, e estas mais que o nome em inglês. Uma palavra
+// posta à mão e digitada inteira ("br", "eua", "joinha") ganha de um começo
+// de nome ("braço"), mas perde para o nome que começa com a palavra inteira.
+// No empate, vale a ordem do Unicode. Com `limit`, devolve só as primeiras.
+function search(query, limit) {
+    load();
+    var words = fold(query).split(/\s+/).filter(function (w) { return w.length > 0; });
+    if (words.length === 0)
+        return [];
+    var found = [];
+    for (var i = 0; i < all.length; i++) {
+        var e = all[i], total = 0;
+        for (var j = 0; j < words.length; j++) {
+            var w = words[j];
+            var s = Math.max(hit(e.fn, w, 100, 80, 50), hit(e.fk, w, 70, 60, 35), hit(e.fe, w, 45, 40, 20));
+            if (s === 100 && leads(e.fn, w))
+                s = 120;
+            else if (e.fx !== "" && e.fx.indexOf(" " + w + " ") >= 0)
+                s = 110;
+            if (s === 0) {
+                total = 0;
+                break;
+            }
+            total += s;
+        }
+        if (total > 0)
+            found.push({ e: e, s: total, i: i });
+    }
+    found.sort(function (a, b) { return b.s - a.s || a.i - b.i; });
+    return (limit ? found.slice(0, limit) : found).map(function (f) { return f.e; });
+}
+"""
+
+with open(out, "w", encoding="utf-8") as f:
+    f.write(head)
+    keys = [k for k in KEYS if k]
+    for n, k in enumerate(keys):
+        f.write("    %s: [\n" % k)
+        f.write(",\n".join("        " + json.dumps(line, ensure_ascii=False) for line in lists[k]))
+        f.write("\n    ]%s\n" % ("," if n < len(keys) - 1 else ""))
+    f.write(tail)
+
+print("%s: %d emoji (%d só em inglês, %d fora por a fonte não desenhar, %d do CLDR sem par)"
+      % (out, total, english, undrawn, skipped), file=sys.stderr)
+PY
+    ;;
+  *)
+    sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//' >&2
+    exit 2
+    ;;
+esac

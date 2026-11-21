@@ -18,22 +18,55 @@ Item {
             .slice(0, 6)
         : []
 
-    // Entrar numa rede nova: a rede que está pedindo senha, e o que deu errado.
+    // Entrar numa rede: a que está pedindo senha, e o que deu errado.
     property var asking: null
     property string wifiError: ""
 
+    // A tentativa em curso: a rede, se foi com a senha guardada, e se é uma
+    // rede nova (o perfil que ela deixar para trás ao falhar é apagado).
+    // `freshSsid`: a rede nova escolhida, enquanto o campo de senha dela vive.
+    property var trying: null
+    property bool tryingStored: false
+    property bool tryingFresh: false
+    property string freshSsid: ""
+
+    // Redes guardadas (scripts/mare-wifi): nome → reconecta sozinho?
+    property var saved: ({})
+    property bool savedLoaded: false
+    property var wifiQueue: []
+    // A linha de opções aberta, e o "esquecer" esperando o segundo clique.
+    property string openSsid: ""
+    property string forgetSsid: ""
+
     function pick(network) {
         wifiError = "";
+        forgetSsid = "";
         if (network.connected || network.stateChanging)
             return;
+        // Nova só se o NetworkManager não tem mesmo nenhum perfil com esse nome:
+        // a faxina apaga pelo nome, e não pode levar um perfil que já existia.
+        if (freshSsid !== network.name)
+            freshSsid = network.known || !savedLoaded || saved[network.name] !== undefined ? "" : network.name;
         if (network.known || network.security === WifiSecurityType.Open) {
             asking = null;
+            trying = network;
+            tryingStored = network.known;
+            tryingFresh = freshSsid === network.name;
             network.connect();
         } else {
-            asking = network;
-            secret.text = "";
-            secret.forceActiveFocus();
+            askFor(network);
         }
+    }
+
+    function askFor(network) {
+        asking = network;
+        secret.text = "";
+        secret.forceActiveFocus();
+    }
+
+    function dismiss() {
+        asking = null;
+        freshSsid = "";
     }
 
     function join() {
@@ -42,23 +75,96 @@ Item {
             return;
         }
         wifiError = "";
+        trying = asking;
+        tryingStored = false;
+        tryingFresh = freshSsid === asking.name;
         // A senha vai para o NetworkManager pelo D-Bus, não por linha de comando.
         asking.connectWithPsk(secret.text);
         secret.text = "";
     }
 
+    // Uma ação do mare-wifi por vez; o nome da rede vai como um argumento só.
+    // `quiet`: a faxina depois de uma falha não mostra o erro dela.
+    function wifiDo(args, quiet) {
+        wifiQueue = wifiQueue.concat([{ args: args, quiet: quiet === true }]);
+        wifiNext();
+    }
+
+    function wifiNext() {
+        if (wifiProc.running || wifiQueue.length === 0)
+            return;
+        wifiProc.quiet = wifiQueue[0].quiet;
+        wifiProc.command = ["bash", Quickshell.shellPath("scripts/mare-wifi")].concat(wifiQueue[0].args);
+        wifiQueue = wifiQueue.slice(1);
+        wifiProc.running = true;
+    }
+
+    function autoconnects(ssid) {
+        return saved[ssid] !== false;
+    }
+
+    function setAutoconnect(ssid, on) {
+        const next = Object.assign({}, saved);
+        next[ssid] = on;
+        saved = next;
+        wifiDo(["autoconnect", ssid, on ? "on" : "off"]);
+    }
+
+    function forget(ssid) {
+        wifiError = "";
+        if (forgetSsid !== ssid) {
+            forgetSsid = ssid;
+            forgetReset.restart();
+            return;
+        }
+        forgetSsid = "";
+        openSsid = "";
+        if (asking && asking.name === ssid)
+            asking = null;
+        wifiDo(["forget", ssid]);
+    }
+
+    Timer {
+        id: forgetReset
+        interval: 4000
+        onTriggered: panel.forgetSsid = ""
+    }
+
     Connections {
-        target: panel.asking
+        target: panel.trying
         ignoreUnknownSignals: true
         function onConnectedChanged() {
-            if (panel.asking && panel.asking.connected) {
-                panel.asking = null;
+            if (panel.trying && panel.trying.connected) {
+                if (!panel.asking || panel.asking === panel.trying)
+                    panel.dismiss();
+                panel.trying = null;
                 netProc.running = true;
+                panel.wifiDo(["list-saved"]);
             }
         }
         function onConnectionFailed(reason) {
-            panel.wifiError = "não conectou: confira a senha";
-            secret.forceActiveFocus();
+            const network = panel.trying;
+            if (!network)
+                return;
+            panel.trying = null;
+            if (panel.tryingFresh)
+                panel.wifiDo(["forget", network.name], true);
+            // O campo já é de outra rede: a falha desta não mexe nele.
+            if (panel.asking && panel.asking !== network)
+                return;
+            if (!panel.asking)
+                panel.freshSsid = "";
+            // Só a recusa da senha pede outra (que substitui a guardada); rede
+            // fora de alcance ou roteador reiniciando não é senha errada.
+            if (panel.tryingStored && network.security !== WifiSecurityType.Open
+                    && reason === ConnectionFailReason.NoSecrets) {
+                panel.askFor(network);
+                panel.wifiError = "a senha guardada não serve mais";
+                return;
+            }
+            panel.wifiError = panel.asking ? "não conectou: confira a senha" : "não conectou";
+            if (panel.asking)
+                secret.forceActiveFocus();
         }
     }
 
@@ -125,10 +231,18 @@ Item {
         if (wifi)
             wifi.scannerEnabled = true;
         netProc.running = true;
+        wifiDo(["list-saved"]);
     }
     Component.onDestruction: {
         if (wifi)
             wifi.scannerEnabled = false;
+        // Fechar o painel não pode cortar um "esquecer" pela metade: o que
+        // estava rodando ou na fila roda de novo, solto (repetir não faz mal).
+        const pending = (wifiProc.running ? [wifiProc.command.slice(2)] : []).concat(wifiQueue.map(q => q.args));
+        for (const args of pending) {
+            if (args[0] !== "list-saved")
+                Quickshell.execDetached(["bash", Quickshell.shellPath("scripts/mare-wifi")].concat(args));
+        }
         Quickshell.execDetached(["rm", "-f", qrPath]);
     }
 
@@ -191,6 +305,32 @@ Item {
         onExited: {
             panel.dnsBusy = "";
             netProc.running = true;
+        }
+    }
+
+    Process {
+        id: wifiProc
+        property bool quiet: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const reply = JSON.parse(text);
+                    if (reply.saved) {
+                        const next = {};
+                        for (const s of reply.saved)
+                            next[s.ssid] = next[s.ssid] === true || s.autoconnect;
+                        panel.saved = next;
+                        panel.savedLoaded = reply.ok === true;
+                    } else if (!reply.ok && reply.error && !wifiProc.quiet) {
+                        panel.wifiError = reply.error;
+                    }
+                } catch (e) {}
+            }
+        }
+        onExited: {
+            if (command[2] !== "list-saved" && panel.wifiQueue.length === 0)
+                panel.wifiQueue = [{ args: ["list-saved"], quiet: true }];
+            Qt.callLater(panel.wifiNext);
         }
     }
 
@@ -371,6 +511,52 @@ Item {
             }
         }
 
+        // VPN: o túnel aberto, numa linha. O resto mora nos Ajustes.
+        RowLayout {
+            visible: !panel.showQr
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+                text: "vpn"
+                color: Theme.textFaint
+                font.family: Theme.mono
+                font.pixelSize: 9
+                font.capitalization: Font.AllUppercase
+                font.letterSpacing: 1.6
+                Layout.rightMargin: 8
+            }
+
+            Text {
+                visible: Vpn.up
+                text: "󰦝"
+                color: Theme.copper
+                font.family: Theme.icons
+                font.pixelSize: 14
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: !Vpn.up ? "desligada"
+                    : Vpn.status.name + (Vpn.status.count > 1 ? " +" + (Vpn.status.count - 1) : "")
+                        + (Vpn.status.iface !== "" ? "  ·  " + Vpn.status.iface : "")
+                        + (Vpn.status.ip !== "" ? "  ·  " + Vpn.status.ip : "")
+                color: Vpn.up ? Theme.text : Theme.textDim
+                font.family: Theme.mono
+                font.pixelSize: 12
+                elide: Text.ElideRight
+            }
+
+            PillButton {
+                implicitHeight: 28
+                text: "ajustes"
+                onClicked: {
+                    Mare.settingsPage = "vpn";
+                    Mare.open("settings");
+                }
+            }
+        }
+
         // QR code para o celular entrar no Wi-Fi.
         ColumnLayout {
             visible: panel.showQr
@@ -426,12 +612,14 @@ Item {
                 id: row
                 required property var modelData
                 required property int index
+                readonly property bool open: modelData.known && panel.openSsid === modelData.name
+                readonly property bool confirming: panel.forgetSsid !== "" && panel.forgetSsid === modelData.name
                 Layout.fillWidth: true
-                implicitHeight: 38
+                implicitHeight: open ? 68 : 38
 
                 Rectangle {
                     anchors.fill: parent
-                    color: row.modelData.connected ? Theme.wash : hover.hovered ? Theme.wash : "transparent"
+                    color: row.modelData.connected || row.open || hover.hovered || moreHover.hovered ? Theme.wash : "transparent"
                 }
 
                 Rectangle {
@@ -441,57 +629,146 @@ Item {
                     color: Theme.copper
                 }
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 10
-                    spacing: 12
+                // A área de clique da rede e a das opções ficam lado a lado, não
+                // uma sobre a outra: senão o clique nas opções também conectaria.
+                Item {
+                    id: main
+                    width: parent.width - (more.visible ? more.width : 0)
+                    height: 38
 
-                    Row {
-                        spacing: 2
-                        Layout.alignment: Qt.AlignVCenter
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: more.visible ? 4 : 10
+                        spacing: 12
 
-                        Repeater {
-                            model: 3
+                        Row {
+                            spacing: 2
+                            Layout.alignment: Qt.AlignVCenter
 
-                            Rectangle {
-                                required property int index
-                                anchors.bottom: parent.bottom
-                                width: 3
-                                height: 5 + index * 4.5
-                                color: row.modelData.signalStrength > index / 3
-                                    ? (row.modelData.connected ? Theme.copper : Theme.textSoft) : Theme.line
+                            Repeater {
+                                model: 3
+
+                                Rectangle {
+                                    required property int index
+                                    anchors.bottom: parent.bottom
+                                    width: 3
+                                    height: 5 + index * 4.5
+                                    color: row.modelData.signalStrength > index / 3
+                                        ? (row.modelData.connected ? Theme.copper : Theme.textSoft) : Theme.line
+                                }
                             }
+                        }
+
+                        Text {
+                            text: row.modelData.name
+                            color: row.modelData.connected ? Theme.text : Theme.textSoft
+                            font.family: Theme.sans
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: row.modelData.connected ? "conectado" : row.modelData.stateChanging ? "conectando…" : row.modelData.known ? "salva"
+                                : row.modelData.security === WifiSecurityType.Open ? "aberta" : "󰌾"
+                            color: Theme.textDim
+                            font.family: Theme.mono
+                            font.pixelSize: 10
+                            font.capitalization: Font.AllUppercase
+                            font.letterSpacing: 1.2
                         }
                     }
 
-                    Text {
-                        text: row.modelData.name
-                        color: row.modelData.connected ? Theme.text : Theme.textSoft
-                        font.family: Theme.sans
-                        font.pixelSize: 13
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
+                    HoverHandler {
+                        id: hover
+                        cursorShape: row.modelData.connected ? Qt.ArrowCursor : Qt.PointingHandCursor
                     }
 
+                    TapHandler {
+                        onTapped: panel.pick(row.modelData)
+                    }
+                }
+
+                // Rede guardada: abre a linha de opções.
+                Item {
+                    id: more
+                    visible: row.modelData.known
+                    anchors.right: parent.right
+                    width: 34
+                    height: 38
+
                     Text {
-                        text: row.modelData.connected ? "conectado" : row.modelData.stateChanging ? "conectando…" : row.modelData.known ? "salva"
-                            : row.modelData.security === WifiSecurityType.Open ? "aberta" : "󰌾"
+                        anchors.centerIn: parent
+                        text: row.open ? "\u{f0143}" : "\u{f0140}"
+                        color: moreHover.hovered ? Theme.text : Theme.textFaint
+                        font.family: Theme.icons
+                        font.pixelSize: 14
+                    }
+
+                    HoverHandler {
+                        id: moreHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: {
+                            panel.forgetSsid = "";
+                            panel.openSsid = row.open ? "" : row.modelData.name;
+                        }
+                    }
+                }
+
+                RowLayout {
+                    visible: row.open
+                    y: 38
+                    width: parent.width
+                    height: 30
+                    spacing: 10
+
+                    Text {
+                        Layout.leftMargin: 12
+                        text: "reconectar sozinho"
                         color: Theme.textDim
                         font.family: Theme.mono
                         font.pixelSize: 10
                         font.capitalization: Font.AllUppercase
                         font.letterSpacing: 1.2
                     }
-                }
 
-                HoverHandler {
-                    id: hover
-                    cursorShape: row.modelData.connected ? Qt.ArrowCursor : Qt.PointingHandCursor
-                }
+                    MkToggle {
+                        scale: 0.8
+                        checked: panel.autoconnects(row.modelData.name)
+                        onToggled: value => panel.setAutoconnect(row.modelData.name, value)
+                    }
 
-                TapHandler {
-                    onTapped: panel.pick(row.modelData)
+                    Item { Layout.fillWidth: true }
+
+                    // Esquecer: o primeiro clique pede a confirmação, o segundo apaga.
+                    Item {
+                        Layout.fillHeight: true
+                        implicitWidth: forgetLabel.implicitWidth + 24
+
+                        Text {
+                            id: forgetLabel
+                            anchors.centerIn: parent
+                            text: row.confirming ? "esquecer mesmo?" : "esquecer"
+                            color: row.confirming ? Theme.copper : forgetHover.hovered ? Theme.text : Theme.textFaint
+                            font.family: Theme.mono
+                            font.pixelSize: 10
+                            font.capitalization: Font.AllUppercase
+                            font.letterSpacing: 1.2
+                        }
+
+                        HoverHandler {
+                            id: forgetHover
+                            cursorShape: Qt.PointingHandCursor
+                        }
+
+                        TapHandler {
+                            onTapped: panel.forget(row.modelData.name)
+                        }
+                    }
                 }
             }
         }
@@ -538,7 +815,7 @@ Item {
                         }
                         Keys.onReturnPressed: panel.join()
                         Keys.onEnterPressed: panel.join()
-                        Keys.onEscapePressed: panel.asking = null
+                        Keys.onEscapePressed: panel.dismiss()
                     }
 
                     Rectangle {

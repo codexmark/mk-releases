@@ -1,6 +1,9 @@
 -- Movimento: a mesma curva do shell e do perfil (cubic-bezier(.215, .61, .355, 1)),
 -- rápida no início e assentando no fim. Janelas entram de 95% para 100%; workspaces
 -- deslizam. A unidade de speed do Hyprland é 100 ms: 2.4 = 240 ms.
+-- Estas são as velocidades de fábrica. A Velocidade dos Ajustes repete esta
+-- lista no ajustes.lua com os speeds multiplicados (shell/mare/SettingsSchema.js,
+-- `animations`): mudou uma folha ou um número aqui, mude lá.
 hl.config({ animations = { enabled = true } })
 
 hl.curve("mare", { type = "bezier", points = { { 0.215, 0.61 }, { 0.355, 1 } } })

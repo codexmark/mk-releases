@@ -10,6 +10,15 @@
 # o mk-update passa a vez para a versão nova dele mesmo (--after-mk), para
 # que a lógica nova já valha nesta rodada.
 #
+# Migração não instala pacote: ela roda antes do -Syu, com a lista de pacotes
+# velha, e um download que falha travaria toda atualização seguinte. A que
+# precisa de pacote declara numa linha "# pacotes: a b c"; eles entram na
+# transação do -Syu e a migração roda depois dela, tolerando a falta deles.
+#
+# Registro: a saída inteira fica em ~/.local/state/mk/atualizacao-*.log (os 5
+# últimos) e o resumo da rodada em ultima-atualizacao.json, que os Ajustes
+# leem (scripts/mare-updates).
+#
 # Snapshots: com o snap-pac, cada pacman cria um snapshot antes e depois, e o
 # limine lista os snapshots no boot. Se algo quebrar, dá para voltar.
 set -euo pipefail
@@ -21,7 +30,81 @@ check=$share/shell/mare/scripts/mare-updates
 [[ -x $check ]] || check=$cfg/shell/scripts/mare-updates
 mode=${1:-}
 sys_done=/var/lib/mk/migrations
-user_done=${XDG_STATE_HOME:-$HOME/.local/state}/mk/migrations
+state=${XDG_STATE_HOME:-$HOME/.local/state}/mk
+user_done=$state/migrations
+summary=$state/ultima-atualizacao.json
+
+# Roda de novo dentro do script(1), que grava tudo o que o terminal mostra:
+# continua sendo um terminal de verdade (senha do sudo, perguntas e barras do
+# pacman iguais), e a senha, que não aparece na tela, não vai para o registro.
+# A troca para o mk-update novo (--after-mk) herda MK_UPDATE_LOG e segue no
+# mesmo registro.
+if [[ -z ${MK_UPDATE_LOG:-} && $mode != --check && -t 0 && -t 1 ]] && command -v script >/dev/null; then
+  mkdir -p "$state"
+  log=$state/atualizacao-$(date +%Y%m%d-%H%M%S).log
+  rc=0 spid=""
+  # Janela fechada no meio: o script(1) não vê o HUP e ficaria para sempre. Ele
+  # roda ao fundo (o env devolve o Ctrl-C que o bash tira de quem roda assim) e
+  # o HUP é repassado à rodada, como o terminal faria; depois arruma o registro.
+  trap 'p=$(pgrep -P "$spid" | head -1) && kill -HUP -- "-${p:-x}" 2>/dev/null || true' HUP TERM
+  MK_UPDATE_LOG=$log script -qefc "$(printf '%q ' env --default-signal=INT,QUIT bash "$0" "$@")" "$log" <&0 &
+  spid=$!
+  while :; do
+    wait "$spid" && rc=0 || rc=$?
+    kill -0 "$spid" 2>/dev/null || break
+  done
+  trap '' HUP TERM
+  if [[ -r $summary && $(jq -r '.log // ""' "$summary" 2>/dev/null) == "$log" ]]; then
+    # Limpa para ler depois: fica o fim de cada barra de progresso e as cores.
+    sed -i -e '1{/\[COMMAND=/d}' -e '${/\[COMMAND_EXIT_CODE=/d}' -e 's/\r*$//' -e 's/.*\r//' \
+      -e 's/\x1b\[[0-9;?]*[A-Za-ln-z]//g' -e 's/\x1b\][^\x07]*\x07//g' "$log" || true
+  else
+    # Nada foi aplicado (tudo em dia, ou você disse não): sem registro.
+    rm -f "$log"
+  fi
+  logs=("$state"/atualizacao-*.log)
+  ((${#logs[@]} > 5)) && rm -f "${logs[@]:0:${#logs[@]}-5}"
+  exit "$rc"
+fi
+
+# A versão do Mk instalada (o commit, 12 letras).
+mk_version() {
+  local f v=""
+  for f in "$cfg/VERSION" "$share/VERSION"; do
+    if [[ -r $f ]]; then
+      read -r v _ <"$f" || true
+      break
+    fi
+  done
+  printf '%s' "${v:0:12}"
+}
+
+# O resumo da rodada, para os Ajustes: quando, se deu certo, em que passo
+# parou, se o kernel pede reinício e a versão do Mk antes e depois. `applied`
+# é a última vez que tudo deu certo (a ilha conta a semana a partir dela).
+applying=0 step=""
+# Depois da troca do Mk, a rodada já está em curso.
+if [[ $mode == --after-mk ]]; then applying=1 step=mk; fi
+export MK_UPDATE_START=${MK_UPDATE_START:-$(date +%s)}
+[[ -v MK_UPDATE_FROM ]] || MK_UPDATE_FROM=$(mk_version)
+export MK_UPDATE_FROM
+write_summary() {
+  local rc=$1 now ok=false reboot=false applied=0
+  now=$(date +%s)
+  [[ -r $summary ]] && applied=$(jq -r '.applied // 0 | floor' "$summary" 2>/dev/null) || applied=0
+  [[ $applied =~ ^[0-9]+$ ]] || applied=0
+  if ((rc == 0)); then
+    ok=true applied=$now step=""
+  fi
+  [[ -d /usr/lib/modules/$(uname -r) ]] || reboot=true
+  mkdir -p "$state"
+  jq -nc --argjson when "$now" --argjson started "$MK_UPDATE_START" --argjson ok "$ok" \
+    --arg step "$step" --argjson reboot "$reboot" --argjson applied "$applied" \
+    --arg from "$MK_UPDATE_FROM" --arg to "$(mk_version)" --arg log "${MK_UPDATE_LOG:-}" \
+    '{when: $when, started: $started, ok: $ok, step: $step, reboot: $reboot,
+      applied: $applied, from: $from, to: $to, log: $log}' >"$summary.novo" &&
+    mv "$summary.novo" "$summary"
+}
 
 # Migrações que ainda não rodaram aqui: "system/nome.sh" e "user/nome.sh".
 pending_migrations() {
@@ -38,21 +121,50 @@ pending_migrations() {
   done
 }
 
+# Os pacotes que uma migração declara precisar (a linha "# pacotes: a b c").
+migration_packages() {
+  sed -n 's/^# pacotes:[[:space:]]*//p' "$1" | tr -s '[:space:]' '\n' |
+    grep -E '^[a-z0-9@._+-]+$' || true
+}
+
+run_migration() {
+  note "  $1"
+  if [[ $1 == system/* ]]; then
+    sudo env MK_SHARE="$share" bash "$share/migrations/$1"
+    sudo mkdir -p "$sys_done"
+    sudo touch "$sys_done/$(basename "$1")"
+  else
+    MK_SHARE="$share" bash "$share/migrations/$1"
+    mkdir -p "$user_done"
+    touch "$user_done/$(basename "$1")"
+  fi
+}
+
 copper=$'\e[38;2;206;94;50m' bone=$'\e[38;2;205;196;186m' dim=$'\e[38;2;113;107;105m' off=$'\e[0m'
 say() { printf '\n%s──%s %s%s%s\n' "$copper" "$off" "$bone" "$*" "$off"; }
 note() { printf '%s%s%s\n' "$dim" "$*" "$off"; }
 ask() {
   local reply
-  read -rp "$1 [S/n] " reply
+  # Sem resposta (janela fechada) é não.
+  read -rp "$1 [S/n] " reply || return 1
   [[ -z $reply || $reply == [sSyY]* ]]
 }
 pause() {
-  [[ -t 0 ]] || return 0
+  [[ -t 0 ]] && ((!closed)) || return 0
   echo
   read -rsp "${dim}Enter fecha.${off}" _ || true
   echo
 }
-trap pause EXIT
+finish() {
+  local rc=$?
+  ((applying)) && { write_summary "$rc" || true; }
+  pause
+}
+trap finish EXIT
+# Terminal fechado no meio também deixa o resumo ("parou em").
+closed=0
+trap 'closed=1; exit 129' HUP
+trap 'closed=1; exit 143' TERM
 
 printf '\n  %sM%s%sk%s  %satualizações%s\n' "$bone" "$off" "$copper" "$off" "$dim" "$off"
 
@@ -71,6 +183,36 @@ printf '  sistema    %s pacotes\n' "$nsys"
 printf '  AUR        %s pacotes\n' "$naur"
 mapfile -t pend < <(pending_migrations)
 ((${#pend[@]})) && printf '  ajustes    %s mudanças do Mk no sistema\n' "${#pend[@]}"
+# As migrações que pedem pacote ficam para depois do pacman (passo 3).
+pend_now=() pend_late=() req=()
+for m in "${pend[@]}"; do
+  pkgs=()
+  [[ $m == system/* ]] && mapfile -t pkgs < <(migration_packages "$share/migrations/$m")
+  if ((${#pkgs[@]})); then
+    pend_late+=("$m")
+    req+=("${pkgs[@]}")
+  else
+    pend_now+=("$m")
+  fi
+done
+# Os apps que entraram em apps.packages desde a última vez (passo 3). Contam
+# aqui para a oferta voltar mesmo quando não há mais nada a atualizar.
+apps_seen=/var/lib/mk/apps-oferecidos
+apps_list=$share/system/packages/apps.packages
+apps_new=() apps_add=()
+find_new_apps() {
+  apps_new=() apps_add=()
+  if [[ -s $apps_seen && -r $apps_list ]]; then
+    mapfile -t apps_new < <(sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$apps_list" |
+      grep -v '^[[:space:]]*$' | grep -vxFf "$apps_seen" || true)
+  fi
+  # pacman -T devolve só os que faltam.
+  if ((${#apps_new[@]})); then
+    mapfile -t apps_add < <(pacman -T "${apps_new[@]}" || true)
+  fi
+}
+find_new_apps
+((${#apps_add[@]})) && printf '  apps       %s novos do Mk\n' "${#apps_add[@]}"
 if ((nsys + naur > 0)); then
   jq -r '(.system + .aur)[] | "    \(.name)  \(.from) → \(.to)"' <<<"$info" | head -40
   ((nsys + naur > 40)) && note "    … e mais $((nsys + naur - 40))"
@@ -78,17 +220,19 @@ fi
 
 [[ $mode == --check ]] && exit 0
 if [[ $mode != --after-mk ]]; then
-  if [[ $mk_available != true ]] && ((nsys + naur + ${#pend[@]} == 0)); then
+  if [[ $mk_available != true ]] && ((nsys + naur + ${#pend[@]} + ${#apps_add[@]} == 0)); then
     say "tudo em dia"
     exit 0
   fi
   ask "Atualizar agora?" || exit 0
 fi
+applying=1
 
 # 1. O próprio Mk: baixa o canal, troca /usr/share/mk e as configs que o Mk
 #    criou em ~/.config/mk (os seus ajustes.json/ajustes.lua ficam).
 if [[ $mk_available == true && $mode != --after-mk ]]; then
   say "Mk"
+  step=mk
   tmp=$(mktemp -d)
   GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 "$channel" "$tmp/mk"
   # O lançamento traz o VERSION ("commit data"); sem ele, o commit do canal.
@@ -133,8 +277,8 @@ if [[ $mk_available == true && $mode != --after-mk ]]; then
     hyprctl dispatch "hl.dsp.exec_cmd(\"bash '$cfg/shell/scripts/mare-start' --restart\")" >/dev/null
   fi
   note "Mk em $version. O Hyprland pega a config nova no próximo login."
-  # O resto (migrações, pacotes) com a versão nova do mk-update.
-  trap - EXIT
+  # O resto (migrações, pacotes) com a versão nova do mk-update. Se a troca
+  # falhar, o resumo fica como "parou em: mk".
   exec /usr/bin/mk-update --after-mk
 fi
 
@@ -150,31 +294,77 @@ if [[ -e $lock ]] && ! pgrep -x 'pacman|yay|makepkg|pamac' >/dev/null; then
 fi
 
 # 2. Migrações: o que mudou no Mk fora de ~/.config/mk, cada uma uma vez.
-if ((${#pend[@]})); then
+if ((${#pend_now[@]})); then
   say "ajustes do Mk no sistema"
-  for m in "${pend[@]}"; do
-    note "  $m"
-    if [[ $m == system/* ]]; then
-      sudo env MK_SHARE="$share" bash "$share/migrations/$m"
-      sudo mkdir -p "$sys_done"
-      sudo touch "$sys_done/$(basename "$m")"
-    else
-      MK_SHARE="$share" bash "$share/migrations/$m"
-      mkdir -p "$user_done"
-      touch "$user_done/$(basename "$m")"
-    fi
+  step=ajustes
+  for m in "${pend_now[@]}"; do
+    run_migration "$m"
   done
+  # Uma migração pode ter acabado de criar a lista de apps já vistos.
+  find_new_apps
 fi
 
-# 3. Pacotes do Arch.
-if ((nsys > 0)); then
+# 3. Pacotes do Arch. Junto vão os apps que entraram em apps.packages desde a
+#    última vez. Cada um é oferecido uma vez só (anotado em $apps_seen), para
+#    não trazer de volta o que você tirou, e entra na mesma transação do -Syu:
+#    instalar app novo sobre um sistema desatualizado quebra bibliotecas.
+#    Pelo mesmo motivo vão junto os pacotes que as migrações pedem.
+step=sistema
+if ((${#apps_add[@]})); then
+  say "apps novos do Mk"
+  note "  ${apps_add[*]}"
+  if ask "Instalar junto com a atualização?"; then
+    # O LibreOffice é o grande (~150 MB): pergunta à parte.
+    if [[ " ${apps_add[*]} " == *" libreoffice-fresh "* ]]; then
+      if ! ask "Incluir o LibreOffice (~150 MB de download)?"; then
+        mapfile -t apps_add < <(printf '%s\n' "${apps_add[@]}" | grep -vx libreoffice-fresh || true)
+      elif grep -qs '^LANG=pt_BR' /etc/locale.conf; then
+        apps_add+=(libreoffice-fresh-pt-br)
+      fi
+    fi
+  else
+    apps_add=()
+  fi
+fi
+# Dos pacotes que as migrações pedem, só os que faltam.
+((${#req[@]})) && mapfile -t req < <(pacman -T "${req[@]}" || true)
+if ((nsys > 0 || ${#apps_add[@]} || ${#req[@]})); then
   say "sistema (sudo pede a sua senha)"
-  sudo pacman -Syu
+  if ((${#req[@]})); then
+    # Lista nova primeiro, para tirar do pedido o que saiu dos repositórios:
+    # um nome que não existe faria o pacman recusar a atualização inteira,
+    # hoje e sempre.
+    sudo pacman -Sy
+    want=("${req[@]}") req=()
+    for p in "${want[@]}"; do
+      if pacman -Si "$p" &>/dev/null; then
+        req+=("$p")
+      else
+        note "  $p não está nos repositórios: fica de fora"
+      fi
+    done
+    sudo pacman -Su --needed "${req[@]}" "${apps_add[@]}"
+  else
+    sudo pacman -Syu --needed "${apps_add[@]}"
+  fi
+fi
+# Só depois de o pacman dar certo: se ele falhar, a oferta volta na próxima.
+if ((${#apps_new[@]})); then
+  printf '%s\n' "${apps_new[@]}" | sudo tee -a "$apps_seen" >/dev/null
+fi
+# As migrações que esperavam os pacotes.
+if ((${#pend_late[@]})); then
+  say "ajustes do Mk que dependiam dos pacotes"
+  step=ajustes
+  for m in "${pend_late[@]}"; do
+    run_migration "$m"
+  done
 fi
 
 # 4. AUR, com o yay (compila como você, sem sudo, e pede a senha só para instalar).
 if ((naur > 0)) && command -v yay >/dev/null; then
   say "AUR"
+  step=aur
   yay -Sua --noconfirm --answerclean None --answerdiff None
 fi
 
@@ -182,6 +372,7 @@ fi
 if [[ -s $share/aur-pendentes.txt ]] && command -v yay >/dev/null; then
   mapfile -t aur_pend <"$share/aur-pendentes.txt"
   say "AUR que ficou de fora da instalação: ${aur_pend[*]}"
+  step=aur
   if ask "Instalar agora?"; then
     yay -S --needed --answerclean None --answerdiff None --removemake "${aur_pend[@]}" &&
       sudo rm -f "$share/aur-pendentes.txt"

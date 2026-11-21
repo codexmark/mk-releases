@@ -103,6 +103,16 @@ if [[ -e $home/.config/quickshell/mare/$marker ]]; then
   rm -rf "$home/.config/quickshell/mare"
 fi
 mkdir -p "$home/Work" "$home/Pictures/Wallpapers"
+# Um usuário novo nasce como numa instalação nova: com as migrações de usuário
+# marcadas como feitas (é por essa marca que o Maré sabe que pode mostrar as
+# boas-vindas no primeiro login; veja shell/mare/Welcome.qml).
+if ((created)); then
+  state=$home/.local/state/mk/migrations
+  install -d -o "$name" -g "$group" "$home/.local" "$home/.local/state" "$home/.local/state/mk" "$state"
+  for m in "$repo"/migrations/user/*.sh; do
+    [[ -f $m ]] && install -m644 -o "$name" -g "$group" /dev/null "$state/$(basename "$m")"
+  done
+fi
 
 if ((wallpapers)) && [[ -n ${SUDO_USER:-} ]]; then
   src=$(getent passwd "$SUDO_USER" | cut -d: -f6)/Pictures/Wallpapers

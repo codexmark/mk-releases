@@ -323,6 +323,7 @@ PanelWindow {
                     case "clipboard": return clipboardPanel;
                     case "wallpaper": return wallpaperPanel;
                     case "capture": return capturePanel;
+                    case "emoji": return emojiPanel;
                     default: return null;
                     }
                 }
@@ -349,6 +350,7 @@ PanelWindow {
     }
 
     Component { id: capturePanel; CapturePanel {} }
+    Component { id: emojiPanel; EmojiPanel {} }
     Component { id: projectPanel; ProjectPanel {} }
     Component { id: volumePanel; VolumePanel {} }
     Component { id: powerPanel; PowerPanel {} }

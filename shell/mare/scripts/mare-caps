@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# O que esta máquina tem, para os Ajustes esconderem o que não faz sentido:
+# {"touchpad": bool, "bateria": bool, "brilho": bool}
+# Só lê /proc e /sys. PROC e SYS trocam a raiz, para testar.
+set -uo pipefail
+
+proc=${PROC:-/proc}
+sys=${SYS:-/sys}
+
+# Touchpad: pelo nome, ou um ponteiro (PROP bit 0) que não é tela de toque
+# (bit 1) e tem eixos absolutos. Um mouse comum não tem ABS.
+touchpad=$(awk '
+  function check() { if (byname || (pointer && abs)) found = 1 }
+  /^I:/ { check(); byname = 0; pointer = 0; abs = 0 }
+  /^N:/ { if (tolower($0) ~ /touchpad|trackpad|synaptics|glidepoint/) byname = 1 }
+  /^B: PROP=/ { d = substr($0, length($0)); if (d ~ /[13579bdfBDF]/ && d !~ /[2367abefABEF]/) pointer = 1 }
+  /^B: ABS=/ { if ($0 !~ /=0*$/) abs = 1 }
+  END { check(); print found ? "true" : "false" }
+' "$proc/bus/input/devices" 2>/dev/null)
+
+has() { compgen -G "$1" >/dev/null && echo true || echo false; }
+
+printf '{"touchpad":%s,"bateria":%s,"brilho":%s}\n' \
+  "${touchpad:-true}" "$(has "$sys/class/power_supply/BAT*")" "$(has "$sys/class/backlight/*")"

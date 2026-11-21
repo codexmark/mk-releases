@@ -40,14 +40,63 @@ Singleton {
 
     // Config do ghostty do Mk (ao lado do shell instalado). O "?" deixa a
     // config opcional e config-default-files=false ignora o ~/.config/ghostty
-    // de outros desktops.
-    readonly property string terminalConfig: Quickshell.shellPath("../ghostty/config")
+    // de outros desktops. Sai de Settings.dir porque o shellPath não sobe
+    // acima da pasta do shell ("../ghostty" voltava como caminho relativo, e
+    // o ghostty abria sem a config do Mk).
+    readonly property string terminalConfig: Settings.dir + "/ghostty/config"
 
-    // Abre o ghostty no diretório do projeto; `cmd` roda dentro dele (lazygit, lazydocker).
+    // Os terminais que o Mk sabe abrir "neste diretório, rodando isto". Não há
+    // padrão do XDG para terminal: a escolha fica no ajustes.json
+    // ("apps.terminal", página Apps padrão dos Ajustes). O de fábrica é o
+    // ghostty com a config do Mk.
+    readonly property var terminals: ["ghostty", "kitty", "foot", "alacritty", "wezterm"]
+    readonly property string terminal: {
+        const t = Settings.get("apps.terminal");
+        return terminals.indexOf(t) >= 0 ? t : "ghostty";
+    }
+
+    // Texto -> um argumento só para o shell.
+    function shellQuote(s) {
+        return "'" + String(s).replace(/'/g, "'\\''") + "'";
+    }
+
+    // A linha de shell que abre o terminal `name` em `dir`. `cmd` é texto de
+    // shell (vazio = só o shell do usuário) e `title`, o título da janela.
+    // Cada terminal tem as suas flags; só o ghostty leva a config do Mk.
+    function terminalLineFor(name, dir, cmd, title) {
+        const d = shellQuote(dir);
+        const t = title ? shellQuote(title) : "";
+        switch (name) {
+        case "kitty":
+            return `kitty --directory=${d}` + (t ? ` --title=${t}` : "") + (cmd ? ` ${cmd}` : "");
+        case "foot":
+            return `foot --working-directory=${d}` + (t ? ` --title=${t}` : "") + (cmd ? ` ${cmd}` : "");
+        case "alacritty":
+            return `alacritty --working-directory ${d}` + (t ? ` --title ${t}` : "") + (cmd ? ` -e ${cmd}` : "");
+        case "wezterm":
+            // Sem --always-new-process a janela nasce num wezterm já aberto e
+            // este comando volta na hora (quem espera o fim, como as
+            // atualizações, acharia que acabou). Não tem flag de título.
+            return `wezterm start --always-new-process --cwd ${d}` + (cmd ? ` -- ${cmd}` : "");
+        default:
+            return `ghostty --config-default-files=false --config-file=${shellQuote("?" + terminalConfig)} --working-directory=${d}`
+                + (t ? ` --title=${t}` : "") + (cmd ? ` -e ${cmd}` : "");
+        }
+    }
+
+    // O mesmo, para o terminal escolhido. Se ele foi desinstalado depois da
+    // escolha, abre o ghostty: Super + Enter nunca fica sem terminal.
+    function terminalLine(dir, cmd, title) {
+        const d = dir && dir !== "" ? dir : home;
+        const fallback = terminalLineFor("ghostty", d, cmd, title);
+        if (terminal === "ghostty")
+            return fallback;
+        return `if command -v ${terminal} >/dev/null 2>&1; then ${terminalLineFor(terminal, d, cmd, title)}; else ${fallback}; fi`;
+    }
+
+    // Abre o terminal no diretório do projeto; `cmd` roda dentro dele (lazygit, lazydocker).
     function openIn(projectDir, cmd) {
-        const d = projectDir !== "" ? projectDir : home;
-        const tail = cmd ? ` -e ${cmd}` : "";
-        Hypr.exec(`ghostty --config-default-files=false --config-file='?${terminalConfig}' --working-directory='${d}'${tail}`);
+        Hypr.exec(terminalLine(projectDir, cmd, ""));
     }
 
     function openHere(cmd) {

@@ -510,10 +510,10 @@ PanelWindow {
                     onClicked: Capture.toggleRecording()
                 }
 
-                // Atualizações pendentes: só aparece quando há alguma.
+                // Atualizações: só aparece pelo que importa (Updates.badge).
                 IslandItem {
                     anchors.verticalCenter: parent.verticalCenter
-                    visible: Updates.count > 0 && Settings.get("updates.island")
+                    visible: Updates.badge && Settings.get("updates.island")
                     icon: "󰚰"
                     text: String(Updates.count)
                     iconColor: Updates.mkAvailable ? Theme.copper : Theme.textDim
@@ -527,6 +527,17 @@ PanelWindow {
                     icon: Notifs.dnd ? "󰂛" : "󰂚"
                     dot: Notifs.count > 0 && !Notifs.dnd
                     panel: "notifications"
+                }
+                // VPN: o escudo só aparece enquanto há um túnel aberto.
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Vpn.up
+                    icon: "󰦝"
+                    iconColor: Theme.copper
+                    onClicked: {
+                        Mare.settingsPage = "vpn";
+                        Mare.open("settings");
+                    }
                 }
                 IslandItem {
                     anchors.verticalCenter: parent.verticalCenter

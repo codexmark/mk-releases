@@ -41,6 +41,8 @@ slurp
 wl-clipboard
 # wl-clip-persist: o que foi copiado sobrevive ao fechar o app de origem
 wl-clip-persist
+# wtype: o painel de emoji digita o escolhido na janela em foco
+wtype
 # playerctl: teclas play/pause/próxima para qualquer player
 playerctl
 # cliphist: histórico da área de transferência (Super+Shift+V)

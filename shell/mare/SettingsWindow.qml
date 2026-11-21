@@ -20,9 +20,20 @@ PanelWindow {
     readonly property string page: Mare.settingsPage
     property string query: ""
     property string flashKey: ""
-    readonly property var results: Schema.search(query)
+    readonly property var results: Schema.search(query, Settings.get("keybinds"), Settings.values, Settings.caps)
+    // As linhas desta página que aparecem agora (veja quando/precisa no esquema).
+    readonly property var shownRows: Schema.pageRows(page, Settings.values, Settings.caps)
     readonly property var pageInfo: Schema.pageName(page)
     readonly property var allPages: Schema.groups.reduce((a, g) => a.concat(g.items), [])
+
+    // Página -> arquivo, para as que têm conteúdo próprio.
+    readonly property var pageFiles: ({
+        "monitores": "SettingsMonitorsPage",
+        "apps": "SettingsAppsPage",
+        "impressoras": "SettingsPrintersPage",
+        "vpn": "SettingsVpnPage",
+        "atalhos": "SettingsKeybindsPage"
+    })
 
     // Detalhes da máquina para a página Sobre (scripts/mare-about).
     property var about: ({})
@@ -76,6 +87,7 @@ PanelWindow {
         }
     }
     onPageChanged: {
+        Settings.dismiss();
         if (page === "sobre")
             aboutProc.running = true;
         if (page === "atualizacoes" && (!Updates.info || Date.now() / 1000 - Updates.info.checked > 600))
@@ -584,6 +596,28 @@ PanelWindow {
                     font.weight: Font.Light
                 }
 
+                // Um ajuste que não pegou, ou o ajustes.json ilegível.
+                RowLayout {
+                    visible: Settings.lastError !== ""
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 6
+                    spacing: 12
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: Settings.lastError
+                        elide: Text.ElideRight
+                        color: Theme.copper
+                        font.family: Theme.sans
+                        font.pixelSize: 12
+                    }
+                    PillButton {
+                        visible: Settings.broken
+                        text: "começar do zero"
+                        onClicked: Settings.startFresh()
+                    }
+                }
+
                 // Atualizações: o resumo, a lista e os botões, antes das opções.
                 ColumnLayout {
                     visible: win.page === "atualizacoes"
@@ -652,6 +686,9 @@ PanelWindow {
                         font.family: Theme.mono
                         font.pixelSize: 11
                     }
+
+                    // A última rodada, o registro e o que chega com o Mk novo.
+                    SettingsUpdatesLast {}
 
                     // Mk, sistema e AUR, cada um numa linha.
                     GridLayout {
@@ -866,7 +903,9 @@ PanelWindow {
                     }
                 }
 
-                // Linhas da página.
+                // Linhas da página. Todas existem; as que não fazem sentido agora
+                // ficam invisíveis (o modelo não muda, então nada é refeito ao
+                // arrastar um slider).
                 Repeater {
                     model: Schema.pageRows(win.page)
 
@@ -874,10 +913,11 @@ PanelWindow {
                         id: line
                         required property var modelData
                         required property int index
-                        readonly property var rowsHere: Schema.pageRows(win.page)
-                        readonly property bool firstOfGroup: index === 0 || rowsHere[index - 1].group !== modelData.group
+                        readonly property int place: win.shownRows.findIndex(r => r.key === modelData.key)
+                        readonly property bool firstOfGroup: place === 0 || (place > 0 && win.shownRows[place - 1].group !== modelData.group)
                         readonly property var value: Settings.get(modelData.key)
 
+                        visible: place >= 0
                         Layout.fillWidth: true
                         spacing: 0
 
@@ -999,6 +1039,23 @@ PanelWindow {
                     }
                 }
 
+                // Páginas com conteúdo próprio (um arquivo cada). Recebem a largura
+                // da folha; a altura é a que o conteúdo pedir.
+                Loader {
+                    id: pageLoader
+                    Layout.fillWidth: true
+                    active: win.open && win.pageFiles[win.page] !== undefined
+                    visible: active
+                    source: active ? Qt.resolvedUrl(win.pageFiles[win.page] + ".qml") : ""
+                }
+                // A linha que a busca pediu, para as páginas que sabem destacá-la.
+                Binding {
+                    target: pageLoader.item
+                    property: "flashKey"
+                    value: win.flashKey
+                    when: pageLoader.item !== null && pageLoader.item.flashKey !== undefined
+                }
+
                 // Extras de algumas páginas.
                 RowLayout {
                     visible: win.page === "fundo"
@@ -1013,67 +1070,6 @@ PanelWindow {
                         visible: Wallpaper.current !== ""
                         text: "só a folha, sem imagem"
                         onClicked: Wallpaper.set("")
-                    }
-                }
-
-                // Atalhos.
-                Repeater {
-                    model: win.page === "atalhos" ? Schema.shortcuts : []
-
-                    ColumnLayout {
-                        id: keys
-                        required property var modelData
-                        Layout.fillWidth: true
-                        spacing: 0
-
-                        Text {
-                            Layout.topMargin: 18
-                            Layout.bottomMargin: 4
-                            text: keys.modelData.group
-                            color: Theme.textFaint
-                            font.family: Theme.mono
-                            font.pixelSize: 9
-                            font.letterSpacing: 1.8
-                        }
-
-                        Repeater {
-                            model: keys.modelData.items
-
-                            ColumnLayout {
-                                id: bind
-                                required property var modelData
-                                Layout.fillWidth: true
-                                spacing: 0
-
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    implicitHeight: 1
-                                    color: Theme.hairline
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 34
-                                    spacing: 16
-
-                                    Text {
-                                        Layout.preferredWidth: 220
-                                        text: bind.modelData[0]
-                                        color: Theme.text
-                                        font.family: Theme.mono
-                                        font.pixelSize: 12
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: bind.modelData[1]
-                                        color: Theme.textSoft
-                                        font.family: Theme.sans
-                                        font.pixelSize: 13
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
 
@@ -1130,6 +1126,17 @@ PanelWindow {
                                 elide: Text.ElideMiddle
                             }
                         }
+                    }
+                }
+
+                // Sobre: o passeio de boas-vindas, de novo.
+                PillButton {
+                    visible: win.page === "sobre"
+                    Layout.topMargin: 20
+                    text: "ver as boas-vindas de novo"
+                    onClicked: {
+                        Mare.close();
+                        Welcome.open();
                     }
                 }
 

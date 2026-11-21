@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# As telas para a página Monitores dos Ajustes (Monitors.qml).
+#
+#   mare-monitors list [monitores.lua]
+#       JSON: { "monitors": [...], "saved": [...] }. "monitors" são as saídas
+#       ligadas ao computador agora (hyprctl -j monitors all), já no formato
+#       que o painel usa; "saved" é o que o arquivo dado guardou da última vez
+#       (a linha "-- mk:telas"), para não perder as telas desconectadas.
+#   mare-monitors trial <segundos> <monitores.lua> <texto novo>
+#       Grava o arquivo, recarrega o Hyprland e deixa um vigia rodando fora do
+#       Maré: se ninguém confirmar em <segundos>, o vigia devolve o arquivo
+#       anterior e recarrega de novo. Assim a tela volta mesmo que o Maré
+#       morra ou a imagem suma.
+#   mare-monitors keep | revert
+#       A resposta ao vigia: manter o que foi aplicado, ou voltar já.
+#
+# Por que arquivo + reload e não `hyprctl eval`: por eval o Hyprland 0.57 só
+# reaplica a regra em telas ligadas e sem espelho; uma tela desligada não
+# religa e um espelho não se desfaz. Recarregando a config, tudo vale.
+#
+# Enquanto a contagem corre, o arquivo anterior fica em <arquivo>.anterior,
+# com a sessão que começou o teste na primeira linha. Se a máquina desligar
+# no meio, o vigia devolve o arquivo ao receber o sinal de término; se nem
+# isso der tempo (queda de energia), o hyprland.lua vê a sobra no próximo
+# login e volta sozinho.
+#
+# O Lua vem pronto do Monitors.qml; aqui nada é montado. MARE_HYPRCTL troca
+# o hyprctl por outro comando (os testes usam um falso).
+set -euo pipefail
+
+hyprctl=${MARE_HYPRCTL:-hyprctl}
+session=${HYPRLAND_INSTANCE_SIGNATURE:-}
+token="${XDG_RUNTIME_DIR:-/tmp}/mk-monitores-${HYPRLAND_INSTANCE_SIGNATURE:-sessao}"
+
+usage() {
+  echo "uso: mare-monitors list [arquivo] | trial <segundos> <arquivo> <texto> | keep | revert" >&2
+  exit 2
+}
+
+# Troca atômica: o Hyprland nunca lê um arquivo pela metade, nem o vigia uma
+# resposta vazia (que ele tomaria por "voltar").
+write() {
+  local tmp
+  tmp=$(mktemp "$1.XXXXXX")
+  printf '%s' "$2" >"$tmp"
+  mv -f "$tmp" "$1"
+}
+
+# Devolve o arquivo de antes do teste (sem a linha da sessão). Se antes não
+# havia arquivo, ele some de novo.
+restore() {
+  local file=$1 old
+  [[ -e $file.anterior ]] || return 0
+  old=$(tail -n +2 "$file.anterior"; printf x)
+  old=${old%x}
+  if [[ -n $old ]]; then
+    write "$file" "$old"
+  else
+    rm -f "$file"
+  fi
+  rm -f "$file.anterior"
+}
+
+reload() {
+  "$hyprctl" reload >/dev/null 2>&1 || true
+}
+
+alive() {
+  "$hyprctl" version >/dev/null 2>&1
+}
+
+# Há um vigia de um teste anterior ainda rodando?
+watching() {
+  [[ -r $token.pid ]] || return 1
+  kill -0 "$(<"$token.pid")" 2>/dev/null
+}
+
+list() {
+  local file=${1:-} raw saved="[]" line
+  raw=$("$hyprctl" -j monitors all 2>/dev/null) || raw="[]"
+  jq -e 'type == "array"' <<<"$raw" >/dev/null 2>&1 || raw="[]"
+  if [[ -n $file && -r $file ]]; then
+    line=$(sed -n 's/^-- mk:telas //p' "$file" | head -n 1)
+    if [[ -n $line ]] && jq -e 'type == "array"' <<<"$line" >/dev/null 2>&1; then
+      saved=$line
+    fi
+  fi
+  # FALLBACK é a tela de mentira que o Hyprland cria quando não sobra
+  # nenhuma ligada, e HEADLESS-n são saídas virtuais: não são do computador.
+  jq -c --argjson saved "$saved" '
+    (map({ key: (.id | tostring), value: .name }) | from_entries) as $names
+    | { monitors: map(select(.name != "FALLBACK" and (.name | startswith("HEADLESS-") | not))) | map({
+          name,
+          description: (.description // ""),
+          make: (.make // ""),
+          model: (.model // ""),
+          w: (.width // 0),
+          h: (.height // 0),
+          refresh: (.refreshRate // 0),
+          x: (.x // 0),
+          y: (.y // 0),
+          scale: (.scale // 1),
+          transform: (.transform // 0),
+          enabled: ((.disabled // false) | not),
+          focused: (.focused // false),
+          mirror: (if (.mirrorOf // "none" | tostring) == "none" then "" else ($names[.mirrorOf | tostring] // "") end),
+          modes: ((.availableModes // [])
+            | map(capture("^(?<w>[0-9]+)x(?<h>[0-9]+)@(?<r>[0-9.]+)Hz$")
+                | { w: (.w | tonumber), h: (.h | tonumber), r: (.r | tonumber) })
+            | unique
+            | sort_by(-(.w * .h), -.w, -.r))
+        }) | sort_by(.x, .y, .name),
+        saved: ($saved | map(select(.name != "FALLBACK" and (.name | startswith("HEADLESS-") | not)))) }' <<<"$raw"
+}
+
+watch() {
+  local seconds=$1 file=$2 answer=""
+  echo $$ >"$token.pid"
+  # Desligar ou reiniciar a máquina no meio da contagem (o reflexo de quem
+  # ficou sem imagem) mata o vigia: antes de sair ele devolve o arquivo, para
+  # o próximo login não subir com a configuração que ninguém confirmou.
+  trap 'restore "$file"; timeout 3 "$hyprctl" reload >/dev/null 2>&1; rm -f "$token" "$token.pid"; exit 0' TERM HUP INT
+  SECONDS=0
+  while (( SECONDS < seconds )); do
+    if [[ -e $token ]]; then
+      answer=$(<"$token")
+      break
+    fi
+    # O Hyprland caiu com a configuração nova: não espera, devolve já, para
+    # o próximo login não cair de novo.
+    alive || break
+    sleep 0.2
+  done
+  trap '' TERM HUP INT
+  case $answer in
+    manter)
+      rm -f "$file.anterior" ;;
+    novo)
+      # Outro teste começou por cima deste: a sobra continua valendo como o
+      # "antes" dele, e o vigia dele assume.
+      ;;
+    *)
+      restore "$file"
+      reload ;;
+  esac
+  rm -f "$token" "$token.pid"
+}
+
+case ${1:-} in
+  list)
+    list "${2:-}" ;;
+  trial)
+    [[ $# -eq 4 && $2 =~ ^[0-9]+$ && -n $3 ]] || usage
+    file=$3
+    mkdir -p "$(dirname "$file")"
+    # Um vigia de antes ainda vivo: nunca dois mexendo no mesmo arquivo. Se
+    # ele já tem resposta (voltar seguido de aplicar), espera terminar. Se
+    # ainda está contando (o Maré reiniciou no meio), sai de cena e deixa a
+    # sobra, que é o "antes" de verdade.
+    inherit=0
+    if watching; then
+      if [[ ! -e $token ]]; then
+        write "$token" novo
+        inherit=1
+      fi
+      for _ in $(seq 1 25); do
+        watching || break
+        sleep 0.2
+      done
+      if watching; then
+        kill -KILL "$(<"$token.pid")" 2>/dev/null || true
+      fi
+    fi
+    rm -f "$token" "$token.pid"
+    # Uma sobra só vale se é do teste que acabou de ceder a vez, nesta
+    # sessão. Qualquer outra é lixo de uma sessão que morreu: usar essa como
+    # "antes" faria o voltar devolver um arquivo de dias atrás.
+    if [[ $inherit -eq 0 || ! -e $file.anterior
+      || $(head -n 1 "$file.anterior") != "-- mk:teste $session" ]]; then
+      {
+        printf -- '-- mk:teste %s\n' "$session"
+        if [[ -r $file ]]; then cat "$file"; fi
+      } >"$file.anterior"
+    fi
+    write "$file" "$4"
+    reload
+    setsid -f bash "$0" watch "$2" "$file" >/dev/null 2>&1 </dev/null
+    echo ok ;;
+  watch)
+    [[ $# -eq 3 ]] || usage
+    watch "$2" "$3" ;;
+  keep)
+    write "$token" manter ;;
+  revert)
+    write "$token" voltar ;;
+  *)
+    usage ;;
+esac

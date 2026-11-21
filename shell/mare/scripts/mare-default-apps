@@ -1,0 +1,336 @@
+#!/usr/bin/env bash
+# Os apps padrão para a página "Apps padrão" dos Ajustes (SettingsAppsPage.qml).
+#
+#   mare-default-apps [--dry-run] list
+#       JSON: { "roles": [...], "terminals": [...], "terminalExec": bool }.
+#       Cada papel (navegador, arquivos, editor, imagens, video, musica, pdf,
+#       email) traz o app que abre aquilo hoje ("current", um id .desktop, ou
+#       "") e os instalados que servem ("apps": id, name, icon, terminal).
+#       "terminals" são os terminais que o Mk sabe abrir e quais estão
+#       instalados; "terminalExec" diz se há xdg-terminal-exec (sem ele, um app
+#       de terminal como o Neovim não abre a partir do gerenciador de arquivos).
+#   mare-default-apps [--dry-run] set <papel> <app.desktop>
+#       Faz do app o padrão do papel (xdg-mime default, para o grupo de tipos
+#       do papel) e devolve o mesmo JSON de `list`, já atualizado.
+#   mare-default-apps [--dry-run] terminal <ghostty|kitty|foot|alacritty|wezterm>
+#       Põe o terminal no alto de xdg-terminals.list, que é onde o
+#       xdg-terminal-exec (e por ele o GLib) procura. A escolha do Mk em si
+#       fica no ajustes.json ("apps.terminal"), gravada pelo Maré.
+#   mare-default-apps [--dry-run] open <papel>
+#       Abre o app padrão do papel, sem arquivo nenhum (o atalho do navegador
+#       usa isto). Se o padrão não existe ou foi desinstalado, abre o primeiro
+#       instalado que serve; sai com 1 se não há nenhum.
+#   mare-default-apps mimes <papel> [app.desktop]
+#       Os tipos que `set` mudaria, um por linha (para conferir).
+#
+# Saída: 0 deu certo; 1 app não encontrado (ou nada para abrir); 2 uso errado,
+# papel ou terminal desconhecido.
+#
+# Cada papel tem tipos "core", que sempre mudam, e "extra", que só mudam se o
+# app disser no .desktop que os abre: escolher o imv para imagens não entrega
+# a ele um formato que ele não lê.
+#
+# Tudo passa pelo xdg-mime, que grava em $XDG_CONFIG_HOME/mimeapps.list. Com
+# --dry-run (ou MARE_APPS_DRY=1) nada é gravado: o que seria feito sai no
+# stderr. Para testar de verdade sem tocar nos seus padrões, aponte HOME,
+# XDG_CONFIG_HOME e XDG_DATA_HOME para uma pasta de rascunho.
+set -euo pipefail
+
+dry=${MARE_APPS_DRY:-0}
+if [[ ${1:-} == --dry-run ]]; then
+  dry=1
+  shift
+fi
+
+usage() {
+  echo "uso: mare-default-apps [--dry-run] list | set <papel> <app.desktop> | terminal <nome> | open <papel> | mimes <papel> [app.desktop]" >&2
+  exit 2
+}
+
+# Os papéis. need: o app precisa declarar um destes tipos; cats: e estar numa
+# destas categorias (vazio = qualquer uma); not: e em nenhuma destas. Sem a
+# categoria, o navegador apareceria como visualizador de imagens, o editor de
+# vídeo como player e o editor de código como gerenciador de arquivos, só por
+# declararem o tipo.
+roles='[
+  { "id": "navegador",
+    "need": ["x-scheme-handler/http", "x-scheme-handler/https"], "cats": [],
+    "core": ["x-scheme-handler/http", "x-scheme-handler/https", "text/html"],
+    "extra": ["application/xhtml+xml", "x-scheme-handler/about", "x-scheme-handler/unknown"] },
+  { "id": "arquivos",
+    "need": ["inode/directory"], "cats": ["FileManager"],
+    "core": ["inode/directory"], "extra": [] },
+  { "id": "editor",
+    "need": ["text/plain"], "cats": ["TextEditor"],
+    "core": ["text/plain"],
+    "extra": ["text/markdown", "text/x-markdown", "text/x-log", "text/csv", "text/x-shellscript",
+              "application/x-shellscript", "application/json", "application/xml", "text/xml",
+              "application/toml", "application/yaml", "application/x-yaml", "text/x-python",
+              "text/x-csrc", "text/x-chdr", "text/x-c++src", "text/x-c++hdr", "text/x-makefile",
+              "text/x-lua", "text/javascript", "application/javascript", "text/css", "text/x-go",
+              "text/rust", "text/x-java", "text/x-tex"] },
+  { "id": "imagens",
+    "need": ["image/png", "image/jpeg"], "cats": ["Viewer", "Graphics", "Photography"],
+    "core": ["image/png", "image/jpeg"],
+    "extra": ["image/gif", "image/webp", "image/bmp", "image/tiff", "image/svg+xml", "image/avif",
+              "image/heif", "image/heic", "image/jxl", "image/x-icon", "image/vnd.microsoft.icon",
+              "image/x-portable-pixmap", "image/x-tga", "image/qoi"] },
+  { "id": "video",
+    "need": ["video/mp4", "video/x-matroska"], "cats": ["Player"], "not": ["AudioVideoEditing"],
+    "core": ["video/mp4", "video/x-matroska", "video/webm"],
+    "extra": ["video/quicktime", "video/x-msvideo", "video/mpeg", "video/ogg", "video/x-flv",
+              "video/3gpp", "video/mp2t", "video/x-ms-wmv", "video/x-m4v", "video/vnd.avi",
+              "video/x-ogm+ogg", "video/x-theora+ogg"] },
+  { "id": "musica",
+    "need": ["audio/mpeg", "audio/flac"], "cats": ["Player", "Music"], "not": ["AudioVideoEditing"],
+    "core": ["audio/mpeg", "audio/flac"],
+    "extra": ["audio/ogg", "audio/x-vorbis+ogg", "audio/opus", "audio/x-opus+ogg", "audio/mp4",
+              "audio/aac", "audio/x-wav", "audio/wav", "audio/x-flac", "audio/mp3", "audio/x-mp3",
+              "audio/x-m4a", "audio/webm", "audio/x-ms-wma", "audio/x-mpegurl", "audio/x-scpls"] },
+  { "id": "pdf",
+    "need": ["application/pdf"], "cats": ["Viewer", "WebBrowser"],
+    "core": ["application/pdf"], "extra": [] },
+  { "id": "email",
+    "need": ["x-scheme-handler/mailto"], "cats": [],
+    "core": ["x-scheme-handler/mailto"], "extra": ["message/rfc822"] }
+]'
+
+# Os terminais que o Projects.qml sabe abrir "neste diretório, rodando isto".
+terminals='[
+  { "id": "ghostty", "name": "Ghostty", "desktop": "com.mitchellh.ghostty.desktop" },
+  { "id": "kitty", "name": "kitty", "desktop": "kitty.desktop" },
+  { "id": "foot", "name": "foot", "desktop": "foot.desktop" },
+  { "id": "alacritty", "name": "Alacritty", "desktop": "Alacritty.desktop" },
+  { "id": "wezterm", "name": "WezTerm", "desktop": "org.wezfurlong.wezterm.desktop" }
+]'
+
+config_home=${XDG_CONFIG_HOME:-$HOME/.config}
+
+# Faz, ou só diz o que faria.
+run() {
+  if [[ $dry == 1 ]]; then
+    printf 'dry-run:' >&2
+    printf ' %q' "$@" >&2
+    printf '\n' >&2
+  else
+    "$@"
+  fi
+}
+
+# Todos os .desktop à vista, na ordem do XDG (o da home ganha do sistema), como
+# JSON numa linha: [{ id, name, icon, mimes: [], cats: [], terminal }]. Quem
+# usa lê pelo stdin, nunca por argumento: com algumas centenas de apps a lista
+# passa do tamanho que o Linux aceita num argumento só. O id é o caminho
+# dentro de applications/ com "-" no lugar de "/". Um awk só lê todos os
+# arquivos; só vale a seção [Desktop Entry], e Hidden=true é como não existir.
+# NoDisplay fica: é como o imv e outros visualizadores se escondem do menu.
+entries() {
+  local dir dirs
+  IFS=: read -r -a dirs <<<"${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+  for dir in "${dirs[@]}"; do
+    [[ -d $dir/applications ]] || continue
+    # O find sai com 1 por um atalho em laço ou uma pasta sem leitura, mesmo
+    # tendo listado o resto: isso não pode parar a volta nas outras pastas.
+    { find -L "$dir/applications" -name '*.desktop' -type f -printf '%P\t%p\n' 2>/dev/null || true; } | sort
+  done | awk -F'\t' '
+    function clean(s) { gsub(/[\t\r]/, " ", s); return s }
+    {
+      id = $1; path = $2
+      gsub("/", "-", id)
+      if (id in seen) next
+      seen[id] = 1
+      name = ""; br = ""; pt = ""; icon = ""; mime = ""; cats = ""; term = 0; hidden = 0; type = ""; inside = 0
+      while ((getline line < path) > 0) {
+        sub(/\r$/, "", line)
+        if (line ~ /^\[/) { inside = (line == "[Desktop Entry]"); continue }
+        if (!inside) continue
+        eq = index(line, "=")
+        if (eq == 0) continue
+        key = substr(line, 1, eq - 1); val = substr(line, eq + 1)
+        sub(/[ \t]+$/, "", key); sub(/^[ \t]+/, "", val)
+        if (key == "Name") name = val
+        else if (key == "Name[pt_BR]") br = val
+        else if (key == "Name[pt]") pt = val
+        else if (key == "Icon") icon = val
+        else if (key == "MimeType") mime = val
+        else if (key == "Categories") cats = val
+        else if (key == "Type") type = val
+        else if (key == "Terminal") term = (val == "true")
+        else if (key == "Hidden") hidden = (val == "true")
+      }
+      close(path)
+      if (hidden || type != "Application") next
+      shown = br != "" ? br : (pt != "" ? pt : name)
+      if (shown == "") shown = id
+      printf "%s\t%s\t%s\t%s\t%s\t%d\n", clean(id), clean(shown), clean(icon), clean(mime), clean(cats), term
+    }' | jq -c -R -s '
+      [ split("\n")[] | select(length > 0) | split("\t")
+        | { id: .[0], name: .[1], icon: .[2],
+            mimes: (.[3] | split(";") | map(select(length > 0))),
+            cats: (.[4] | split(";") | map(select(length > 0))),
+            terminal: (.[5] == "1") } ]'
+}
+
+# O padrão de hoje para o primeiro tipo "core" de cada papel: { papel: id }.
+# As consultas rodam juntas, porque o xdg-mime é lento (um shell por tipo).
+currents() {
+  local tmp id mime
+  tmp=$(mktemp -d)
+  while IFS=$'\t' read -r id mime; do
+    (xdg-mime query default "$mime" >"$tmp/$id" 2>/dev/null || true) &
+  done < <(jq -r '.[] | [.id, .core[0]] | @tsv' <<<"$roles")
+  wait
+  for id in $(jq -r '.[].id' <<<"$roles"); do
+    jq -n --arg id "$id" --arg app "$(head -n 1 "$tmp/$id" 2>/dev/null || true)" '{ ($id): $app }'
+  done | jq -s 'add // {}'
+  rm -rf "${tmp:?}"
+}
+
+list() {
+  local installed="" id
+  for id in $(jq -r '.[].id' <<<"$terminals"); do
+    command -v "$id" >/dev/null 2>&1 && installed+="$id "
+  done
+  entries | jq --argjson roles "$roles" --argjson current "$(currents)" \
+    --argjson terminals "$terminals" --arg installed "$installed" \
+    --argjson exec "$(command -v xdg-terminal-exec >/dev/null 2>&1 && echo true || echo false)" '
+    . as $entries
+    | ($entries | map({ key: .id, value: . }) | from_entries) as $byId
+    | { roles: [ $roles[] | . as $r
+          | ($current[$r.id] // "") as $cur
+          | { id: $r.id, current: $cur,
+              currentName: (if $cur == "" then "" else ($byId[$cur].name // ($cur | sub("\\.desktop$"; ""))) end),
+              apps: ([ $entries[]
+                      | select((.mimes - (.mimes - $r.need)) | length > 0)
+                      | select(($r.cats | length) == 0 or ((.cats - (.cats - $r.cats)) | length > 0))
+                      | select((.cats - (.cats - ($r.not // []))) | length == 0)
+                      | { id, name, icon, terminal } ]
+                    | sort_by(.name | ascii_downcase)
+                    # Dois apps com o mesmo nome (pacote e flatpak): o id desempata.
+                    | (group_by(.name) | map(select(length > 1) | .[0].name)) as $twice
+                    | map(if .name as $n | $twice | index($n) then .name += " (" + (.id | sub("\\.desktop$"; "")) + ")" else . end)) } ],
+        terminals: [ $terminals[] | { id, name, installed: (.id as $t | ($installed | split(" ") | index($t)) != null) } ],
+        terminalExec: $exec }'
+}
+
+# Sai com 2 se o papel não existe.
+check_role() {
+  jq -e --arg r "$1" 'any(.[]; .id == $r)' <<<"$roles" >/dev/null || {
+    echo "mare-default-apps: papel desconhecido: $1" >&2
+    exit 2
+  }
+}
+
+# Os tipos que mudam: os core, mais os extra que o app declara. Sem app, todos.
+mimes() {
+  local role=$1 app=${2:-} declared="[]"
+  check_role "$role"
+  if [[ -n $app ]]; then
+    declared=$(entries | jq --arg a "$app" '[ .[] | select(.id == $a) ]')
+    [[ $(jq 'length' <<<"$declared") -gt 0 ]] || {
+      echo "mare-default-apps: app não encontrado: $app" >&2
+      exit 1
+    }
+    declared=$(jq '.[0].mimes' <<<"$declared")
+  fi
+  jq -r --arg r "$role" --arg a "$app" --argjson d "$declared" '
+    .[] | select(.id == $r)
+    | .core + (if $a == "" then .extra else (.extra - (.extra - $d)) end) | .[]' <<<"$roles"
+}
+
+set_role() {
+  local role=$1 app=$2 out types
+  # Fora de uma substituição de processo, para o código de saída do mimes
+  # (2 = papel desconhecido, 1 = app não encontrado) ser o do script.
+  out=$(mimes "$role" "$app")
+  mapfile -t types <<<"$out"
+  [[ -n $out ]] || exit 1
+  run xdg-mime default "$app" "${types[@]}"
+  list
+}
+
+# O caminho do .desktop de um id, procurando nas pastas do XDG (um id
+# "a-b.desktop" pode ser a/b.desktop). Vazio se não está instalado.
+desktop_path() {
+  local app=$1 dir dirs
+  IFS=: read -r -a dirs <<<"${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+  for dir in "${dirs[@]}"; do
+    if [[ -f $dir/applications/$app ]]; then
+      echo "$dir/applications/$app"
+      return 0
+    fi
+  done
+  for dir in "${dirs[@]}"; do
+    [[ -d $dir/applications ]] || continue
+    find -L "$dir/applications" -mindepth 2 -name '*.desktop' -type f -printf '%P\t%p\n' 2>/dev/null || true
+  done | awk -F'\t' -v want="$app" '{ id = $1; gsub("/", "-", id); if (id == want) { print $2; exit } }'
+}
+
+# Abre o app padrão do papel. Sem padrão, ou com um padrão que foi
+# desinstalado, abre o primeiro instalado que serve: o atalho do navegador não
+# fica mudo porque o mimeapps.list aponta para um app que saiu.
+open_role() {
+  local role=$1 mime app file=""
+  check_role "$role"
+  mime=$(jq -r --arg r "$role" '.[] | select(.id == $r) | .core[0]' <<<"$roles")
+  app=$(xdg-mime query default "$mime" 2>/dev/null | head -n 1 || true)
+  [[ -z $app ]] || file=$(desktop_path "$app")
+  if [[ -z $file ]]; then
+    app=$(list | jq -r --arg r "$role" '.roles[] | select(.id == $r) | .apps[0].id // ""')
+    [[ -z $app ]] || file=$(desktop_path "$app")
+  fi
+  [[ -n $file ]] || {
+    echo "mare-default-apps: nenhum app instalado para $role" >&2
+    exit 1
+  }
+  run gio launch "$file"
+}
+
+# O terminal escolhido no alto de xdg-terminals.list; o que já estava lá
+# continua abaixo, na mesma ordem.
+set_terminal() {
+  local name=$1 desktop file tmp
+  desktop=$(jq -r --arg n "$name" '.[] | select(.id == $n) | .desktop' <<<"$terminals")
+  [[ -n $desktop ]] || {
+    echo "mare-default-apps: terminal desconhecido: $name" >&2
+    exit 2
+  }
+  file=$config_home/xdg-terminals.list
+  if [[ $dry == 1 ]]; then
+    echo "dry-run: $desktop no alto de $file" >&2
+    return 0
+  fi
+  mkdir -p "$config_home"
+  tmp=$(mktemp "$file.XXXXXX")
+  {
+    echo "$desktop"
+    [[ -r $file ]] && grep -vxF -- "$desktop" "$file" || true
+  } >"$tmp"
+  chmod 644 "$tmp"
+  mv -f "$tmp" "$file"
+}
+
+case ${1:-} in
+  list)
+    list
+    ;;
+  set)
+    [[ $# -eq 3 ]] || usage
+    set_role "$2" "$3"
+    ;;
+  terminal)
+    [[ $# -eq 2 ]] || usage
+    set_terminal "$2"
+    ;;
+  open)
+    [[ $# -eq 2 ]] || usage
+    open_role "$2"
+    ;;
+  mimes)
+    [[ $# -ge 2 && $# -le 3 ]] || usage
+    mimes "$2" "${3:-}"
+    ;;
+  *)
+    usage
+    ;;
+esac

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Confere que config/hypr/mare/binds.lua e shell/mare/Keybinds.js têm as
+# mesmas ações (id, grupo, descrição, combo e marcas, na mesma ordem), as
+# mesmas famílias e as mesmas teclas de emergência. Sai com 1 se divergirem.
+# O comando mora no cabeçalho do Keybinds.js; aqui ele só é extraído e rodado.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+command -v node >/dev/null || { echo "check-keybinds: precisa do node" >&2; exit 2; }
+cmd=$(sed -n 's|^//   \(node -e .*\)$|\1|p' shell/mare/Keybinds.js)
+[[ -n $cmd ]] || { echo "check-keybinds: comando não encontrado no Keybinds.js" >&2; exit 2; }
+bash -c "$cmd"

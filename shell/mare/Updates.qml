@@ -18,6 +18,24 @@ Singleton {
     readonly property int count: systemCount + aurCount + (mkAvailable ? 1 : 0) + migrations
     readonly property string error: info ? info.error : ""
 
+    // A última rodada do mk-update (resumo que ele deixa), se o kernel em uso
+    // já foi trocado e o que chega com a versão nova do Mk.
+    readonly property var last: info && info.last ? info.last : null
+    readonly property bool reboot: info ? info.reboot === true : false
+    readonly property var news: mkAvailable && info.news ? info.news : []
+
+    // A ilha só acende pelo que importa: versão nova do Mk, migração pendente
+    // ou pacotes esperando há uma semana. No Arch há pacote novo todo dia.
+    readonly property bool badge: {
+        if (!info)
+            return false;
+        if (mkAvailable || migrations > 0)
+            return true;
+        if (systemCount + aurCount === 0)
+            return false;
+        return !info.applied || info.checked - info.applied >= 7 * 86400;
+    }
+
     function check() {
         if (!checking) {
             checking = true;
@@ -38,6 +56,31 @@ Singleton {
             : "há " + Math.round(min / 60) + " h";
     }
 
+    // "hoje", "ontem", "há 5 dias"; depois de um mês, a data.
+    function day(epoch) {
+        const d = new Date(epoch * 1000);
+        const n = new Date();
+        const days = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate())
+            - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+        return days <= 0 ? "hoje" : days === 1 ? "ontem" : days < 30 ? "há " + days + " dias"
+            : Qt.formatDate(d, "dd/MM/yyyy");
+    }
+
+    function lastText() {
+        if (!last)
+            return "";
+        const mk = last.to && last.to !== last.from ? " · mk " + last.to : "";
+        return "última vez: " + day(last.when) + ", "
+            + (last.ok ? "tudo certo" + mk : "parou em: " + (last.step || "início"));
+    }
+
+    // O registro da última rodada, no terminal (no fim, onde parou).
+    function openLog() {
+        if (last && last.log)
+            Quickshell.execDetached(["sh", "-c", Projects.terminalLine("",
+                "less -R +G " + Projects.shellQuote(last.log), "Mk · registro")]);
+    }
+
     Process {
         id: proc
         command: ["bash", Quickshell.shellPath("scripts/mare-updates")]
@@ -55,8 +98,7 @@ Singleton {
     Process {
         id: runner
         command: ["sh", "-c", "u=$(command -v mk-update || echo /usr/share/mk/bin/mk-update); "
-            + "exec ghostty --config-default-files=false --config-file='?" + Projects.terminalConfig + "' "
-            + "--title='Mk · atualizações' -e \"$u\""]
+            + Projects.terminalLine("", "\"$u\"", "Mk · atualizações")]
         onExited: root.check()
     }
 

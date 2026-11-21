@@ -39,9 +39,17 @@ networkmanager
 iwd
 wireless-regdb
 iw
+# VPN: o WireGuard já vem no kernel e o NetworkManager fala com ele sozinho;
+# o OpenVPN precisa do plugin (este é o sem interface GTK, traz o openvpn)
+networkmanager-vpn-plugin-openvpn
 # avahi + nss-mdns: resolver nomes .local (impressoras, outras máquinas da rede)
 avahi
 nss-mdns
+# impressão: o CUPS e o ipp-usb (USB sem driver); a página Impressoras dos Ajustes usa os dois
+cups
+ipp-usb
+# jq: os scripts do Maré (impressoras, monitores...) montam o JSON com ele
+jq
 # openssh: ssh e git por ssh; o servidor (sshd) fica desligado até você ligar
 openssh
 # firewall: ufw nega entrada por padrão (configurado em scripts/system/firewall.sh)

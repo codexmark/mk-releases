@@ -1,4 +1,5 @@
 .pragma library
+.import "Keybinds.js" as Keybinds
 
 // Os Ajustes do Mk como dados. Cada página é uma lista de linhas; o painel
 // desenha todas do mesmo jeito, e a busca procura em todas. Uma linha:
@@ -7,7 +8,11 @@
 //   def     o valor de fábrica (o mesmo que o Mk usa sem ajustes.json)
 //   hypr    o campo do Hyprland que a linha muda (vai para ajustes.lua e
 //           é aplicado na hora com hyprctl eval); sem hypr, é do Maré
+//           ("@..." = entra no Lua por um caminho próprio, veja hyprCode)
 //   kw      palavras que alguém digitaria na busca e que o texto não usa
+//   quando  { outra chave: valor ou [valores] }: a linha só aparece assim
+//   precisa "touchpad" | "bateria" | "brilho": some se a máquina não tem
+//           (scripts/mare-caps)
 // A ideia vem do Hub do Ryoku: a página é dado, não layout.
 
 var groups = [
@@ -20,13 +25,18 @@ var groups = [
         { key: "janelas", name: "Janelas", num: "05" } ] },
     { name: "DISPOSITIVOS", items: [
         { key: "tela", name: "Tela", num: "06" },
-        { key: "som", name: "Som", num: "07" },
-        { key: "entrada", name: "Teclado e mouse", num: "08" },
-        { key: "energia", name: "Energia", num: "09" } ] },
+        { key: "monitores", name: "Monitores", num: "07" },
+        { key: "som", name: "Som", num: "08" },
+        { key: "entrada", name: "Teclado e mouse", num: "09" },
+        { key: "energia", name: "Energia", num: "10" },
+        { key: "impressoras", name: "Impressoras", num: "11" } ] },
+    { name: "REDE", items: [
+        { key: "vpn", name: "VPN", num: "12" } ] },
     { name: "SISTEMA", items: [
-        { key: "atualizacoes", name: "Atualizações", num: "10" },
-        { key: "atalhos", name: "Atalhos", num: "11" },
-        { key: "sobre", name: "Sobre o Mk", num: "12" } ] }
+        { key: "apps", name: "Apps padrão", num: "13" },
+        { key: "atualizacoes", name: "Atualizações", num: "14" },
+        { key: "atalhos", name: "Atalhos", num: "15" },
+        { key: "sobre", name: "Sobre o Mk", num: "16" } ] }
 ];
 
 var blurbs = {
@@ -40,7 +50,11 @@ var blurbs = {
     "janelas": "Espaços, bordas e cantos das janelas. Muda na hora, sem reiniciar.",
     "entrada": "Layout do teclado, repetição de teclas, mouse e touchpad.",
     "atualizacoes": "O Mk, os pacotes do Arch e os do AUR. Cada atualização cria um snapshot antes: se algo quebrar, dá para voltar pelo menu do boot.",
-    "atalhos": "Os atalhos do Mk. Super sozinho abre a busca; Super com outra tecla faz o atalho.",
+    "monitores": "Cada tela ligada: resolução, taxa, escala, posição e rotação.",
+    "impressoras": "As impressoras deste computador e as que a rede oferece.",
+    "vpn": "Conexões privadas (WireGuard e OpenVPN) pelo NetworkManager.",
+    "apps": "Que app abre cada tipo de coisa: páginas, arquivos, texto, imagens, vídeos, música, PDF, e-mail. E o terminal do Mk.",
+    "atalhos": "Os atalhos do Mk. Clique num para trocar a tecla; Super sozinho abre a busca.",
     "sobre": "Esta máquina e onde os ajustes ficam guardados."
 };
 
@@ -70,13 +84,10 @@ var rows = [
       min: 0, max: 0.16, step: 0.01, def: 0.06, unit: "%", kw: "ruído textura filme" },
 
     // Movimento
-    { page: "movimento", group: "MARÉ", key: "motion.speed", label: "Velocidade",
-      desc: "Painéis, ilha e trocas de workspace na barra", ctl: "choice", def: 1,
+    { page: "movimento", group: "TUDO", key: "motion.speed", label: "Velocidade",
+      desc: "Painéis, ilha, janelas e workspaces", ctl: "choice", def: 1,
       options: [ { v: 0.7, label: "rápido" }, { v: 1, label: "normal" }, { v: 1.4, label: "calmo" }, { v: 0, label: "sem" } ],
-      kw: "animação rapidez" },
-    { page: "movimento", group: "JANELAS", key: "hypr.animations", label: "Animar janelas",
-      desc: "Janelas e workspaces entrando e saindo", ctl: "switch", def: true,
-      hypr: "animations.enabled", kw: "animação hyprland" },
+      hypr: "@animations", kw: "animação rapidez animar janelas hyprland" },
 
     // Notificações
     { page: "notificacoes", group: "AVISOS", key: "notify.duration", label: "Tempo na tela",
@@ -89,7 +100,7 @@ var rows = [
       options: [ { v: 0.75, label: "75%" }, { v: 0.85, label: "85%" }, { v: 1, label: "100%" }, { v: 1.15, label: "115%" } ],
       kw: "tamanho fonte letra grande pequeno zoom interface barra" },
     { page: "tela", group: "TAMANHO", key: "hypr.scale", label: "Escala da tela",
-      desc: "Tudo, inclusive as janelas. Para telas pequenas de alta resolução", ctl: "choice", def: 1,
+      desc: "Para telas sem ajuste próprio em Monitores, onde a escala é por tela", ctl: "choice", def: 1,
       options: [ { v: 1, label: "100%" }, { v: 1.25, label: "125%" }, { v: 1.5, label: "150%" }, { v: 2, label: "200%" } ],
       hypr: "@monitor.scale", kw: "zoom tamanho hidpi dpi resolução monitor" },
     { page: "tela", group: "LUZ NOTURNA", key: "night.temperature", label: "Calor",
@@ -98,14 +109,17 @@ var rows = [
     { page: "tela", group: "LUZ NOTURNA", key: "night.auto", label: "Ligar sozinha à noite",
       desc: "Entre as horas abaixo", ctl: "switch", def: false, kw: "automático horário" },
     { page: "tela", group: "LUZ NOTURNA", key: "night.from", label: "Começa às",
-      desc: "", ctl: "slider", min: 16, max: 23, step: 1, def: 19, unit: "h" },
+      desc: "", ctl: "slider", min: 16, max: 23, step: 1, def: 19, unit: "h",
+      quando: { "night.auto": true } },
     { page: "tela", group: "LUZ NOTURNA", key: "night.to", label: "Termina às",
-      desc: "", ctl: "slider", min: 4, max: 10, step: 1, def: 6, unit: "h" },
+      desc: "", ctl: "slider", min: 4, max: 10, step: 1, def: 6, unit: "h",
+      quando: { "night.auto": true } },
 
     // Energia
     { page: "energia", group: "AO SE AFASTAR", key: "idle.dim", label: "Escurecer a tela",
       desc: "Minutos sem mexer no teclado ou no mouse", ctl: "slider",
-      min: 0, max: 30, step: 1, def: 4, unit: "min", kw: "inatividade ocioso brilho hypridle" },
+      min: 0, max: 30, step: 1, def: 4, unit: "min", precisa: "brilho",
+      kw: "inatividade ocioso brilho hypridle" },
     { page: "energia", group: "AO SE AFASTAR", key: "idle.lock", label: "Bloquear",
       desc: "Pede a senha para voltar", ctl: "slider",
       min: 0, max: 60, step: 1, def: 5, unit: "min", kw: "bloqueio senha hyprlock tela de bloqueio" },
@@ -115,6 +129,9 @@ var rows = [
     { page: "energia", group: "AO SE AFASTAR", key: "idle.suspend", label: "Suspender",
       desc: "O computador dorme e gasta quase nada", ctl: "slider",
       min: 0, max: 120, step: 5, def: 30, unit: "min", kw: "suspensão dormir sleep" },
+    { page: "energia", group: "BATERIA", key: "power.lowWarn", label: "Avisar bateria fraca",
+      desc: "Um aviso quando a carga está acabando", ctl: "switch", def: true, precisa: "bateria",
+      kw: "carga pouca acabando notificação" },
 
     // Janelas
     { page: "janelas", group: "ESPAÇOS", key: "hypr.gapsIn", label: "Entre janelas",
@@ -147,6 +164,10 @@ var rows = [
       desc: "Com dois layouts, Alt+Shift troca entre eles", ctl: "choice", def: "br",
       options: [ { v: "br", label: "ABNT2" }, { v: "us", label: "US" }, { v: "br,us", label: "ABNT2 + US" } ],
       hypr: "input.kb_layout", kw: "idioma teclado abnt" },
+    { page: "entrada", group: "TECLADO", key: "input.caps", label: "Caps Lock",
+      desc: "O que a tecla faz", ctl: "choice", def: "normal",
+      options: [ { v: "normal", label: "normal" }, { v: "esc", label: "Esc" }, { v: "ctrl", label: "Ctrl" } ],
+      hypr: "@kb_options", kw: "maiúsculas escape control vim" },
     { page: "entrada", group: "TECLADO", key: "hypr.repeatRate", label: "Repetição",
       desc: "Letras por segundo com a tecla segurada", ctl: "slider",
       min: 10, max: 60, step: 1, def: 25, unit: "/s", hypr: "input.repeat_rate", kw: "repetir velocidade" },
@@ -158,63 +179,60 @@ var rows = [
       min: -1, max: 1, step: 0.1, def: 0, unit: "", hypr: "input.sensitivity", kw: "ponteiro cursor velocidade" },
     { page: "entrada", group: "TOUCHPAD", key: "hypr.naturalScroll", label: "Rolagem natural",
       desc: "O conteúdo segue os dedos, como no celular", ctl: "switch", def: true,
-      hypr: "input.touchpad.natural_scroll", kw: "scroll inverter" },
+      hypr: "input.touchpad.natural_scroll", precisa: "touchpad", kw: "scroll inverter" },
     { page: "entrada", group: "TOUCHPAD", key: "hypr.tapToClick", label: "Tocar para clicar",
       desc: "Um toque leve conta como clique", ctl: "switch", def: true,
-      hypr: "input.touchpad.tap_to_click", kw: "toque clique" }
+      hypr: "input.touchpad.tap_to_click", precisa: "touchpad", kw: "toque clique" }
 ];
 
-// Os atalhos de config/hypr/mare/binds.lua, para ler.
-var shortcuts = [
-    { group: "MARÉ", items: [
-        ["Super", "busca: apps, projetos e comandos"],
-        ["Super + ,", "estes ajustes"],
-        ["Alt + Tab", "trocar de janela"],
-        ["Super + P", "projeto do workspace"],
-        ["Super + C", "calendário"],
-        ["Super + N", "notificações"],
-        ["Super + Shift + N", "não perturbe"],
-        ["Super + W", "papel de parede"],
-        ["Super + Shift + V", "área de transferência"],
-        ["Super + Esc", "sair, bloquear, desligar"] ] },
-    { group: "APPS", items: [
-        ["Super + Enter", "terminal no projeto"],
-        ["Super + G", "lazygit"],
-        ["Super + D", "lazydocker"],
-        ["Super + E", "arquivos (yazi)"],
-        ["Super + B", "navegador"],
-        ["Super + L", "bloquear a tela"] ] },
-    { group: "JANELAS", items: [
-        ["Super + Q", "fechar"],
-        ["Super + F", "tela cheia"],
-        ["Super + V", "flutuar"],
-        ["Super + setas", "mover o foco"],
-        ["Super + Shift + setas", "mover a janela"],
-        ["Super + Ctrl + setas", "redimensionar"],
-        ["Super + arrastar", "mover / redimensionar com o mouse"] ] },
-    { group: "WORKSPACES", items: [
-        ["Super + 1…9", "ir para α β γ…"],
-        ["Super + Shift + 1…9", "levar a janela"],
-        ["Super + Tab", "workspace anterior"],
-        ["Super + roda", "workspace ao lado"] ] },
-    { group: "TELA", items: [
-        ["Print", "recortar e copiar"],
-        ["Shift + Print", "salvar a tela inteira"],
-        ["Super + Print", "painel de captura (área, janela, vídeo)"],
-        ["Super + Shift + R", "gravar a tela / parar"],
-        ["Super + Shift + Enter", "terminal de emergência"],
-        ["Super + Shift + Esc", "sair do Hyprland"] ] }
-];
+// Chaves com página própria (sem linha desenhada pelo painel): só o valor de fábrica.
+var hidden = {
+    "apps.terminal": "ghostty",
+    "emoji.recent": [],
+    "emoji.tone": 0
+};
 
 function defaults() {
     var out = {};
     for (var i = 0; i < rows.length; i++)
         out[rows[i].key] = rows[i].def;
+    for (var k in hidden)
+        out[k] = hidden[k];
     return out;
 }
 
-function pageRows(page) {
-    return rows.filter(function (r) { return r.page === page; });
+// A linha aparece? `values` são os ajustes de agora e `caps` o que o
+// scripts/mare-caps achou. Sem values não se olha `quando`; sem caps (ainda
+// não respondeu), a máquina tem tudo.
+function shown(row, values, caps) {
+    if (row.precisa && caps && caps[row.precisa] === false)
+        return false;
+    if (row.quando && values)
+        for (var k in row.quando) {
+            var want = row.quando[k];
+            var v = valueOf(values, k);
+            if (Array.isArray(want) ? want.indexOf(v) < 0 : v !== want)
+                return false;
+        }
+    return true;
+}
+
+// Sem values e caps: todas as linhas da página, as escondidas também.
+function pageRows(page, values, caps) {
+    return rows.filter(function (r) { return r.page === page && shown(r, values, caps); });
+}
+
+function rowOf(key) {
+    for (var i = 0; i < rows.length; i++)
+        if (rows[i].key === key)
+            return rows[i];
+    return null;
+}
+
+// Mudar esta chave muda o Lua do Hyprland?
+function touchesHypr(key) {
+    var r = rowOf(key);
+    return r !== null && r.hypr !== undefined;
 }
 
 function pageName(key) {
@@ -238,7 +256,7 @@ function fold(s) {
     return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-function search(query) {
+function search(query, binds, values, caps) {
     var words = fold(query).split(/\s+/).filter(function (w) { return w.length > 0; });
     if (words.length === 0)
         return [];
@@ -255,17 +273,72 @@ function search(query) {
         }
     for (var r = 0; r < rows.length; r++) {
         var row = rows[r];
+        if (!shown(row, values, caps))
+            continue;
         var page = pageName(row.page);
         if (test(row.label + " " + row.desc + " " + row.group + " " + page.name + " " + (row.kw || "")))
             out.push({ page: row.page, key: row.key, label: row.label, where: page.name + " › " + row.group.toLowerCase() });
     }
-    for (var s = 0; s < shortcuts.length; s++)
-        for (var k = 0; k < shortcuts[s].items.length; k++) {
-            var sc = shortcuts[s].items[k];
-            if (test(sc[0] + " " + sc[1] + " atalho tecla"))
-                out.push({ page: "atalhos", key: "", label: sc[1], where: "Atalhos › " + sc[0] });
-        }
+    // Os atalhos (Keybinds.js), com o combo que vale agora.
+    var keybinds = Keybinds.entries(binds);
+    for (var s = 0; s < keybinds.length; s++)
+        if (test(keybinds[s].label + " " + keybinds[s].combo + " " + keybinds[s].group + " atalho tecla"))
+            out.push({ page: "atalhos", key: "atalho:" + keybinds[s].id, label: keybinds[s].label, where: "Atalhos › " + keybinds[s].combo });
     return out.slice(0, 9);
+}
+
+// As opções do xkb, montadas dos Ajustes: Alt+Shift só existe com dois
+// layouts, e o Caps Lock vira o que a pessoa escolheu.
+var capsOptions = { "esc": "caps:escape", "ctrl": "ctrl:nocaps" };
+
+function kbOptions(values) {
+    var parts = [];
+    if (String(valueOf(values, "hypr.kbLayout")).indexOf(",") >= 0)
+        parts.push("grp:alt_shift_toggle");
+    var caps = capsOptions[valueOf(values, "input.caps")];
+    if (caps)
+        parts.push(caps);
+    return parts.join(",");
+}
+
+// As animações do config/hypr/mare/motion.lua (mesmas folhas, curvas e
+// velocidades de fábrica; mudou lá, mude aqui). O speed do Hyprland é em
+// 100 ms, então motion.speed multiplica: calmo = número maior.
+var animations = [
+    ["global", 2.4, "mare", ""],
+    ["windows", 2.4, "mare", ""],
+    ["windowsIn", 2.0, "mare", "popin 95%"],
+    ["windowsOut", 1.6, "mareOut", "popin 94%"],
+    ["border", 2.0, "mare", ""],
+    ["fade", 1.7, "mare", ""],
+    ["layers", 2.0, "mare", "fade"],
+    ["workspaces", 2.8, "mare", "slide"],
+    ["specialWorkspace", 2.4, "mare", "slidevert"]
+];
+
+// Uma destas chaves saiu da fábrica, ou foi mexida nesta sessão (`changed`,
+// um mapa de chaves)? Só então o Lua fala do assunto: com tudo de fábrica,
+// o kb_options e as animações dos arquivos da pessoa ficam em paz.
+function ours(values, changed, keys) {
+    for (var i = 0; i < keys.length; i++)
+        if ((changed && changed[keys[i]]) || valueOf(values, keys[i]) !== rowOf(keys[i]).def)
+            return true;
+    return false;
+}
+
+// "sem" (0) não emite nada: animations.enabled = false já desliga tudo.
+function animationCode(values, changed) {
+    var speed = Number(valueOf(values, "motion.speed"));
+    if (!(speed > 0) || !ours(values, changed, ["motion.speed"]))
+        return "";
+    var out = "";
+    for (var i = 0; i < animations.length; i++) {
+        var a = animations[i];
+        out += "hl.animation({ leaf = " + luaValue(a[0]) + ", enabled = true, speed = "
+            + luaValue(Math.round(a[1] * speed * 100) / 100) + ", bezier = " + luaValue(a[2])
+            + (a[3] ? ", style = " + luaValue(a[3]) : "") + " })\n";
+    }
+    return out;
 }
 
 // O ajustes.lua que o Hyprland carrega no login: só as linhas com hypr.
@@ -277,7 +350,7 @@ function luaValue(v) {
     return "\"" + String(v).replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\"";
 }
 
-function hyprTable(values) {
+function hyprTable(values, changed) {
     var tree = {};
     for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
@@ -292,6 +365,10 @@ function hyprTable(values) {
         }
         node[parts[parts.length - 1]] = v;
     }
+    if (ours(values, changed, ["hypr.kbLayout", "input.caps"]))
+        tree.input.kb_options = kbOptions(values);
+    if (ours(values, changed, ["motion.speed"]))
+        tree.animations = { enabled: valueOf(values, "motion.speed") > 0 };
     var emit = function (obj) {
         var items = [];
         for (var k in obj)
@@ -308,9 +385,12 @@ function valueOf(values, key) {
     return undefined;
 }
 
-// O Lua que aplica tudo: hl.config e a escala dos monitores.
-function hyprCode(values) {
-    return "hl.config(" + hyprTable(values) + ")\n"
+// O Lua que aplica tudo: hl.config, as animações e a escala dos monitores.
+// `changed` (as chaves mexidas nesta sessão) só entra no eval; o ajustes.lua
+// é gerado sem ele.
+function hyprCode(values, changed) {
+    return "hl.config(" + hyprTable(values, changed) + ")\n"
+        + animationCode(values, changed)
         + "hl.monitor({ output = \"\", mode = \"preferred\", position = \"auto\", scale = "
         + luaValue(valueOf(values, "hypr.scale")) + " })\n";
 }
@@ -321,7 +401,8 @@ function hyprLua(values) {
 }
 
 // O hypridle.conf dos Ajustes (Energia). Minutos 0 = aquele passo não acontece.
-function hypridleConf(values, hyprDir) {
+// Sem brilho para mexer (caps), o passo de escurecer também não.
+function hypridleConf(values, hyprDir, caps) {
     var out = "# Gerado pelos Ajustes do Mk (Super + ,), página Energia. Não edite.\n\n"
         + "general {\n"
         + "    lock_cmd = qs -p " + hyprDir.replace(/\/hypr$/, "/shell") + " ipc call mare lock || pidof hyprlock || hyprlock -c " + hyprDir + "/hyprlock.conf\n"
@@ -336,7 +417,7 @@ function hypridleConf(values, hyprDir) {
     ];
     for (var i = 0; i < steps.length; i++) {
         var min = valueOf(values, steps[i][0]);
-        if (!min)
+        if (!min || (steps[i][0] === "idle.dim" && caps && caps.brilho === false))
             continue;
         out += "\nlistener {\n    timeout = " + Math.round(min * 60) + "\n    on-timeout = " + steps[i][1] + "\n"
             + (steps[i][2] ? "    on-resume = " + steps[i][2] + "\n" : "") + "}\n";

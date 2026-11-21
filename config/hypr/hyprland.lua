@@ -14,13 +14,44 @@ require("mare.binds")
 require("mare.rules")
 require("mare.autostart")
 
--- O que foi escolhido nos Ajustes (Super + ,): <raiz>/ajustes.lua, gerado
--- pelo Maré, fora da pasta hypr que a instalação substitui.
-local ajustes = require("mare.paths").root .. "ajustes.lua"
-if package.searchpath("ajustes", (ajustes:gsub("ajustes%.lua$", "?.lua"))) then
-    local ok, err = pcall(dofile, ajustes)
-    if not ok then
-        print("Mk: ajustes.lua falhou: " .. tostring(err))
+-- O que foi escolhido nos Ajustes (Super + ,), em arquivos gerados pelo Maré
+-- na raiz (<raiz>/ajustes.lua...), fora da pasta hypr que a instalação
+-- substitui. Nesta ordem: ajustes gerais, monitores. O atalhos.lua não entra
+-- aqui: é só dado, e o mare/binds.lua já o leu, sem acesso a nada.
+local root = require("mare.paths").root
+
+-- Uma troca de monitores que ficou sem resposta (a máquina desligou ou o
+-- Hyprland caiu durante a contagem dos Ajustes): o arquivo anterior volta.
+-- A primeira linha da sobra diz que sessão começou o teste; se é esta, o
+-- teste ainda está correndo e o scripts/mare-monitors cuida dele.
+do
+    local path = root .. "monitores.lua"
+    local left = io.open(path .. ".anterior")
+    if left then
+        local mark = left:read("l") or ""
+        local before = left:read("a") or ""
+        left:close()
+        if mark ~= "-- mk:teste " .. (os.getenv("HYPRLAND_INSTANCE_SIGNATURE") or "") then
+            if before == "" then
+                os.remove(path)
+            else
+                local out = io.open(path, "w")
+                if out then
+                    out:write(before)
+                    out:close()
+                end
+            end
+            os.remove(path .. ".anterior")
+        end
+    end
+end
+
+for _, name in ipairs({ "ajustes", "monitores" }) do
+    if package.searchpath(name, root .. "?.lua") then
+        local ok, err = pcall(dofile, root .. name .. ".lua")
+        if not ok then
+            print("Mk: " .. name .. ".lua falhou: " .. tostring(err))
+        end
     end
 end
 

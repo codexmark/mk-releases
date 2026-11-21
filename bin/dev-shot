@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Testa o Maré sem mexer na sua tela: sobe um Hyprland aninhado (numa janela
+# que fica num workspace escondido), roda uma CÓPIA do shell nele, manda os
+# comandos de IPC pedidos, tira uma captura e mostra os avisos do log.
+#
+#   bin/dev-shot <saida.png> [comando ipc]...
+# Precisa de uma regra no seu Hyprland para esconder a janela (some no
+# próximo reload):
+#   hyprctl eval 'hl.window_rule({ match = { class = "^aquamarine$" }, workspace = "special:mkdev silent" })'
+#   ex.: bin/dev-shot /tmp/x.png "settings monitores"
+#        bin/dev-shot /tmp/x.png "toggle launcher" "close" "toggleAt volume 800"
+# Variáveis: MK_DEV_SHELL (pasta do shell; padrão shell/mare do repositório),
+# MK_DEV_WAIT (segundos depois de cada comando; padrão 1.5), MK_DEV_SIZE (1600x900).
+# Sai com 1 se o log do Maré tiver erro de QML.
+set -uo pipefail
+
+out=${1:?uso: bin/dev-shot <saida.png> [comando ipc]...}
+shift
+repo=$(cd "$(dirname "$0")/.." && pwd)
+src=${MK_DEV_SHELL:-$repo/shell/mare}
+tmp=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/mk-dev.XXXXXX")
+cp -r "$src" "$tmp/shell"
+mkdir -p "$tmp/hypr"
+# Sem as boas-vindas do primeiro login (MK_DEV_WELCOME=1 para vê-las).
+[[ -n ${MK_DEV_WELCOME:-} ]] || touch "$tmp/.bem-vindo"
+cat >"$tmp/hypr/h.lua" <<EOF2
+hl.monitor({ output = "", mode = "${MK_DEV_SIZE:-1600x900}@60", position = "auto", scale = 1 })
+-- As curvas do Mk: os Ajustes mandam animações que usam os nomes delas.
+dofile("$repo/config/hypr/mare/motion.lua")
+hl.config({ misc = { disable_hyprland_logo = true, disable_splash_rendering = true, background_color = 0x0B0B0B } })
+hl.on("hyprland.start", function()
+    hl.exec_cmd("QT_SCALE_FACTOR=0.85 qs -p '$tmp/shell' > '$tmp/qs.log' 2>&1")
+end)
+EOF2
+
+Hyprland -c "$tmp/hypr/h.lua" >"$tmp/hypr.log" 2>&1 &
+hpid=$!
+cleanup() {
+  kill "$hpid" 2>/dev/null
+  wait "$hpid" 2>/dev/null
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
+
+sig="" wd=""
+for _ in $(seq 1 40); do
+  read -r sig wd < <(hyprctl -j instances 2>/dev/null | jq -r --argjson p "$hpid" '.[] | select(.pid == $p) | "\(.instance) \(.wl_socket)"')
+  [[ -n $sig && -S ${XDG_RUNTIME_DIR}/$wd ]] && break
+  sleep 0.25
+done
+[[ -n $sig ]] || { echo "dev-shot: o Hyprland aninhado não subiu" >&2; tail -5 "$tmp/hypr.log" >&2; exit 2; }
+
+for _ in $(seq 1 40); do
+  grep -q "Configuration Loaded" "$tmp/qs.log" 2>/dev/null && break
+  sleep 0.25
+done
+sleep 1
+for cmd in "$@"; do
+  # shellcheck disable=SC2086
+  WAYLAND_DISPLAY=$wd qs -p "$tmp/shell" ipc call mare $cmd 2>&1 | grep -v -i 'locale\|utf-8\|reconfigure\|information' | sed 's/^/ipc: /'
+  sleep "${MK_DEV_WAIT:-1.5}"
+done
+# A janela do aninhado fica escondida, e um compositor escondido não desenha
+# quadros novos: a captura só sai se a janela estiver visível. Sem captura, o
+# log ainda vale.
+if WAYLAND_DISPLAY=$wd timeout 4 grim "$out" 2>/dev/null; then
+  echo "captura: $out"
+else
+  echo "captura: indisponível (janela escondida); o log abaixo vale"
+fi
+
+bad=$(sed 's/\x1b\[[0-9;]*m//g' "$tmp/qs.log" | grep -iE 'error|TypeError|ReferenceError|not defined|is not a|cannot|unable to assign|WARN scene' | grep -v 'quickshell.service.notifications\|org.bluez\|textinput' | sort -u | sed "s|$tmp/shell/||g")
+if [[ -n $bad ]]; then
+  echo "--- avisos do Maré ---"
+  echo "$bad" | head -40
+  exit 1
+fi
+echo "log do Maré: limpo"

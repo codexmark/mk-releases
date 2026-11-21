@@ -1,0 +1,703 @@
+#!/usr/bin/env bash
+# As impressoras (CUPS) para a página "Impressoras" dos Ajustes
+# (SettingsPrintersPage.qml).
+#
+#   mare-printers status
+#       JSON: { "installed", "running", "enabled", "default", "pending", "last",
+#               "printers": [ { "name", "state" (idle|printing|paused),
+#                               "message", "uri", "default",
+#                               "jobs": [ { "id", "user", "size" } ] } ] }
+#       "installed": o CUPS está no sistema; "running": o serviço responde;
+#       "enabled": liga sozinho no boot; "pending": a ação que ainda está em
+#       curso ("add:<uri>", "remove:<fila>", "enable"..., vazio se nenhuma);
+#       "last": o resultado da última ação, se tem menos de 30 s (ou null).
+#   mare-printers find
+#       Procura (uns 5 s) impressoras que entram sem driver (IPP Everywhere /
+#       AirPrint), na rede e no USB (pelo ipp-usb). JSON:
+#       { "found": [ { "name", "uri", "model", "kind" (rede|usb), "added" } ],
+#         "legacy": [ { "uri", "model" } ], "mdns", "legacyUnknown" }
+#       "legacy" são as USB que o CUPS vê mas que pedem driver do fabricante;
+#       "legacyUnknown": o CUPS não deixou listá-las (pede administrador);
+#       "mdns": a descoberta de rede (avahi) está ligada.
+#   mare-printers add <uri> [nome]     lpadmin -p <fila> -E -v <uri> -m everywhere
+#   mare-printers default <fila>       lpoptions -d <fila>
+#   mare-printers remove <fila>        lpadmin -x <fila>
+#   mare-printers test <fila>          imprime a página de teste do CUPS
+#   mare-printers cancel <fila>        cancela tudo o que está na fila
+#   mare-printers resume <fila>        tira a fila da pausa (cupsenable + cupsaccept)
+#   mare-printers enable               systemctl enable --now cups.socket
+#       As ações devolvem, na última linha, o JSON de `status` já atualizado
+#       mais o resultado: "key", "ok", "error" (vazio se deu certo), "message"
+#       (a frase para mostrar), "elevated" (passou pela janela de senha) e
+#       "at" (quando, em ms). Antes dela pode vir a linha {"elevating":true}:
+#       a janela de senha do polkit vai aparecer.
+#   mare-printers selftest             confere a leitura com saídas de exemplo
+#
+# Permissão: adicionar, remover, retomar e cancelar trabalhos dos outros são
+# operações de administrador do CUPS. O padrão do Arch ("SystemGroup sys root
+# wheel" no cups-files.conf) deveria deixar quem é do wheel administrar direto
+# pelo socket local, mas isso não se confirmou em toda máquina. Então a ação é
+# tentada direto e, se o CUPS recusar, refeita UMA vez pelo pkexec: quem pede a
+# senha é o agente do polkit, numa janela. Ligar o serviço vai sempre pelo
+# pkexec. Escolher a padrão (lpoptions), a página de teste e cancelar os
+# próprios trabalhos não pedem nada.
+#
+# A ação não depende da página: quem a faz é um processo à parte, em outra
+# sessão. Os Ajustes são uma folha por cima de tudo, e a janela de senha
+# ficaria atrás dela; por isso a página fecha a folha ao ler "elevating" (e o
+# processo dela morre junto). A ação segue, grava o resultado na pasta de
+# estado ($XDG_RUNTIME_DIR/mare-printers) e, no fim, reabre a folha na página
+# (com MARE_PRINTERS_SHELL=<pasta do shell>) ou manda um aviso.
+#
+# Teste: com MARE_PRINTERS_FIXTURES=<pasta> nada do sistema é lido nem mudado.
+# As consultas saem dos arquivos da pasta (lpstat-r, lpstat-p, lpstat-d,
+# lpstat-v, lpstat-o, ippfind, lpinfo-v; os que faltam contam como saída
+# vazia) e as ações só dizem no stderr o que fariam. Arquivos que mudam o faz
+# de conta: "ausente" (CUPS não instalado), "recusa" (o CUPS responde
+# Forbidden às ações de administrador), "senha-negada" (a janela de senha foi
+# fechada), "sem-avahi" (descoberta desligada), "eu" (o nome do usuário, para
+# os trabalhos da fila). MARE_PRINTERS_FAKE_WAIT=<s> faz a janela de senha de
+# mentira demorar. O `selftest` traz exemplos desses arquivos.
+set -uo pipefail
+
+# O CUPS traduz as mensagens; a leitura abaixo conta com o inglês.
+export LC_ALL=C LANG=C LANGUAGE=C
+
+fx=${MARE_PRINTERS_FIXTURES:-}
+# Onde fica o estado da ação em curso e o último resultado.
+if [[ -n ${MARE_PRINTERS_STATE:-} ]]; then
+  sd=$MARE_PRINTERS_STATE
+elif [[ -n $fx ]]; then
+  sd=$fx/.estado
+else
+  sd=${XDG_RUNTIME_DIR:-/tmp}/mare-printers
+fi
+err=""
+raw=""
+rc=0
+elevated=false
+
+usage() {
+  echo "uso: mare-printers status | find | add <uri> [nome] | default <fila> | remove <fila> | test <fila> | cancel <fila> | resume <fila> | enable | selftest" >&2
+  exit 2
+}
+
+# Consulta só de leitura: q <arquivo de exemplo> <comando...>
+q() {
+  local name=$1
+  shift
+  if [[ -n $fx ]]; then
+    [[ -f $fx/$name ]] && cat "$fx/$name"
+    return 0
+  fi
+  timeout 12 "$@" 2>/dev/null </dev/null || true
+}
+
+installed() {
+  if [[ -n $fx ]]; then
+    [[ ! -e $fx/ausente ]]
+  else
+    [[ -e /usr/lib/systemd/system/cups.socket || -e /usr/bin/cupsd ]]
+  fi
+}
+
+running() {
+  installed && q lpstat-r lpstat -r | grep -q 'scheduler is running'
+}
+
+enabled() {
+  if [[ -n $fx ]]; then
+    [[ ! -e $fx/ausente ]]
+  else
+    systemctl is-enabled --quiet cups.socket 2>/dev/null || systemctl is-enabled --quiet cups.service 2>/dev/null
+  fi
+}
+
+# A descoberta na rede passa pelo avahi (o ippfind fala com ele).
+mdns() {
+  if [[ -n $fx ]]; then
+    [[ ! -e $fx/sem-avahi ]]
+  else
+    systemctl is-active --quiet avahi-daemon.service 2>/dev/null || systemctl is-active --quiet avahi-daemon.socket 2>/dev/null
+  fi
+}
+
+bool() {
+  if "$@"; then echo true; else echo false; fi
+}
+
+# A ação em curso (a chave dela), se o processo que a faz ainda vive.
+pending() {
+  local pid key
+  [[ -f $sd/pid ]] || return 0
+  read -r pid key <"$sd/pid" || return 0
+  [[ $pid =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && echo "$key"
+  return 0
+}
+
+# "printer HP is idle.  enabled since ..." -> nome, estado, mensagem. A linha
+# seguinte, recuada, é o que o CUPS tem a dizer sobre ela ("Paused", ...).
+parse_printers() {
+  awk '
+    function flush() { if (name != "") printf "%s\t%s\t%s\n", name, state, msg }
+    /^printer / {
+      flush()
+      name = $2; msg = ""
+      if ($0 ~ / disabled since /) state = "paused"
+      else if ($3 == "now" && $4 == "printing") state = "printing"
+      else state = "idle"
+      next
+    }
+    /^[ \t]/ {
+      if (name != "" && msg == "") { sub(/^[ \t]+/, ""); gsub(/\t/, " "); msg = $0 }
+    }
+    END { flush() }
+  '
+}
+
+# "device for HP: ipp://..." -> nome, uri
+parse_devices() {
+  sed -n 's/^device for \([^:]*\): \(.*\)$/\1\t\2/p'
+}
+
+# "HP-12   maria   1024   Thu ..." -> fila, número, dono, bytes. O nome da
+# fila pode ter hífen: o número é só o que vem depois do último.
+parse_jobs() {
+  awk '$1 ~ /-[0-9]+$/ {
+    id = $1; sub(/^.*-/, "", id)
+    dest = $1; sub(/-[0-9]+$/, "", dest)
+    printf "%s\t%s\t%s\t%s\n", dest, id, $2, ($3 ~ /^[0-9]+$/ ? $3 : 0)
+  }'
+}
+
+status() {
+  local inst run printers="" devices="" jobs="" def="" last=null
+  inst=$(bool installed)
+  run=$(bool running)
+  if [[ $run == true ]]; then
+    printers=$(q lpstat-p lpstat -p | parse_printers)
+    devices=$(q lpstat-v lpstat -v | parse_devices)
+    jobs=$(q lpstat-o lpstat -o | parse_jobs)
+    def=$(q lpstat-d lpstat -d | sed -n 's/^system default destination: //p' | head -n1)
+  fi
+  [[ -s $sd/ultimo.json ]] && last=$(jq -c --argjson now "$(date +%s%3N)" \
+    'if type == "object" and ($now - (.at // 0)) < 30000 then . else null end' "$sd/ultimo.json" 2>/dev/null)
+  jq -cn --arg p "$printers" --arg v "$devices" --arg o "$jobs" --arg def "$def" \
+    --argjson installed "$inst" --argjson running "$run" --argjson enabled "$(bool enabled)" \
+    --arg pending "$(pending)" --argjson last "${last:-null}" '
+    def rows(s): s | split("\n") | map(select(length > 0) | split("\t"));
+    (rows($v) | map({ key: .[0], value: .[1] }) | from_entries) as $uri
+    | (rows($o) | map({ printer: .[0], id: (.[1] | tonumber), user: .[2], size: (.[3] | tonumber) })) as $jobs
+    | { installed: $installed, running: $running, enabled: $enabled, default: $def,
+        pending: $pending, last: $last,
+        printers: (rows($p) | map(. as $r | {
+          name: $r[0], state: $r[1], message: ($r[2] // ""), uri: ($uri[$r[0]] // ""),
+          default: ($r[0] == $def),
+          jobs: ($jobs | map(select(.printer == $r[0]) | del(.printer))) })) }'
+}
+
+# Roda um comando de ação por no máximo <s> segundos: run <s> <comando...>.
+# Deixa a saída em $raw e o código em $rc. Com exemplos (teste), só diz o que
+# faria. O setsid tira o terminal de perto (sem ele o CUPS pediria senha num
+# terminal que ninguém vê) e faz do comando uma sessão, que dá para encerrar
+# inteira. A saída vai para um arquivo, não para um cano: um filho que
+# sobrevive (o pkexec, depois da senha, é do root) não segura a espera.
+run() {
+  local secs=$1 pid i outf
+  shift
+  raw=""
+  rc=0
+  if [[ -n $fx ]]; then
+    echo "faria: $*" >&2
+    if [[ $1 == pkexec ]]; then
+      sleep "${MARE_PRINTERS_FAKE_WAIT:-0}"
+      [[ -e $fx/senha-negada ]] && rc=126
+    elif [[ -e $fx/recusa && ($1 =~ ^(lpadmin|cupsenable|cupsaccept)$ || "$1 ${2:-}" == "cancel -a") ]]; then
+      raw="$1: Forbidden"
+      rc=1
+    fi
+    return "$rc"
+  fi
+  outf=$(mktemp "$sd/saida.XXXXXX") || { rc=1; return 1; }
+  # Em segundo plano e sem controle de tarefas o setsid não precisa de fork:
+  # $! é o próprio comando, líder da sessão nova.
+  setsid "$@" </dev/null >"$outf" 2>&1 &
+  pid=$!
+  for ((i = 0; i < secs * 5; i++)); do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.2
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    pkill -TERM -s "$pid" 2>/dev/null
+    sleep 1
+    pkill -KILL -s "$pid" 2>/dev/null
+    rc=124
+  else
+    wait "$pid"
+    rc=$?
+  fi
+  raw=$(tail -n 5 "$outf")
+  rm -f "$outf"
+  return "$rc"
+}
+
+refused() {
+  grep -qiE 'forbidden|unauthorized|not authorized|password' <<<"$raw"
+}
+
+# A frase, em português, para o que o comando $1 respondeu ($raw, $rc).
+explain() {
+  local line
+  line=$(grep -v '^[[:space:]]*$' <<<"$raw" | tail -n1)
+  if [[ $rc == 124 ]]; then
+    echo "demorou demais e foi interrompido"
+  elif refused; then
+    echo "o CUPS recusou: sem permissão para administrar as impressoras"
+  elif grep -qiE 'scheduler is not running|cups\.sock|bad file descriptor' <<<"$raw"; then
+    echo "o serviço de impressão não respondeu"
+  elif grep -qiE 'unable to (connect|resolve|locate)|name or service not known|host is down|no route to host|connection refused|timed out' <<<"$raw"; then
+    echo "não deu para falar com a impressora: ela está ligada e na mesma rede?"
+  elif grep -qiE 'unable to query|does not support required|unable to create ppd|everywhere' <<<"$raw"; then
+    echo "a impressora não aceitou o modo sem driver (IPP Everywhere)"
+  elif [[ -n $line ]]; then
+    echo "não deu certo: $line"
+  else
+    echo "o comando $1 falhou"
+  fi
+}
+
+# Uma ação comum: roda e, se falhar, deixa a frase em $err.
+act() {
+  run 90 "$@" && return 0
+  err=$(explain "$1")
+  return 1
+}
+
+# Pela janela de senha do polkit: uma só por clique. O arquivo "elevando"
+# avisa a página (por quem espera a ação) de que a janela vai aparecer.
+elevate() {
+  command -v pkexec >/dev/null || { err="o CUPS recusou e não há pkexec para pedir a senha"; return 1; }
+  elevated=true
+  : >"$sd/elevando"
+  err=""
+  run 180 pkexec "$@" && return 0
+  case $rc in
+    126) err="a senha não foi dada: nada mudou" ;;
+    127) err="a autorização falhou: nada mudou" ;;
+    124) err="a janela de senha ficou sem resposta: nada mudou" ;;
+    *) err=$(explain "$1") ;;
+  esac
+  return 1
+}
+
+# Ação de administrador do CUPS: direto e, se ele recusar, pelo polkit.
+admin() {
+  act "$@" && return 0
+  refused || return 1
+  elevate "$@"
+}
+
+# Um nome de fila que o CUPS aceita (sem espaço, "/" nem "#"), a partir do
+# nome que a impressora anuncia.
+queue_name() {
+  local name
+  name=$(sed 's/[^A-Za-z0-9_-]/_/g; s/__*/_/g; s/^_//; s/_$//' <<<"$1" | cut -c1-60)
+  echo "${name:-impressora}"
+}
+
+known_queue() {
+  q lpstat-v lpstat -v | parse_devices | cut -f1 | grep -qxF -- "$1"
+}
+
+# Para o CUPS, "HP" e "hp" são a mesma fila: um nome novo não pode bater com
+# um que já existe nem trocando maiúsculas.
+taken_queue() {
+  q lpstat-v lpstat -v | parse_devices | cut -f1 | grep -qixF -- "$1"
+}
+
+need_queue() {
+  if [[ -z ${1:-} ]] || ! known_queue "$1"; then
+    err="não há impressora chamada ${1:-}"
+    return 1
+  fi
+}
+
+add() {
+  local uri=${1:-} label=${2:-} name base n=2
+  [[ $uri =~ ^ipps?://[^[:space:]]+$ ]] || { err="endereço inválido: só ipp:// ou ipps://"; return 1; }
+  [[ -n $label ]] || label=$(sed 's|^ipps\?://||; s|[:/].*||; s|\.local\.\?$||' <<<"$uri")
+  base=$(queue_name "$label")
+  name=$base
+  while taken_queue "$name"; do
+    name=${base}_$n
+    n=$((n + 1))
+  done
+  admin lpadmin -p "$name" -E -v "$uri" -m everywhere -D "$label"
+}
+
+test_page() {
+  local page
+  for page in /usr/share/cups/data/default-testpage.pdf /usr/share/cups/data/testprint; do
+    if [[ -f $page || -n $fx ]]; then
+      act lp -d "$1" -t "página de teste" "$page"
+      return
+    fi
+  done
+  err="a página de teste do CUPS não está instalada"
+  return 1
+}
+
+# Cancela tudo o que está na fila. Os trabalhos de quem clicou saem um a um
+# (o dono pode); "cancel -a" é operação de administrador, e só é usada se
+# sobrar trabalho de outra pessoa.
+cancel_queue() {
+  local me jobs id others
+  if [[ -n $fx && -f $fx/eu ]]; then me=$(<"$fx/eu"); else me=$(id -un); fi
+  jobs=$(q lpstat-o lpstat -o | parse_jobs | awk -F'\t' -v d="$1" '$1 == d')
+  while read -r id; do
+    [[ -n $id ]] || continue
+    act cancel "$1-$id" || return 1
+  done < <(awk -F'\t' -v u="$me" '$3 == u { print $2 }' <<<"$jobs")
+  others=$(awk -F'\t' -v u="$me" '$3 != u' <<<"$jobs" | grep -c . || true)
+  [[ $others == 0 ]] || admin cancel -a "$1"
+}
+
+# Tira a fila da pausa: são dois comandos, mas uma janela de senha só.
+resume() {
+  if act cupsenable "$1" && act cupsaccept "$1"; then
+    return 0
+  fi
+  refused || return 1
+  # shellcheck disable=SC2016
+  elevate sh -c 'cupsenable "$1" && cupsaccept "$1"' _ "$1"
+}
+
+# Ligar o serviço é com o systemd. Sem o pkexec na frente o systemctl pediria
+# a autorização em até três janelas (habilitar, recarregar, iniciar).
+enable() {
+  elevate systemctl enable --now cups.socket && return 0
+  [[ $rc == 126 || $rc == 127 || $rc == 124 ]] || err="não deu para ligar o serviço de impressão"
+  return 1
+}
+
+# O que dizer quando a ação <chave> deu certo.
+done_text() {
+  local what=${1%%:*} name=${1#*:}
+  case $what in
+    add) echo "impressora adicionada" ;;
+    remove) echo "$name removida" ;;
+    default) echo "$name é a padrão agora" ;;
+    test) echo "página de teste enviada para $name" ;;
+    cancel) echo "fila de $name cancelada" ;;
+    resume) echo "$name voltou a imprimir" ;;
+    enable) echo "impressão ligada" ;;
+  esac
+}
+
+# Conta o resultado a quem não está mais olhando: a folha dos Ajustes fechou
+# (para a janela de senha aparecer, ou porque a pessoa saiu). Depois da senha
+# a folha volta na página, se nada mais abriu no lugar; senão, um aviso.
+tell() {
+  local text=$1 state=""
+  if [[ $elevated == true && -n ${MARE_PRINTERS_SHELL:-} ]] && command -v qs >/dev/null; then
+    state=$(timeout 5 qs -p "$MARE_PRINTERS_SHELL" ipc call mare state 2>/dev/null | tail -n1)
+    [[ $state == settings ]] && return 0
+    if [[ $state == rest ]]; then
+      timeout 5 qs -p "$MARE_PRINTERS_SHELL" ipc call mare settings impressoras >/dev/null 2>&1 && return 0
+    fi
+  fi
+  if [[ -n $fx ]]; then
+    echo "avisaria: $text" >&2
+  else
+    notify-send -a "Impressoras" -i printer "Impressoras" "$text" 2>/dev/null || true
+  fi
+}
+
+# A chave de uma ação, como a página a conhece: "remove:<fila>", "enable"...
+key_of() {
+  if [[ $1 == enable ]]; then echo enable; else echo "$1:${2:-}"; fi
+}
+
+# Quem faz a ação de verdade, numa sessão à parte: worker <ação> [args...]
+worker() {
+  local action=$1 key ok=true text
+  key=$(key_of "$@")
+  echo "$$ $key" >"$sd/pid"
+  trap 'rm -f "$sd/pid" "$sd/elevando"' EXIT
+  case $action in
+    add) add "${2:-}" "${3:-}" ;;
+    default) need_queue "${2:-}" && act lpoptions -d "$2" ;;
+    remove) need_queue "${2:-}" && admin lpadmin -x "$2" ;;
+    test) need_queue "${2:-}" && test_page "$2" ;;
+    cancel) need_queue "${2:-}" && cancel_queue "$2" ;;
+    resume) need_queue "${2:-}" && resume "$2" ;;
+    enable)
+      enable
+      # O soquete ligado já basta; o cupsd sobe na primeira conversa.
+      [[ -n $err ]] || running || err="o serviço foi ligado, mas o CUPS não respondeu"
+      ;;
+  esac
+  if [[ -n $err ]]; then
+    ok=false
+    text=$err
+  else
+    text=$(done_text "$key")
+  fi
+  jq -cn --arg key "$key" --argjson ok "$ok" --arg error "$err" --arg message "$text" \
+    --argjson elevated "$elevated" --argjson at "$(date +%s%3N)" \
+    '{ key: $key, ok: $ok, error: $error, message: $message, elevated: $elevated, at: $at }' >"$sd/ultimo.json.novo" &&
+    mv "$sd/ultimo.json.novo" "$sd/ultimo.json"
+  rm -f "$sd/pid" "$sd/elevando"
+  # Com a página ainda esperando, é ela que conta; sem ela, conta-se daqui.
+  if [[ $elevated == true ]] || ! kill -0 "${MARE_PRINTERS_FRONT:-0}" 2>/dev/null; then
+    tell "$text"
+  fi
+}
+
+# Uma ação pedida pela página: solta o worker e espera por ele, avisando da
+# janela de senha. Se a página fechar no meio, só esta espera morre.
+action() {
+  local wpid told=0 busy key
+  key=$(key_of "$@")
+  mkdir -p "$sd" && chmod 700 "$sd"
+  busy=$(pending)
+  if [[ -n $busy ]]; then
+    status | jq -c --arg key "$key" '. + { key: $key, ok: false, elevated: false, at: 0,
+      error: "outra ação ainda está em curso", message: "outra ação ainda está em curso" }'
+    return 0
+  fi
+  rm -f "$sd/ultimo.json" "$sd/elevando"
+  MARE_PRINTERS_FRONT=$$ setsid bash "$0" __worker "$@" </dev/null >/dev/null &
+  wpid=$!
+  while kill -0 "$wpid" 2>/dev/null; do
+    if [[ $told == 0 && -e $sd/elevando ]]; then
+      echo '{"elevating":true}'
+      told=1
+    fi
+    sleep 0.15
+  done
+  status | jq -c --arg key "$key" '. + (.last // { key: $key, ok: false, elevated: false, at: 0,
+    error: "a ação não terminou", message: "a ação não terminou" })'
+}
+
+find_printers() {
+  local found="" legacy="" devices="" unknown=false
+  if running; then
+    devices=$(q lpstat-v lpstat -v | parse_devices)
+    # Só o que fala IPP: é o que entra com "-m everywhere". As USB aparecem
+    # aqui pelo ipp-usb, em localhost.
+    found=$(q ippfind ippfind -T 4 _ipp._tcp _ipps._tcp \
+      --exec printf '%s\t%s\t%s\n' '{service_name}' '{service_uri}' '{txt_ty}' ';')
+    # USB que o CUPS vê direto: só para avisar que pede driver. O lpinfo é
+    # operação de administrador; se for recusado (aqui não se pede senha: é
+    # só uma procura), a página avisa que essa parte ficou de fora.
+    if [[ -n $fx ]]; then
+      legacy=$(q lpinfo-v true)
+    else
+      legacy=$(timeout 12 lpinfo --timeout 3 --include-schemes usb -l -v 2>&1 </dev/null || true)
+    fi
+    raw=$legacy
+    refused && unknown=true
+    legacy=$(awk '
+        function flush() { if (uri != "") printf "%s\t%s\n", uri, model }
+        /^Device: / { flush(); uri = ""; model = ""; sub(/^Device: uri = /, ""); uri = $0; next }
+        /^[ \t]+make-and-model = / { sub(/^[ \t]+make-and-model = /, ""); model = $0 }
+        /^[ \t]+info = / { if (model == "" || model == "Unknown") { sub(/^[ \t]+info = /, ""); model = $0 } }
+        END { flush() }
+      ' <<<"$legacy")
+  fi
+  jq -cn --arg f "$found" --arg l "$legacy" --arg v "$devices" \
+    --argjson mdns "$(bool mdns)" --argjson unknown "$unknown" '
+    def rows(s): s | split("\n") | map(select(length > 0) | split("\t"));
+    def clean: if . == null or startswith("{") then "" else . end;
+    (rows($v) | map(.[1])) as $have
+    | { found: (rows($f)
+          | map(select((.[1] // "") | test("^ipps?://")) | {
+              name: .[0], uri: .[1], model: (.[2] | clean),
+              kind: (if (.[1] | test("^ipps?://(localhost|127\\.0\\.0\\.1|\\[::1\\])[:/]")) then "usb" else "rede" end),
+              added: (.[1] as $u | $have | index($u) != null) })
+          # A mesma impressora costuma se anunciar em ipp e em ipps: fica o ipp.
+          | group_by(.name) | map(sort_by(.uri | startswith("ipps")) | .[0])
+          | sort_by(.name | ascii_downcase)),
+        legacy: (rows($l) | map({ uri: .[0], model: (.[1] // "") })),
+        mdns: $mdns, legacyUnknown: $unknown }'
+}
+
+selftest() {
+  local dir fail=0 out self=$0
+  dir=$(mktemp -d)
+  # shellcheck disable=SC2064
+  trap "rm -rf '$dir'" EXIT
+  check() {
+    if jq -e "$2" >/dev/null <<<"$out"; then
+      echo "ok    $1"
+    else
+      echo "FALHA $1: $2" >&2
+      fail=1
+    fi
+  }
+
+  # Sem CUPS.
+  mkdir "$dir/ausente-dir" && : >"$dir/ausente-dir/ausente"
+  out=$(MARE_PRINTERS_FIXTURES=$dir/ausente-dir bash "$self" status)
+  check "sem cups" '.installed == false and .running == false and .printers == []'
+
+  # Instalado e parado.
+  mkdir "$dir/parado" && echo "scheduler is not running" >"$dir/parado/lpstat-r"
+  out=$(MARE_PRINTERS_FIXTURES=$dir/parado bash "$self" status)
+  check "parado" '.installed and .running == false and .printers == []'
+
+  # Ligado e sem impressoras (o lpstat reclama no stderr; o stdout vem assim).
+  mkdir "$dir/vazio"
+  echo "scheduler is running" >"$dir/vazio/lpstat-r"
+  echo "no system default destination" >"$dir/vazio/lpstat-d"
+  out=$(MARE_PRINTERS_FIXTURES=$dir/vazio bash "$self" status)
+  check "vazio" '.running and .default == "" and .printers == []'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/vazio bash "$self" find)
+  check "procura vazia" '.found == [] and .legacy == []'
+
+  # Três impressoras: parada, imprimindo e em pausa; nomes com hífen.
+  mkdir "$dir/tres"
+  echo "scheduler is running" >"$dir/tres/lpstat-r"
+  cat >"$dir/tres/lpstat-p" <<'EOF'
+printer Brother_HL-L2350DW is idle.  enabled since Thu 19 Nov 2026 10:12:44 AM -03
+printer EPSON-ET-2850 now printing EPSON-ET-2850-42.  enabled since Fri 20 Nov 2026 09:01:10 AM -03
+	Rendering completed
+printer HP_LaserJet_M15w disabled since Wed 18 Nov 2026 05:40:02 PM -03 -
+	Paused
+EOF
+  echo "system default destination: EPSON-ET-2850" >"$dir/tres/lpstat-d"
+  cat >"$dir/tres/lpstat-v" <<'EOF'
+device for Brother_HL-L2350DW: ipp://BRW1234.local:631/ipp/print
+device for EPSON-ET-2850: ipps://EPSON1A2B3C.local:631/ipp/print
+device for HP_LaserJet_M15w: ipp://localhost:60000/ipp/print
+EOF
+  cat >"$dir/tres/lpstat-o" <<'EOF'
+EPSON-ET-2850-42        maria            204800   Fri 20 Nov 2026 09:01:08 AM -03
+EPSON-ET-2850-43        maria             10240   Fri 20 Nov 2026 09:02:30 AM -03
+HP_LaserJet_M15w-7      joao               1024   Wed 18 Nov 2026 05:39:50 PM -03
+EOF
+  printf '%s\t%s\t%s\n' \
+    "Brother HL-L2350DW series" "ipp://BRW1234.local:631/ipp/print" "Brother HL-L2350DW series" \
+    "EPSON ET-2850 Series" "ipp://EPSON1A2B3C.local:631/ipp/print" "EPSON ET-2850 Series" \
+    "EPSON ET-2850 Series" "ipps://EPSON1A2B3C.local:631/ipp/print" "EPSON ET-2850 Series" \
+    "Canon G3010 (USB)" "ipp://localhost:60001/ipp/print" "{txt_ty}" \
+    "Sala @ servidor" "http://servidor.local:631/" "" >"$dir/tres/ippfind"
+  cat >"$dir/tres/lpinfo-v" <<'EOF'
+Device: uri = usb://Samsung/ML-1660%20Series?serial=Z4WABKBZ500123
+        class = direct
+        info = Samsung ML-1660 Series
+        make-and-model = Samsung ML-1660 Series
+        device-id = MFG:Samsung;CMD:SPL,FWV;MDL:ML-1660 Series;CLS:PRINTER;
+        location =
+EOF
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" status)
+  check "três impressoras" '.printers | length == 3'
+  check "padrão" '.default == "EPSON-ET-2850" and ([.printers[] | select(.default)] | length == 1)'
+  check "estados" '[.printers[].state] == ["idle", "printing", "paused"]'
+  check "mensagem" '.printers[1].message == "Rendering completed" and .printers[2].message == "Paused" and .printers[0].message == ""'
+  check "endereços" '.printers[0].uri == "ipp://BRW1234.local:631/ipp/print" and .printers[2].uri == "ipp://localhost:60000/ipp/print"'
+  check "fila com hífen" '(.printers[1].jobs | map(.id)) == [42, 43] and .printers[1].jobs[0].user == "maria" and .printers[1].jobs[0].size == 204800'
+  check "fila da pausada" '(.printers[2].jobs | length) == 1 and (.printers[0].jobs | length) == 0'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" find)
+  check "achadas" '.found | length == 3'
+  check "ipp antes de ipps" '[.found[] | select(.name == "EPSON ET-2850 Series")][0].uri | startswith("ipp://")'
+  check "já adicionada" '[.found[] | select(.added) | .name] == ["Brother HL-L2350DW series"]'
+  check "usb pelo ipp-usb" '[.found[] | select(.kind == "usb")][0] | .name == "Canon G3010 (USB)" and .model == ""'
+  check "usb com driver" '.legacy == [{ uri: "usb://Samsung/ML-1660%20Series?serial=Z4WABKBZ500123", model: "Samsung ML-1660 Series" }]'
+
+  # As ações, sem executar nada: o que fariam sai no stderr.
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" add "ipp://localhost:60001/ipp/print" "Canon G3010 (USB)" 2>&1 >/dev/null)
+  out=$(jq -Rn --arg s "$out" '$s')
+  check "add" '. == "faria: lpadmin -p Canon_G3010_USB -E -v ipp://localhost:60001/ipp/print -m everywhere -D Canon G3010 (USB)"'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" add "ipp://outra.local/ipp/print" "EPSON-ET-2850" 2>&1 >/dev/null)
+  out=$(jq -Rn --arg s "$out" '$s')
+  check "add sem repetir o nome" 'test("^faria: lpadmin -p EPSON-ET-2850_2 ")'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" add "usb://Samsung/ML-1660" 2>/dev/null)
+  check "add recusa usb://" '.ok == false and (.error | test("inválido"))'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" remove "nao-existe" 2>/dev/null)
+  check "remove desconhecida" '.ok == false and (.printers | length == 3)'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" remove "HP_LaserJet_M15w" 2>&1 >/dev/null)
+  out=$(jq -Rn --arg s "$out" '$s')
+  check "remove" '. == "faria: lpadmin -x HP_LaserJet_M15w"'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" default "Brother_HL-L2350DW" 2>/dev/null)
+  check "default responde com o status" '.ok and .error == "" and (.printers | length == 3)'
+
+  # Nome que só muda nas maiúsculas: para o CUPS é a mesma fila.
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" add "ipp://x.local/ipp/print" "brother_hl-l2350dw" 2>&1 >/dev/null)
+  out=$(jq -Rn --arg s "$out" '$s')
+  check "add sem repetir nem em minúsculas" 'test("^faria: lpadmin -p brother_hl-l2350dw_2 ")'
+
+  # Cancelar: os próprios trabalhos um a um, sem administrador.
+  echo maria >"$dir/tres/eu"
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" cancel "EPSON-ET-2850" 2>&1 >/dev/null)
+  out=$(jq -Rn --arg s "$out" '$s')
+  check "cancel dos próprios" '. == "faria: cancel EPSON-ET-2850-42\nfaria: cancel EPSON-ET-2850-43"'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" cancel "HP_LaserJet_M15w" 2>&1 >/dev/null)
+  out=$(jq -Rn --arg s "$out" '$s')
+  check "cancel dos outros é de administrador" '. == "faria: cancel -a HP_LaserJet_M15w"'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" cancel "EPSON-ET-2850" 2>/dev/null | tail -n1)
+  check "resultado da ação" '.ok and .key == "cancel:EPSON-ET-2850" and .message == "fila de EPSON-ET-2850 cancelada" and .elevated == false and .at > 0 and .pending == ""'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" status)
+  check "status lembra o último resultado" '.last.key == "cancel:EPSON-ET-2850" and .last.ok'
+
+  # O CUPS recusa: a ação é refeita pelo pkexec, uma vez só por clique.
+  cp -r "$dir/tres" "$dir/recusa" && rm -rf "$dir/recusa/.estado" && : >"$dir/recusa/recusa"
+  out=$(MARE_PRINTERS_FIXTURES=$dir/recusa bash "$self" remove "HP_LaserJet_M15w" 2>&1 >/dev/null)
+  out=$(jq -Rn --arg s "$out" '$s')
+  check "recusado vai pelo pkexec" '. == "faria: lpadmin -x HP_LaserJet_M15w\nfaria: pkexec lpadmin -x HP_LaserJet_M15w\navisaria: HP_LaserJet_M15w removida"'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/recusa MARE_PRINTERS_FAKE_WAIT=0.6 bash "$self" remove "HP_LaserJet_M15w" 2>/dev/null | head -n1)
+  check "avisa da janela de senha antes do resultado" '. == { elevating: true }'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/recusa bash "$self" remove "HP_LaserJet_M15w" 2>/dev/null | tail -n1)
+  check "resultado elevado" '.ok and .elevated and .key == "remove:HP_LaserJet_M15w"'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/recusa bash "$self" resume "HP_LaserJet_M15w" 2>&1 >/dev/null | grep -c pkexec)
+  check "retomar pede uma senha só" '. == 1'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/recusa bash "$self" enable 2>&1 >/dev/null | head -n1)
+  out=$(jq -Rn --arg s "$out" '$s')
+  check "ligar vai direto pelo pkexec" '. == "faria: pkexec systemctl enable --now cups.socket"'
+  : >"$dir/recusa/senha-negada"
+  out=$(MARE_PRINTERS_FIXTURES=$dir/recusa bash "$self" add "ipp://nova.local/ipp/print" 2>/dev/null | tail -n1)
+  check "janela de senha fechada" '.ok == false and .elevated and .error == "a senha não foi dada: nada mudou" and .message == .error'
+
+  # A procura diz o que não pôde ver.
+  : >"$dir/recusa/sem-avahi" && echo "lpinfo: Forbidden" >"$dir/recusa/lpinfo-v"
+  out=$(MARE_PRINTERS_FIXTURES=$dir/recusa bash "$self" find)
+  check "procura sem avahi e sem lpinfo" '.mdns == false and .legacyUnknown and .legacy == []'
+  out=$(MARE_PRINTERS_FIXTURES=$dir/tres bash "$self" find)
+  check "procura completa" '.mdns and .legacyUnknown == false'
+
+  # As frases de erro, a partir do que as ferramentas do CUPS dizem.
+  out=$(jq -n --arg a "$(bash "$self" __explain 1 'lpadmin: Unable to connect to "X.local:631": Name or service not known')" \
+    --arg b "$(bash "$self" __explain 1 'cancel: cancel-jobs failed: Forbidden')" \
+    --arg c "$(bash "$self" __explain 124 '')" \
+    --arg d "$(bash "$self" __explain 1 'lpadmin: Printer does not support required IPP attributes or document formats.')" \
+    --arg e "$(bash "$self" __explain 1 'lp: algo novo')" '[$a, $b, $c, $d, $e]')
+  check "frases de erro" '(.[0] | test("ligada e na mesma rede")) and (.[1] | test("sem permissão")) and (.[2] | test("demorou")) and (.[3] | test("sem driver")) and .[4] == "não deu certo: lp: algo novo"'
+
+  [[ $fail == 0 ]] && echo "tudo certo"
+  return "$fail"
+}
+
+case ${1:-} in
+  status) status ;;
+  find) find_printers ;;
+  add)
+    [[ -n ${2:-} ]] || usage
+    action "$@"
+    ;;
+  default | remove | test | cancel | resume)
+    [[ -n ${2:-} ]] || usage
+    action "$1" "$2"
+    ;;
+  enable) action enable ;;
+  __worker)
+    shift
+    worker "$@"
+    ;;
+  __explain)
+    rc=${2:-1} raw=${3:-}
+    explain comando
+    ;;
+  selftest) selftest ;;
+  *) usage ;;
+esac

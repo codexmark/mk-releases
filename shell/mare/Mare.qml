@@ -12,7 +12,7 @@ Singleton {
 
     readonly property var panels: ["project", "volume", "power", "network", "calendar", "picker",
         "launcher", "switcher", "notifications", "session", "media", "bluetooth", "display", "system",
-        "clipboard", "wallpaper", "settings", "capture"]
+        "clipboard", "wallpaper", "settings", "capture", "emoji"]
     readonly property var transients: ["toast", "osd"]
     property string mode: "rest"
 
@@ -203,6 +203,27 @@ Singleton {
                 Settings.set(key, value);
             }
             return key + " = " + JSON.stringify(Settings.get(key));
+        }
+
+        // Boas-vindas: welcome abrir | continuar | fechar | fim | seguir | voltar | estado
+        function welcome(action: string): string {
+            if (action === "abrir") {
+                root.close();
+                Welcome.open();
+            } else if (action === "continuar")
+                Welcome.resume();
+            else if (action === "fechar")
+                Welcome.close();
+            else if (action === "fim")
+                Welcome.finish();
+            else if (action === "seguir")
+                Welcome.next();
+            else if (action === "voltar")
+                Welcome.back();
+            else if (action !== "estado")
+                return "uso: welcome abrir | continuar | fechar | fim | seguir | voltar | estado";
+            return (!Welcome.shown ? "fechada" : (Welcome.paused ? "recolhida" : "aberta") + ", passo " + (Welcome.step + 1) + " de " + Welcome.count)
+                + (Welcome.seen ? ", já vista" : ", ainda não vista");
         }
 
         function state(): string {

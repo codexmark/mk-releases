@@ -6,12 +6,27 @@
 #   mare-shot janela    a janela em foco
 #   mare-shot tela      a tela inteira
 #   mare-shot pasta     imprime a pasta das capturas
+#   mare-shot gravacao  imprime por que não dá para gravar (nada = dá)
 set -euo pipefail
 
 pics=$(xdg-user-dir PICTURES 2>/dev/null || true)
 [[ -n $pics && $pics != "$HOME" ]] || pics=$HOME/Pictures
 dir=$pics/Capturas
 [[ ${1:-} == pasta ]] && { echo "$dir"; exit 0; }
+
+# Só lê a ajuda do gpu-screen-recorder; não grava nada.
+if [[ ${1:-} == gravacao ]]; then
+  command -v gpu-screen-recorder >/dev/null || { echo "falta o gpu-screen-recorder"; exit 0; }
+  rc=0
+  ajuda=$(timeout 3 gpu-screen-recorder --help 2>&1) || rc=$?
+  if ((rc == 124 || rc == 137)); then
+    echo "o gpu-screen-recorder não respondeu"
+  elif [[ $ajuda != *usage:* ]]; then
+    echo "o gpu-screen-recorder não abre neste sistema"
+  fi
+  exit 0
+fi
+
 mkdir -p "$dir"
 file=$dir/$(date +%F_%H-%M-%S).png
 
@@ -31,7 +46,7 @@ case ${1:-area} in
   tela)
     grim "$file" ;;
   *)
-    echo "uso: mare-shot copiar | area | janela | tela | pasta" >&2
+    echo "uso: mare-shot copiar | area | janela | tela | pasta | gravacao" >&2
     exit 2 ;;
 esac
 wl-copy --type image/png <"$file"

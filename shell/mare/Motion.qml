@@ -7,6 +7,7 @@ import Quickshell
 // clicado com um leve passar do ponto. Os detalhes usam a curva do perfil.
 Singleton {
     // Velocidade escolhida nos Ajustes: 0.7 rápido, 1 normal, 1.4 calmo, 0 sem.
+    // O mesmo número escala as animações do Hyprland (SettingsSchema.js).
     readonly property real speed: Settings.get("motion.speed")
 
     readonly property int fast: Math.round(120 * speed)

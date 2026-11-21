@@ -1,0 +1,45 @@
+# Os apps padrão de um Mk recém-instalado, para os apps que vêm com ele
+# (system/packages/apps.packages). Vai para ~/.config/mimeapps.list de quem
+# ainda não tem um; depois disso é seu, e a página "Apps padrão" dos Ajustes
+# (Super + ,) reescreve o que você trocar.
+#
+# Onde há dois apps na linha, vale o primeiro que estiver instalado: o segundo
+# é o que o Mk trazia antes (imv, evince) ou o mpv, que toca tudo.
+[Default Applications]
+x-scheme-handler/http=chromium.desktop
+x-scheme-handler/https=chromium.desktop
+text/html=chromium.desktop
+application/xhtml+xml=chromium.desktop
+inode/directory=org.gnome.Nautilus.desktop
+text/plain=org.gnome.TextEditor.desktop
+text/markdown=org.gnome.TextEditor.desktop
+application/x-shellscript=org.gnome.TextEditor.desktop
+application/pdf=org.gnome.Papers.desktop;org.gnome.Evince.desktop
+image/png=org.gnome.Loupe.desktop;imv.desktop
+image/jpeg=org.gnome.Loupe.desktop;imv.desktop
+image/gif=org.gnome.Loupe.desktop;imv.desktop
+image/webp=org.gnome.Loupe.desktop;imv.desktop
+image/bmp=org.gnome.Loupe.desktop;imv.desktop
+image/tiff=org.gnome.Loupe.desktop;imv.desktop
+image/svg+xml=org.gnome.Loupe.desktop;imv.desktop
+image/avif=org.gnome.Loupe.desktop;imv.desktop
+image/heif=org.gnome.Loupe.desktop;imv.desktop
+image/jxl=org.gnome.Loupe.desktop;imv.desktop
+video/mp4=mpv.desktop
+video/x-matroska=mpv.desktop
+video/webm=mpv.desktop
+video/quicktime=mpv.desktop
+video/x-msvideo=mpv.desktop
+video/mpeg=mpv.desktop
+video/ogg=mpv.desktop
+video/x-flv=mpv.desktop
+video/3gpp=mpv.desktop
+video/mp2t=mpv.desktop
+audio/mpeg=io.bassi.Amberol.desktop;mpv.desktop
+audio/flac=io.bassi.Amberol.desktop;mpv.desktop
+audio/ogg=io.bassi.Amberol.desktop;mpv.desktop
+audio/x-vorbis+ogg=io.bassi.Amberol.desktop;mpv.desktop
+audio/opus=io.bassi.Amberol.desktop;mpv.desktop
+audio/mp4=io.bassi.Amberol.desktop;mpv.desktop
+audio/aac=io.bassi.Amberol.desktop;mpv.desktop
+audio/x-wav=io.bassi.Amberol.desktop;mpv.desktop

@@ -1,18 +1,84 @@
 # Aplicativos gráficos do dia a dia. Opcionais: o instalador pode pular este
-# arquivo. Deixei de fora o que é pesado e não é dev (kdenlive, obs-studio,
-# libreoffice, gimp/pinta); mova para cá se quiser.
+# arquivo. Um app por função, de preferência GTK4/libadwaita, que é o que
+# veste melhor o tema GTK "Mk". Tudo vem de core/extra (bin/check-packages).
+# De fora, de propósito: monitor de sistema (a ilha e o btop já cobrem),
+# app de notas (neovim e o editor de texto dão conta), anotador de capturas
+# (satty: entra quando o painel de captura tiver a ação "anotar"), gimp,
+# kdenlive, obs-studio. Instale à parte se precisar.
 
 # Navegador (mantenha só um)
 chromium
 
-# Arquivos, imagens, PDF, vídeo
+# Arquivos
 nautilus
+# sushi: espaço no Nautilus abre uma prévia do arquivo
 sushi
+# file-roller: abrir um .zip/.tar/.7z e olhar dentro sem extrair tudo
+file-roller
+# unrar: .rar com senha ou em volumes, que o libarchive não abre
+unrar
+# gvfs-gphoto2: câmeras e celulares em modo foto (PTP) aparecem no Nautilus
+gvfs-gphoto2
+# gvfs-dnssd: a pasta "Rede" do Nautilus acha os compartilhamentos da rede local
+gvfs-dnssd
+
+# Miniaturas no Nautilus (PNG, JPEG, WebP, SVG e JXL já vêm com o glycin)
+# ffmpegthumbnailer: miniaturas de vídeo e capas de música
 ffmpegthumbnailer
-imv
-evince
+# libheif: miniaturas e abertura de .heic/.avif (fotos de iPhone)
+libheif
+
+# Texto, contas e documentos
+# gnome-text-editor: editor de texto gráfico, para quando o neovim é demais
+gnome-text-editor
+# gnome-calculator: calculadora (com conversão de unidades e moedas)
+gnome-calculator
+# papers: PDF, djvu e quadrinhos (o sucessor GTK4 do evince; o sushi já o usa)
+papers
+# libreoffice-fresh: abrir e editar .docx/.xlsx/.pptx. É o maior download da
+# lista (~150 MB); apague a linha se não usa. Veste o tema pelo GTK 3, que o
+# portal do desktop já instala. A interface em português
+# (libreoffice-fresh-pt-br) o instalador acrescenta quando o idioma é pt_BR
+libreoffice-fresh
+
+# Imagens
+# loupe: visualizador de imagens (duplo clique no Nautilus, zoom com gesto)
+loupe
+# pinta: editor de imagens simples (recortar, redimensionar, camadas). Traz o
+# runtime do .NET junto: ~30 MB de download, ainda bem menos que o gimp
+pinta
+
+# Vídeo e música
 mpv
+# mpv-mpris: o mpv aparece na ilha e obedece às teclas de mídia
 mpv-mpris
+# amberol: tocador de música simples, toca a pasta que você soltar nele
+amberol
+# gst-libav: codecs (AAC, H.264...) para o amberol, o snapshot e o sushi
+gst-libav
+# snapshot: webcam (fotos e vídeos, testar a câmera antes de uma chamada)
+snapshot
+
+# Sistema
+# gnome-disk-utility: particionar, formatar, gravar imagem em pendrive, SMART
+gnome-disk-utility
+# baobab: o que está ocupando o disco, em gráfico
+baobab
+# seahorse: ver e apagar senhas e chaves guardadas no gnome-keyring (GTK 3:
+# não há equivalente em GTK 4 nos repositórios)
+seahorse
+# gnome-font-viewer: ver e instalar uma fonte com duplo clique
+gnome-font-viewer
+
+# Scanner (par da impressão por CUPS)
+# simple-scan: digitalizar documentos para PDF ou imagem
+simple-scan
+# sane-airscan: scanners de rede e multifuncionais sem driver (eSCL/WSD)
+sane-airscan
+
+# Torrent
+# fragments: cliente de torrent simples (ISOs de Linux)
+fragments
 
 # Mídia de linha de comando usada por outras ferramentas
 ffmpeg

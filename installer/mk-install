@@ -317,7 +317,7 @@ interview() {
   fi
 
   APPS=nao ENCRYPT=nao
-  if confirm "Instalar os apps gráficos (chromium, nautilus, mpv, evince...)?" sim; then APPS=sim; fi
+  if confirm "Instalar os apps gráficos (chromium, nautilus, libreoffice, mpv...)?" sim; then APPS=sim; fi
   if confirm "Criptografar o disco (LUKS)? A senha do disco será a mesma do usuário." nao; then ENCRYPT=sim; fi
 }
 
@@ -461,6 +461,8 @@ install_packages() {
     mapfile -t -O "${#pkgs[@]}" pkgs < <(read_list "$PKG_DIR/$f.packages")
   done
   [[ $APPS == sim ]] && mapfile -t -O "${#pkgs[@]}" pkgs < <(read_list "$PKG_DIR/apps.packages")
+  # O LibreOffice em português, só para quem instala o sistema em pt_BR.
+  [[ $APPS == sim && $LOCALE == pt_BR* ]] && pkgs+=(libreoffice-fresh-pt-br)
   # shellcheck disable=SC2086 # um perfil por palavra
   [[ -n $HARDWARE ]] && mapfile -t -O "${#pkgs[@]}" pkgs < <(read_hardware $HARDWARE)
 
@@ -576,6 +578,9 @@ EOF
   place "$src/config/fastfetch" "$skel/.config/mk/fastfetch"
   place "$src/config/bash" "$skel/.config/mk/bash"
   install -Dm644 "$src/config/bash/seu.bash.exemplo" "$skel/.config/mk/seu.bash"
+  # Os apps padrão do Mk (navegador, arquivos, texto, imagens, vídeo, música,
+  # PDF); depois cada um troca os seus na página Apps padrão dos Ajustes.
+  install -Dm644 "$src/config/mimeapps.list" "$skel/.config/mimeapps.list"
   # A pasta de papéis de parede fica dentro da pasta de imagens do sistema
   # (Imagens, em português); o Maré cria quando abre.
   mkdir -p "$skel/Work"
@@ -590,6 +595,9 @@ EOF
   mkdir -p "$target/var/lib/mk/migrations" "$skel/.local/state/mk/migrations"
   for m in "$src"/migrations/system/*.sh; do [[ -f $m ]] && touch "$target/var/lib/mk/migrations/$(basename "$m")"; done
   for m in "$src"/migrations/user/*.sh; do [[ -f $m ]] && touch "$skel/.local/state/mk/migrations/$(basename "$m")"; done
+  # Os apps que esta instalação já viu (instalados ou recusados): o mk-update
+  # só oferece os que entrarem em apps.packages depois.
+  read_list "$PKG_DIR/apps.packages" >"$target/var/lib/mk/apps-oferecidos"
 
   # Os apps na paleta Folha: tema GTK, ícones (pastas em osso), a fonte
   # Space Grotesk (que só existe aqui) e as cores do Qt.
@@ -769,13 +777,25 @@ configure_snapper() {
 configure_services() {
   step "serviços"
   local unit units=(NetworkManager.service bluetooth.service sddm.service avahi-daemon.service
-    power-profiles-daemon.service systemd-timesyncd.service ufw.service docker.socket
+    power-profiles-daemon.service systemd-timesyncd.service ufw.service docker.socket cups.socket
     fstrim.timer plocate-updatedb.timer snapper-cleanup.timer limine-snapper-sync.service)
   for unit in "${units[@]}"; do
     if [[ -n $(find "$target/usr/lib/systemd/system" -maxdepth 1 -name "$unit" -print -quit) ]]; then
       arch-chroot "$target" systemctl enable "$unit" >/dev/null 2>&1 || warn "não habilitou $unit"
     fi
   done
+
+  # Impressoras: quem é do wheel deveria administrar o CUPS sem senha (é o
+  # padrão do Arch; aqui só se garante). Se o CUPS recusar mesmo assim, a
+  # página Impressoras dos Ajustes pede a senha pelo polkit.
+  local cups_conf=$target/etc/cups/cups-files.conf
+  if [[ -f $cups_conf ]] && ! grep -Eq '^SystemGroup .*\bwheel\b' "$cups_conf"; then
+    if grep -q '^SystemGroup ' "$cups_conf"; then
+      sed -i 's/^SystemGroup .*/& wheel/' "$cups_conf"
+    else
+      echo 'SystemGroup sys root wheel' >>"$cups_conf"
+    fi
+  fi
 
   # Firewall (o mesmo de scripts/system/firewall.sh): nega entrada, libera
   # saída, LocalSend e DNS do Docker. No chroot só se grava a regra; o ufw

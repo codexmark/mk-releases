@@ -31,6 +31,12 @@ Scope {
         active: scope.focused
     }
 
+    // Boas-vindas (primeiro login; Welcome.qml decide quando).
+    WelcomeWindow {
+        screen: scope.modelData
+        active: scope.focused
+    }
+
     // Clique fora da linha e da barra fecha o painel aberto.
     HyprlandFocusGrab {
         windows: [tide, bar, settings]

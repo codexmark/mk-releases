@@ -12,4 +12,7 @@ ShellRoot {
 
     // A tela de bloqueio (Super + L), uma para todas as telas.
     LockScreen {}
+
+    // Aviso de bateria fraca: a referência é o que carrega o singleton.
+    readonly property var batteryWatch: BatteryWatch
 }

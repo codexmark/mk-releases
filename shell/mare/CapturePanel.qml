@@ -101,11 +101,16 @@ Item {
             Layout.topMargin: 14
             spacing: 8
 
+            // Sem gravador a linha apaga e diz por quê.
+            opacity: Capture.available || Capture.recording ? 1 : 0.45
+
             PillButton {
                 primary: !Capture.recording
                 selected: Capture.recording
                 text: Capture.recording ? "parar a gravação" : "gravar a tela"
                 onClicked: {
+                    if (!Capture.available && !Capture.recording)
+                        return;
                     Capture.toggleRecording();
                     Mare.close();
                 }
@@ -113,7 +118,7 @@ Item {
 
             Text {
                 Layout.fillWidth: true
-                text: "vídeo com o som do sistema"
+                text: Capture.available || Capture.recording ? "vídeo com o som do sistema" : Capture.reason
                 color: Theme.textFaint
                 font.family: Theme.serif
                 font.pixelSize: 13

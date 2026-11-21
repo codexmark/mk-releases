@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Redes Wi-Fi guardadas no NetworkManager, em JSON, para o painel de rede.
+#
+#   mare-wifi list-saved                 {"ok","saved":[{"ssid","uuid","autoconnect"}]}
+#   mare-wifi forget <ssid>              {"ok","count","error"}
+#   mare-wifi autoconnect <ssid> on|off  {"ok","count","error"}
+#
+# O perfil é achado pelo SSID, não pelo nome (o nome pode ter sido trocado, e
+# uma rede pode ter mais de um perfil: a ação vale para todos). O SSID chega
+# como um argumento só e nunca vai para o nmcli: quem vai é o UUID do perfil.
+set -uo pipefail
+
+nm() { LC_ALL=C nmcli "$@"; }
+
+# Uma linha por perfil Wi-Fi: uuid, yes|no e o SSID, separados por \x1f
+# (um SSID pode ter espaço, tabulação, dois-pontos, aspas...).
+sep=$'\x1f'
+profiles() {
+  local line uuid type key uu="" auto="" ssid="" open=0
+  local -a ids=()
+  while IFS=: read -r uuid type _; do
+    [[ $type == 802-11-wireless ]] && ids+=(uuid "$uuid")
+  done < <(nm -t -f UUID,TYPE con show) || true
+  ((${#ids[@]})) || return 0
+
+  flush() {
+    [[ -n $uu ]] && printf '%s\n' "$uu$sep$auto$sep$ssid"
+    uu="" auto="" ssid="" open=0
+  }
+  while IFS= read -r line; do
+    key=${line%%:*}
+    case $key in
+      connection.uuid) flush; uu=${line#*:} ;;
+      connection.autoconnect) auto=${line#*:} ;;
+      802-11-wireless.ssid) ssid=${line#*:}; open=1 ;;
+      *) if [[ -z $line ]]; then open=0; elif ((open)); then ssid+=" $line"; fi ;;
+    esac
+  done < <(nm -t -e no -f connection.uuid,connection.autoconnect,802-11-wireless.ssid con show "${ids[@]}")
+  flush
+}
+
+# Os UUIDs dos perfis de um SSID, um por linha.
+uuids_of() {
+  local uuid auto ssid
+  while IFS=$sep read -r uuid auto ssid; do
+    [[ $ssid == "$1" ]] && printf '%s\n' "$uuid"
+  done < <(profiles)
+}
+
+reply() {
+  jq -nc --argjson ok "$1" --argjson count "$2" --arg error "$3" '{ok: $ok, count: $count, error: $error}'
+}
+
+# each <ssid> <args do nmcli antes do uuid> -- <args depois>
+each() {
+  local ssid=$1 uuid out count=0 error=""
+  local -a pre=() post=() found=()
+  shift
+  while (($#)) && [[ $1 != -- ]]; do pre+=("$1"); shift; done
+  shift || true
+  post=("$@")
+  mapfile -t found < <(uuids_of "$ssid")
+  if ((${#found[@]} == 0)); then
+    reply false 0 "essa rede não está guardada"
+    return 1
+  fi
+  for uuid in "${found[@]}"; do
+    if out=$(nm "${pre[@]}" uuid "$uuid" "${post[@]}" 2>&1); then
+      count=$((count + 1))
+    else
+      error=${out##*$'\n'}
+    fi
+  done
+  if [[ -n $error ]]; then
+    reply false "$count" "$error"
+    return 1
+  fi
+  reply true "$count" ""
+}
+
+case ${1:-} in
+  list-saved)
+    if ! nm -t -f RUNNING general >/dev/null 2>&1; then
+      echo '{"ok":false,"saved":[]}'
+      exit 1
+    fi
+    profiles | jq -Rnc '{ok: true, saved: [inputs | split("\u001f")
+      | {uuid: .[0], autoconnect: (.[1] == "yes"), ssid: (.[2:] | join("\u001f"))}]}'
+    ;;
+  forget)
+    [[ $# -eq 2 && -n $2 ]] || { reply false 0 "uso: mare-wifi forget <ssid>"; exit 2; }
+    each "$2" con delete --
+    ;;
+  autoconnect)
+    [[ $# -eq 3 && -n $2 && ($3 == on || $3 == off) ]] \
+      || { reply false 0 "uso: mare-wifi autoconnect <ssid> on|off"; exit 2; }
+    each "$2" con modify -- connection.autoconnect "$([[ $3 == on ]] && echo yes || echo no)"
+    ;;
+  *)
+    echo "uso: mare-wifi list-saved | forget <ssid> | autoconnect <ssid> on|off" >&2
+    exit 2
+    ;;
+esac

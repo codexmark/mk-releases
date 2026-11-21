@@ -8,8 +8,8 @@
 #   bin/mk-release "o que mudou"   com uma frase sua no lugar da lista de commits
 #
 # O lançamento leva os arquivos do git (sem .git, sem o que o .gitignore
-# ignora) e um VERSION com "commit data": é por ele que os Mk instalados
-# sabem que há versão nova.
+# ignora), um VERSION com "commit data" (é por ele que os Mk instalados
+# sabem que há versão nova) e um NOVIDADES com o que mudou desde o anterior.
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
@@ -24,6 +24,9 @@ fi
 if [[ -n $(git log --oneline '@{u}..' 2>/dev/null) ]]; then
   echo "aviso: há commits que ainda não foram para o repositório privado (git push)" >&2
 fi
+
+# A lista de atalhos existe em dois arquivos (binds.lua e Keybinds.js): iguais, ou não lança.
+"$repo/bin/check-keybinds"
 
 src=$(git rev-parse --short=12 HEAD)
 date=$(git log -1 --format=%cs)
@@ -57,6 +60,15 @@ elif [[ -n $last ]] && git cat-file -e "$last" 2>/dev/null; then
 else
   notes="Primeiro lançamento."
 fi
+
+# NOVIDADES: o que chega com esta versão, em poucas linhas (os assuntos dos
+# commits, no máximo 12). Os Ajustes mostram antes de atualizar.
+news=$(grep -v '^[[:space:]]*$' <<<"$notes" | sed 's/^- //' || true)
+total=$(grep -c '' <<<"$news")
+if ((total > 12)); then
+  news=$(head -11 <<<"$news")$'\n'"… e mais $((total - 11))"
+fi
+printf '%s\n' "$news" >"$work/NOVIDADES"
 
 git -C "$work" add -A
 # No repositório público, o endereço "noreply" do GitHub no lugar do seu e-mail.

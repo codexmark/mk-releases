@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Procura atualizações sem sudo e responde em JSON, para os Ajustes e a ilha:
 # {"checked": epoch, "system": [{name, from, to}], "aur": [...],
-#  "mk": {"version", "date", "channel", "latest", "available"}, "error": ""}
+#  "mk": {"version", "date", "channel", "latest", "available"}, "error": "",
+#  "last": {...} | null, "applied": epoch, "reboot": bool, "news": ["..."]}
 #   system: pacotes do Arch (checkupdates, base temporária: não mexe no sistema)
 #   aur:    pacotes do AUR (yay -Qua)
 #   mk:     o próprio Mk, comparando a versão instalada com o canal (git)
 #   migrations: mudanças do Mk fora de ~/.config/mk que ainda não rodaram aqui
+#   last:    o resumo da última rodada do mk-update (ultima-atualizacao.json)
+#   applied: quando o sistema foi atualizado pela última vez (0 = não se sabe)
+#   reboot:  o kernel em uso já saiu do disco: falta reiniciar
+#   news:    o que chega com a versão nova do Mk (NOVIDADES do lançamento)
 set -uo pipefail
 
 err=""
@@ -37,7 +42,7 @@ for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/channel" /usr/share/mk/system/mk/
 done
 # A versão no canal: o arquivo VERSION do último lançamento ("commit data"),
 # lido sem baixar o resto (clone raso, só a árvore, só esse arquivo).
-latest="" latest_date=""
+latest="" latest_date="" news=""
 if [[ -n $channel ]]; then
   tmp=$(mktemp -d)
   # Nunca pede senha: num canal privado sem login, só avisa.
@@ -46,6 +51,7 @@ if [[ -n $channel ]]; then
     "$channel" "$tmp/c" 2>/dev/null; then
     read -r latest latest_date < <(git -C "$tmp/c" show HEAD:VERSION 2>/dev/null) || true
     [[ -n $latest ]] || latest=$(git -C "$tmp/c" rev-parse --short=12 HEAD)
+    news=$(timeout 10 git -C "$tmp/c" show HEAD:NOVIDADES 2>/dev/null | head -12) || true
   elif [[ -z $err ]]; then
     err="sem acesso ao canal do Mk ($channel)"
   fi
@@ -57,6 +63,26 @@ available=false
 if [[ -n $latest && -n $version && ${latest:0:12} != "${version:0:12}" ]]; then
   [[ -z $latest_date || -z $date || ! $latest_date < $date ]] && available=true
 fi
+[[ $available == true ]] || news=""
+
+# A última rodada do mk-update. A data vale a mais nova entre o resumo e o
+# pacman.log (um -Syu à mão, ou uma rodada que só falhou depois do pacman).
+last=null applied=0
+f=${XDG_STATE_HOME:-$HOME/.local/state}/mk/ultima-atualizacao.json
+if [[ -r $f ]] && last=$(jq -ce 'select(type == "object")' "$f" 2>/dev/null); then
+  applied=$(jq -r '.applied // 0 | floor' <<<"$last" 2>/dev/null)
+  # Registro que já saiu da pasta (ficam os 5 últimos) não tem o que abrir.
+  [[ -r $(jq -r '.log // ""' <<<"$last") ]] || last=$(jq -c '.log = ""' <<<"$last")
+else
+  last=null
+fi
+[[ $applied =~ ^[1-9][0-9]*$ ]] || applied=0
+stamp=$(grep -a 'starting full system upgrade' /var/log/pacman.log 2>/dev/null | tail -1 |
+  sed -n 's/^\[\([^]]*\)\].*/\1/p')
+[[ -n $stamp ]] && stamp=$(date -d "$stamp" +%s 2>/dev/null)
+[[ $stamp =~ ^[0-9]+$ ]] && ((stamp > applied)) && applied=$stamp
+reboot=false
+[[ -d /usr/lib/modules/$(uname -r) ]] || reboot=true
 
 # Migrações pendentes (o mk-update roda cada uma uma vez).
 migrations=0
@@ -73,7 +99,9 @@ jq -nc \
   --argjson system "$(to_json <<<"$sys")" --argjson aur "$(to_json <<<"$aur")" \
   --arg version "${version:0:12}" --arg date "$date" --arg channel "$channel" \
   --arg latest "$latest" --argjson available "$available" --arg error "$err" \
-  --argjson migrations "$migrations" \
+  --argjson migrations "$migrations" --argjson last "$last" --argjson applied "$applied" \
+  --argjson reboot "$reboot" --arg news "$news" \
   '{checked: now | floor, system: $system, aur: $aur,
     mk: {version: $version, date: $date, channel: $channel, latest: $latest, available: $available},
-    migrations: $migrations, error: $error}'
+    migrations: $migrations, error: $error, last: $last, applied: $applied, reboot: $reboot,
+    news: ($news | split("\n") | map(select(test("\\S"))))}'
