@@ -143,7 +143,7 @@ complete -W "atualizar ajustes papel bloquear boas-vindas reiniciar-mare ficha v
 if ((mk_ble)); then
   mk_face() {
     if declare -F ble-face >/dev/null; then
-      mk_face "$1" "$2"
+      ble-face "$1=$2"
     else
       ble-color-setface "$1" "$2"
     fi 2>/dev/null

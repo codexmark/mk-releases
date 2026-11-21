@@ -60,4 +60,6 @@ papirus-icon-theme
 adw-gtk-theme
 qt6ct
 gnome-keyring
+# gcr-4: o agente SSH do chaveiro (gcr-ssh-agent), ligado para todos os usuários
+gcr-4
 polkit

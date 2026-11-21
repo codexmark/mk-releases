@@ -27,6 +27,8 @@ fi
 
 # A lista de atalhos existe em dois arquivos (binds.lua e Keybinds.js): iguais, ou não lança.
 "$repo/bin/check-keybinds"
+# O bash do Mk abre e sai sem cair (já foi lançado um mk.bash que derrubava todo terminal).
+"$repo/bin/check-shell"
 
 src=$(git rev-parse --short=12 HEAD)
 date=$(git log -1 --format=%cs)

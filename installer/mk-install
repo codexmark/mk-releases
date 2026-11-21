@@ -669,9 +669,9 @@ TARGET_OS_NAME="Mk"
 ESP_PATH="/boot"
 KERNEL_CMDLINE[default]="$cmdline"
 ENABLE_LIMINE_FALLBACK=yes
-FIND_BOOTLOADERS=yes
+FIND_BOOTLOADERS=no
 BOOT_ORDER="*, *fallback, Snapshots"
-MAX_SNAPSHOT_ENTRIES=5
+MAX_SNAPSHOT_ENTRIES=auto
 EOF
 
   mkdir -p "$target/boot/EFI/limine" "$target/boot/EFI/BOOT"
@@ -728,6 +728,8 @@ limine_conf_ok() {
   local conf=$1 file n=0
   [[ -f $conf ]] || return 1
   while read -r file; do
+    # Com a verificação ligada, o limine-entry-tool põe "#<resumo>" no fim.
+    file=${file%%#*}
     [[ -f $target/boot/$file ]] || return 1
     n=$((n + 1))
   done < <(sed -n 's/^[[:space:]]*\(path\|module_path\|image_path\|kernel_path\): *boot():\/*//p' "$conf")
@@ -756,10 +758,25 @@ finish_boot() {
   # ganchos do limine a entrada 1 é um grupo).
   arch-chroot "$target" bash /usr/share/mk/system/mk/boot/limine-default >/dev/null 2>&1 || true
 
-  if [[ -d /sys/firmware/efi/efivars ]] && ! efibootmgr 2>/dev/null | grep -q ' Mk'; then
-    efibootmgr --create --disk "$DISK" --part 1 --label Mk --loader '\EFI\limine\BOOTX64.EFI' >/dev/null ||
-      warn "não consegui criar a entrada Mk na NVRAM; o firmware ainda acha EFI/BOOT/BOOTX64.EFI"
+  # Uma entrada só na NVRAM, chamada Mk. Com os ganchos do limine quem cuida
+  # do binário é o limine-install (EFI/limine/limine_x64.efi, atualizado a cada
+  # versão): a entrada "Limine" que ele registrou sai e a Mk aponta para o
+  # mesmo arquivo (ele não recria enquanto houver entrada para esse caminho).
+  # Sem os ganchos, vale a cópia que o instalador fez.
+  [[ -d /sys/firmware/efi/efivars ]] || return 0
+  local loader='\EFI\limine\BOOTX64.EFI' num
+  if [[ -f $target/boot/EFI/limine/limine_x64.efi ]]; then
+    loader='\EFI\limine\limine_x64.efi'
+    rm -f "$target/boot/EFI/limine/BOOTX64.EFI"
   fi
+  # Saem a "Limine" do gancho e qualquer "Mk" de uma instalação anterior.
+  while read -r num; do
+    efibootmgr --bootnum "$num" --delete-bootnum >/dev/null 2>&1 || true
+  done < <(efibootmgr 2>/dev/null |
+    sed -n -e '/limine_x64\.efi/I s/^Boot\([0-9A-Fa-f]\{4\}\)\*\{0,1\}[[:space:]]\{1,\}Limine[[:space:]].*/\1/p' \
+      -e 's/^Boot\([0-9A-Fa-f]\{4\}\)\*\{0,1\}[[:space:]]\{1,\}Mk[[:space:]].*/\1/p')
+  efibootmgr --create --disk "$DISK" --part 1 --label Mk --loader "$loader" >/dev/null ||
+    warn "não consegui criar a entrada Mk na NVRAM; o firmware ainda acha EFI/BOOT/BOOTX64.EFI"
 }
 
 configure_snapper() {
@@ -784,6 +801,12 @@ configure_services() {
       arch-chroot "$target" systemctl enable "$unit" >/dev/null 2>&1 || warn "não habilitou $unit"
     fi
   done
+  # O agente SSH do chaveiro, para todos os usuários (config/hypr/mare/env.lua
+  # aponta o SSH_AUTH_SOCK para ele quando este soquete está ligado).
+  if [[ -f $target/usr/lib/systemd/user/gcr-ssh-agent.socket ]]; then
+    arch-chroot "$target" systemctl --global enable gcr-ssh-agent.socket >/dev/null 2>&1 ||
+      warn "não habilitou gcr-ssh-agent.socket"
+  fi
 
   # Impressoras: quem é do wheel deveria administrar o CUPS sem senha (é o
   # padrão do Arch; aqui só se garante). Se o CUPS recusar mesmo assim, a

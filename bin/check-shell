@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Teste de fumaça do bash do Mk: abre um bash interativo de verdade (num
+# pseudo-terminal, que é onde o ble.sh carrega) com o config/bash/mk.bash
+# deste repositório e confere que ele sobe e sai sem cair. `bash -i -c` não
+# pega esses erros: sem terminal o ble.sh não carrega.
+#   bin/check-shell        sai com 1 se o shell morrer
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+command -v script >/dev/null || { echo "check-shell: precisa do script (util-linux)" >&2; exit 2; }
+rc=$(mktemp)
+trap 'rm -f "$rc"' EXIT
+printf 'MK_NO_FETCH=1\nsource %q\n' "$PWD/config/bash/mk.bash" >"$rc"
+status=0
+for term in xterm-256color xterm-ghostty; do
+  out=$(printf 'echo mk-ok-$((40+2))\nexit\n' |
+    TERM=$term timeout 30 script -qec "bash --rcfile '$rc' -i" /dev/null 2>&1) && code=0 || code=$?
+  if [[ $code -ne 0 || $out != *mk-ok-42* ]]; then
+    echo "check-shell: o bash interativo caiu (TERM=$term, saída $code)" >&2
+    status=1
+  fi
+done
+((status == 0)) && echo "bash do Mk: sobe e sai limpo (com$( [[ -r /usr/share/blesh/ble.sh ]] || echo ' sem') ble.sh)"
+exit "$status"

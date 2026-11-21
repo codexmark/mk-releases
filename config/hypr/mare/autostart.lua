@@ -13,8 +13,6 @@ hl.on("hyprland.start", function()
         idle = paths.hypr .. "hypridle.conf"
     end
     hl.exec_cmd("hypridle -c '" .. idle .. "'")
-    hl.exec_cmd("systemctl --user start hyprpolkitagent")
-    hl.exec_cmd("gnome-keyring-daemon --start --components=secrets,pkcs11")
     hl.exec_cmd("wl-clip-persist --clipboard regular")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
