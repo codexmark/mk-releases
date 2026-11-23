@@ -1041,7 +1041,7 @@ PanelWindow {
                     }
                 }
 
-                // Energia: o aviso da placa que não acorda e o preparo da hibernação.
+                // Energia: o aviso da placa que não acorda.
                 SettingsSleepBlock {
                     visible: win.page === "energia"
                     Layout.fillWidth: true

@@ -166,20 +166,20 @@ Singleton {
         return Schema.hypridleConf(values, dir + "/hypr", caps);
     }
 
-    // Como a máquina dorme agora ("suspender", "hibernar" ou "nada"): a
+    // Como a máquina dorme agora ("suspender" ou "nada"): a
     // escolha de power.sleep, se a máquina puder. O hypridle, o painel de
     // sessão e a tela de bloqueio seguem isto.
     readonly property string sleepMode: Schema.sleepMode(values, caps)
 
-    // Relê o mare-caps: a hibernação é preparada fora daqui (bin/mk-hibernate).
+    // Relê o mare-caps.
     function refreshCaps() {
         if (!capsProc.running)
             capsProc.running = true;
     }
 
     // O hypridle.conf gerado segue a máquina. Sem brilho, a linha de escurecer
-    // some: o passo sai do arquivo também. E o passo de dormir muda quando a
-    // hibernação fica pronta ou deixa de estar.
+    // some: o passo sai do arquivo também. E o passo de dormir segue o que a
+    // máquina pode (sleepMode).
     function syncIdle() {
         if (!loaded || broken || !caps || !idle.loaded)
             return;

@@ -367,8 +367,8 @@ Item {
             // O jeito de dormir de Ajustes › Energia; "não dormir" tira o botão.
             Action {
                 visible: Settings.sleepMode !== "nada"
-                label: Settings.sleepMode === "hibernar" ? "hibernar" : "suspender"
-                onClicked: Quickshell.execDetached(["systemctl", Settings.sleepMode === "hibernar" ? "hibernate" : "suspend"])
+                label: "suspender"
+                onClicked: Quickshell.execDetached(["systemctl", "suspend"])
             }
             Action {
                 label: "reiniciar"

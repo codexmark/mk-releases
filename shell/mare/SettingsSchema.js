@@ -11,7 +11,7 @@
 //           ("@..." = entra no Lua por um caminho próprio, veja hyprCode)
 //   kw      palavras que alguém digitaria na busca e que o texto não usa
 //   quando  { outra chave: valor ou [valores] }: a linha só aparece assim
-//   precisa "touchpad" | "bateria" | "brilho" | "hibernar": some se a
+//   precisa "touchpad" | "bateria" | "brilho": some se a
 //           máquina não tem (scripts/mare-caps). Vale também numa opção de
 //           um "choice" (veja optionShown)
 // A ideia vem do Hub do Ryoku: a página é dado, não layout.
@@ -133,18 +133,16 @@ var rows = [
       desc: "Um aviso quando a carga está acabando", ctl: "switch", def: true, precisa: "bateria",
       kw: "carga pouca acabando notificação" },
     // Uma escolha só, usada em todo lugar: o passo de dormir abaixo, o painel
-    // de sessão e a tela de bloqueio (veja sleepMode). "hibernar" só aparece
-    // com a hibernação preparada (bin/mk-hibernate).
+    // de sessão e a tela de bloqueio (veja sleepMode). O Mk não hiberna.
     { page: "energia", group: "DORMIR", key: "power.sleep", label: "Ao dormir",
-      desc: "Suspender guarda na memória e volta na hora; hibernar guarda no disco e desliga",
+      desc: "Suspender guarda na memória e volta na hora",
       ctl: "choice", def: "suspender",
-      options: [ { v: "suspender", label: "suspender" }, { v: "hibernar", label: "hibernar", precisa: "hibernar" },
-                 { v: "nada", label: "não dormir" } ],
-      kw: "suspender suspensão hibernar hibernação sleep suspend hibernate s3 swap" },
+      options: [ { v: "suspender", label: "suspender" }, { v: "nada", label: "não dormir" } ],
+      kw: "suspender suspensão sleep suspend s3" },
     { page: "energia", group: "DORMIR", key: "idle.suspend", label: "Dormir",
       desc: "Minutos sem uso até o computador dormir sozinho", ctl: "slider",
-      min: 0, max: 120, step: 5, def: 30, unit: "min", quando: { "power.sleep": ["suspender", "hibernar"] },
-      kw: "suspender suspensão hibernar inatividade ocioso sleep" },
+      min: 0, max: 120, step: 5, def: 30, unit: "min", quando: { "power.sleep": ["suspender"] },
+      kw: "suspender suspensão inatividade ocioso sleep" },
 
     // Janelas
     { page: "janelas", group: "ESPAÇOS", key: "hypr.gapsIn", label: "Entre janelas",
@@ -426,26 +424,25 @@ function hyprLua(values) {
 }
 
 // Como a máquina dorme de fato: a escolha de power.sleep, se a máquina puder.
-// Hibernar sem a hibernação pronta, ou suspender com o suspend proibido
-// (sleep.conf), vira "nada": o Mk não troca um pelo outro por conta própria.
+// Suspender com o suspend proibido (sleep.conf) vira "nada". Um "hibernar"
+// que sobrou de quando o Mk hibernava também: não vira suspender sozinho.
 // Sem caps (o mare-caps ainda não respondeu), vale a escolha.
 function sleepMode(values, caps) {
     var mode = valueOf(values, "power.sleep");
-    if (mode === "hibernar")
-        return caps && caps.hibernar === false ? "nada" : "hibernar";
     if (mode === "suspender")
         return caps && caps.sono && caps.sono.canSuspend === false ? "nada" : "suspender";
     return "nada";
 }
 
 // O comando de cada jeito de dormir; "" = não dorme.
-var sleepCommands = { "suspender": "systemctl suspend", "hibernar": "systemctl hibernate" };
+var sleepCommands = { "suspender": "systemctl suspend" };
 
 function sleepCommand(values, caps) {
     return sleepCommands[sleepMode(values, caps)] || "";
 }
 
-// O passo de dormir que um hypridle.conf tem ("" = nenhum).
+// O passo de dormir que um hypridle.conf tem ("" = nenhum). O hibernate é de
+// um arquivo antigo: achá-lo faz o syncIdle reescrever sem ele.
 function sleepStep(text) {
     var m = /on-timeout = (systemctl (?:suspend|hibernate))\b/.exec(text);
     return m ? m[1] : "";

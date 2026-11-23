@@ -427,7 +427,7 @@ Hyprland do Mk.
 | `bin/install-packages` | instala as listas num Arch já instalado; pede o perfil de hardware |
 | `bin/lib-packages.sh` | as funções que leem as listas, usadas por `install-packages`, `check-packages` e pelo instalador |
 | `bin/check-keybinds` | confere que `binds.lua` e `Keybinds.js` estão iguais |
-| `bin/mk-hibernate` | prepara (ou desfaz) a hibernação: swapfile em `/swap`, fstab e `resume=` no boot; roda como root |
+| `bin/mk-hibernate` | desfaz um preparo antigo de hibernação (`remove`); o Mk não hiberna mais e o `setup` recusa |
 | `bin/check-shell` | abre um bash interativo com o `mk.bash` e confere que ele não cai |
 | `bin/dev-shot` | testa o Maré num Hyprland aninhado e tira uma captura |
 | `docs/` | `atualizacoes.md` e `desenvolvimento.md`: para quem mantém o Mk |

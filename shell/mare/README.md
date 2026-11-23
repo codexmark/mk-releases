@@ -271,7 +271,7 @@ administrador, pelo `pkexec`, quando o CUPS recusa uma ação.
 | `mare-emoji` | `pick` copia (e digita, com `wtype`) o emoji; `tem-wtype`; `gerar` refaz o `Emoji.js`. | `EmojiPanel.qml`; `gerar` é para quem mantém o Mk |
 | `mare-monitors` | `list` lê as telas; `trial` grava o `monitores.lua`, recarrega o Hyprland e deixa um vigia; `keep` e `revert` respondem ao vigia. | `Monitors.qml` |
 | `mare-default-apps` | Apps padrão: `list`, `set`, `terminal`, `open`. | `SettingsAppsPage.qml`; `binds.lua` (`open navegador`) |
-| `mare-sleep` | Como a máquina pode dormir: `status` (JSON: suspender e hibernar permitidos, hibernação pronta ou pendente de reinício, placas com defeito conhecido ao voltar da suspensão); `now` dorme do jeito escolhido em `power.sleep`. | `mare-caps`, `config/hypr/hypridle.conf` |
+| `mare-sleep` | Como a máquina pode dormir: `status` (JSON: suspender permitido ou não, placas com defeito conhecido ao voltar da suspensão); `now` dorme do jeito escolhido em `power.sleep`. | `mare-caps`, `config/hypr/hypridle.conf` |
 | `mare-devtools` | Roda o `scripts/user/mise-tools.sh` num terminal e espera o Enter. | `Welcome.qml`, `mk ferramentas` |
 | `mare-gamepad` | O controle Xbox e o driver xone: `status` (JSON), `install` e `remove` (interativos, num terminal). | `SettingsGamepadPage.qml` |
 | `mare-printers` | Impressoras do CUPS: `status`, `find`, `add` e as outras ações da página. | `SettingsPrintersPage.qml` |

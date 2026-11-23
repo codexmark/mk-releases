@@ -562,7 +562,6 @@ install_desktop() {
 
   install -Dm755 "$src/bin/mk-session" "$target/usr/bin/mk-session"
   install -Dm755 "$src/bin/mk-update" "$target/usr/bin/mk-update"
-  install -Dm755 "$src/bin/mk-hibernate" "$target/usr/bin/mk-hibernate"
   # O MkTunes (apps/mktunes): comando, atalho no menu e ícone.
   bash "$src/system/mk/mktunes-links" "$target"
   install -Dm644 /dev/stdin "$target/usr/share/wayland-sessions/mk.desktop" <<'EOF'
