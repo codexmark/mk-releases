@@ -562,6 +562,7 @@ install_desktop() {
 
   install -Dm755 "$src/bin/mk-session" "$target/usr/bin/mk-session"
   install -Dm755 "$src/bin/mk-update" "$target/usr/bin/mk-update"
+  install -Dm755 "$src/bin/mk-hibernate" "$target/usr/bin/mk-hibernate"
   # O MkTunes (apps/mktunes): comando, atalho no menu e ícone.
   bash "$src/system/mk/mktunes-links" "$target"
   install -Dm644 /dev/stdin "$target/usr/share/wayland-sessions/mk.desktop" <<'EOF'
@@ -580,6 +581,12 @@ EOF
   place "$src/config/fastfetch" "$skel/.config/mk/fastfetch"
   place "$src/config/bash" "$skel/.config/mk/bash"
   install -Dm644 "$src/config/bash/seu.bash.exemplo" "$skel/.config/mk/seu.bash"
+  # Placa de vídeo que não volta do suspender (AMD Navi 10): o usuário novo
+  # nasce com "não dormir". Só em instalação nova; quem já usa o Mk vê o aviso
+  # em Ajustes › Energia e escolhe.
+  if [[ $(bash "$src/shell/mare/scripts/mare-sleep" status 2>/dev/null) == *'"risky":["'* ]]; then
+    printf '{\n  "power.sleep": "nada"\n}\n' >"$skel/.config/mk/ajustes.json"
+  fi
   # Os apps padrão do Mk (navegador, arquivos, texto, imagens, vídeo, música,
   # PDF); depois cada um troca os seus na página Apps padrão dos Ajustes.
   install -Dm644 "$src/config/mimeapps.list" "$skel/.config/mimeapps.list"

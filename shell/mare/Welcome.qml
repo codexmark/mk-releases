@@ -15,7 +15,7 @@ Singleton {
     id: root
 
     readonly property string seenPath: Settings.dir + "/.bem-vindo"
-    readonly property int count: 4
+    readonly property int count: 5
 
     // Quem já tinha o Mk antes das boas-vindas existirem não é "primeiro
     // login": a migração de usuário abaixo grava o .bem-vindo para essa gente.
@@ -92,6 +92,13 @@ Singleton {
             greet.restart();
         else
             greet.stop();
+    }
+
+    // O botão de uma linha da folha. "devtools": as ferramentas do usuário,
+    // num terminal (a janela nova recolhe a folha para a etiqueta).
+    function act(action) {
+        if (action === "devtools")
+            Hypr.exec(Projects.terminalLine("", "bash " + Projects.shellQuote(Quickshell.shellPath("scripts/mare-devtools")), "Mk · ferramentas"));
     }
 
     function open() {

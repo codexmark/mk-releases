@@ -24,3 +24,5 @@ ttf-fraunces-variable
 # e cores de sintaxe. Só existe no AUR. A versão -git é a 0.4, que tem as
 # cores por tipo que o Mk usa; o pacote "blesh" ainda é o 0.3.
 blesh-git
+# Vercel CLI. Só existe no AUR; atualiza com o `mk atualizar` (yay).
+vercel

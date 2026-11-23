@@ -11,8 +11,9 @@
 //           ("@..." = entra no Lua por um caminho próprio, veja hyprCode)
 //   kw      palavras que alguém digitaria na busca e que o texto não usa
 //   quando  { outra chave: valor ou [valores] }: a linha só aparece assim
-//   precisa "touchpad" | "bateria" | "brilho": some se a máquina não tem
-//           (scripts/mare-caps)
+//   precisa "touchpad" | "bateria" | "brilho" | "hibernar": some se a
+//           máquina não tem (scripts/mare-caps). Vale também numa opção de
+//           um "choice" (veja optionShown)
 // A ideia vem do Hub do Ryoku: a página é dado, não layout.
 
 var groups = [
@@ -47,7 +48,7 @@ var blurbs = {
     "notificacoes": "Os avisos que descem da ilha. Super + Shift + N liga e desliga o não perturbe.",
     "tela": "Tamanho das coisas na tela e a luz noturna, que esquenta as cores para descansar a vista.",
     "som": "Por onde o som sai e por onde o microfone entra. O volume fica na ilha.",
-    "energia": "O que acontece quando você se afasta. Zero quer dizer nunca.",
+    "energia": "O que acontece quando você se afasta, e como o computador dorme. Zero quer dizer nunca.",
     "janelas": "Espaços, bordas e cantos das janelas. Muda na hora, sem reiniciar.",
     "entrada": "Layout do teclado, repetição de teclas, mouse e touchpad.",
     "atualizacoes": "O Mk, os pacotes do Arch e os do AUR. Cada atualização cria um snapshot antes: se algo quebrar, dá para voltar pelo menu do boot.",
@@ -128,12 +129,22 @@ var rows = [
     { page: "energia", group: "AO SE AFASTAR", key: "idle.off", label: "Desligar a tela",
       desc: "A tela apaga; qualquer tecla acende", ctl: "slider",
       min: 0, max: 60, step: 1, def: 6, unit: "min", kw: "dpms monitor apagar" },
-    { page: "energia", group: "AO SE AFASTAR", key: "idle.suspend", label: "Suspender",
-      desc: "O computador dorme e gasta quase nada", ctl: "slider",
-      min: 0, max: 120, step: 5, def: 30, unit: "min", kw: "suspensão dormir sleep" },
     { page: "energia", group: "BATERIA", key: "power.lowWarn", label: "Avisar bateria fraca",
       desc: "Um aviso quando a carga está acabando", ctl: "switch", def: true, precisa: "bateria",
       kw: "carga pouca acabando notificação" },
+    // Uma escolha só, usada em todo lugar: o passo de dormir abaixo, o painel
+    // de sessão e a tela de bloqueio (veja sleepMode). "hibernar" só aparece
+    // com a hibernação preparada (bin/mk-hibernate).
+    { page: "energia", group: "DORMIR", key: "power.sleep", label: "Ao dormir",
+      desc: "Suspender guarda na memória e volta na hora; hibernar guarda no disco e desliga",
+      ctl: "choice", def: "suspender",
+      options: [ { v: "suspender", label: "suspender" }, { v: "hibernar", label: "hibernar", precisa: "hibernar" },
+                 { v: "nada", label: "não dormir" } ],
+      kw: "suspender suspensão hibernar hibernação sleep suspend hibernate s3 swap" },
+    { page: "energia", group: "DORMIR", key: "idle.suspend", label: "Dormir",
+      desc: "Minutos sem uso até o computador dormir sozinho", ctl: "slider",
+      min: 0, max: 120, step: 5, def: 30, unit: "min", quando: { "power.sleep": ["suspender", "hibernar"] },
+      kw: "suspender suspensão hibernar inatividade ocioso sleep" },
 
     // Janelas
     { page: "janelas", group: "ESPAÇOS", key: "hypr.gapsIn", label: "Entre janelas",
@@ -217,6 +228,18 @@ function shown(row, values, caps) {
                 return false;
         }
     return true;
+}
+
+// Uma opção de um "choice" vale nesta máquina? Com `precisa`, ela some como
+// a linha some; a que está escolhida fica, para a pessoa ver o que vale (e
+// trocar).
+function optionShown(row, option, values, caps) {
+    return !option.precisa || !caps || caps[option.precisa] !== false
+        || (values !== undefined && values !== null && valueOf(values, row.key) === option.v);
+}
+
+function options(row, values, caps) {
+    return (row.options || []).filter(function (o) { return optionShown(row, o, values, caps); });
 }
 
 // Sem values e caps: todas as linhas da página, as escondidas também.
@@ -402,8 +425,35 @@ function hyprLua(values) {
         + hyprCode(values);
 }
 
+// Como a máquina dorme de fato: a escolha de power.sleep, se a máquina puder.
+// Hibernar sem a hibernação pronta, ou suspender com o suspend proibido
+// (sleep.conf), vira "nada": o Mk não troca um pelo outro por conta própria.
+// Sem caps (o mare-caps ainda não respondeu), vale a escolha.
+function sleepMode(values, caps) {
+    var mode = valueOf(values, "power.sleep");
+    if (mode === "hibernar")
+        return caps && caps.hibernar === false ? "nada" : "hibernar";
+    if (mode === "suspender")
+        return caps && caps.sono && caps.sono.canSuspend === false ? "nada" : "suspender";
+    return "nada";
+}
+
+// O comando de cada jeito de dormir; "" = não dorme.
+var sleepCommands = { "suspender": "systemctl suspend", "hibernar": "systemctl hibernate" };
+
+function sleepCommand(values, caps) {
+    return sleepCommands[sleepMode(values, caps)] || "";
+}
+
+// O passo de dormir que um hypridle.conf tem ("" = nenhum).
+function sleepStep(text) {
+    var m = /on-timeout = (systemctl (?:suspend|hibernate))\b/.exec(text);
+    return m ? m[1] : "";
+}
+
 // O hypridle.conf dos Ajustes (Energia). Minutos 0 = aquele passo não acontece.
-// Sem brilho para mexer (caps), o passo de escurecer também não.
+// Sem brilho para mexer (caps), o passo de escurecer também não; o de dormir
+// segue power.sleep.
 function hypridleConf(values, hyprDir, caps) {
     var out = "# Gerado pelos Ajustes do Mk (Super + ,), página Energia. Não edite.\n\n"
         + "general {\n"
@@ -415,11 +465,11 @@ function hypridleConf(values, hyprDir, caps) {
         ["idle.dim", "brightnessctl -s set 15%", "brightnessctl -r"],
         ["idle.lock", "loginctl lock-session", ""],
         ["idle.off", "hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })'", "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'"],
-        ["idle.suspend", "systemctl suspend", ""]
+        ["idle.suspend", sleepCommand(values, caps), ""]
     ];
     for (var i = 0; i < steps.length; i++) {
         var min = valueOf(values, steps[i][0]);
-        if (!min || (steps[i][0] === "idle.dim" && caps && caps.brilho === false))
+        if (!min || !steps[i][1] || (steps[i][0] === "idle.dim" && caps && caps.brilho === false))
             continue;
         out += "\nlistener {\n    timeout = " + Math.round(min * 60) + "\n    on-timeout = " + steps[i][1] + "\n"
             + (steps[i][2] ? "    on-resume = " + steps[i][2] + "\n" : "") + "}\n";

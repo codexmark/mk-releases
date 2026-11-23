@@ -31,6 +31,7 @@ Singleton {
 
     // O que a máquina tem (scripts/mare-caps); null enquanto não respondeu.
     property var caps: null
+    property string capsText: ""
 
     // Valores de antes, por chave, das mudanças que o Hyprland ainda não
     // aceitou: `undo` espera o eval, `flight` é o eval que está rodando.
@@ -67,7 +68,7 @@ Singleton {
         saveTimer.restart();
         if (Schema.touchesHypr(key))
             hyprTimer.restart();
-        if (key.startsWith("idle."))
+        if (key.startsWith("idle.") || key === "power.sleep")
             idleDirty = true;
         // O tamanho da interface é a escala do Qt: só vale num Maré novo.
         if (key === "ui.scale")
@@ -85,7 +86,7 @@ Singleton {
                 hypr = true;
                 remember(row.key);
             }
-            idleDirty = idleDirty || row.key.startsWith("idle.");
+            idleDirty = idleDirty || row.key.startsWith("idle.") || row.key === "power.sleep";
             delete next[row.key];
         }
         values = next;
@@ -165,13 +166,29 @@ Singleton {
         return Schema.hypridleConf(values, dir + "/hypr", caps);
     }
 
-    // Sem brilho, a linha de escurecer some: o passo sai do arquivo também.
+    // Como a máquina dorme agora ("suspender", "hibernar" ou "nada"): a
+    // escolha de power.sleep, se a máquina puder. O hypridle, o painel de
+    // sessão e a tela de bloqueio seguem isto.
+    readonly property string sleepMode: Schema.sleepMode(values, caps)
+
+    // Relê o mare-caps: a hibernação é preparada fora daqui (bin/mk-hibernate).
+    function refreshCaps() {
+        if (!capsProc.running)
+            capsProc.running = true;
+    }
+
+    // O hypridle.conf gerado segue a máquina. Sem brilho, a linha de escurecer
+    // some: o passo sai do arquivo também. E o passo de dormir muda quando a
+    // hibernação fica pronta ou deixa de estar.
     function syncIdle() {
-        if (!loaded || broken || !caps || caps.brilho !== false || !idle.loaded)
+        if (!loaded || broken || !caps || !idle.loaded)
             return;
-        if (idle.text().indexOf("brightnessctl") < 0 || idle.text() === idleText())
+        const now = idle.text();
+        const next = idleText();
+        const dim = caps.brilho === false && now.indexOf("brightnessctl") >= 0;
+        if (now === next || (!dim && Schema.sleepStep(now) === Schema.sleepStep(next)))
             return;
-        idle.setText(idleText());
+        idle.setText(next);
         idleRestart.running = true;
     }
 
@@ -311,12 +328,17 @@ Singleton {
     }
 
     Process {
+        id: capsProc
         running: true
         command: ["bash", Quickshell.shellPath("scripts/mare-caps")]
         stdout: StdioCollector {
             onStreamFinished: {
+                // Relido sem novidade (refreshCaps): nada muda, nada redesenha.
+                if (text === root.capsText)
+                    return;
                 try {
                     root.caps = JSON.parse(text);
+                    root.capsText = text;
                 } catch (e) {}
                 root.syncIdle();
             }

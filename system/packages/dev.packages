@@ -78,3 +78,12 @@ just
 direnv
 httpie
 pgcli
+
+# Editor gráfico e CLIs de nuvem, dos repositórios oficiais (atualizam com o
+# sistema). `code` é o build aberto do VS Code (aparece como "Code - OSS" e
+# usa o Open VSX no lugar da loja da Microsoft); o binário da Microsoft é o
+# visual-studio-code-bin do AUR, que o Mk não traz porque não pode ser
+# redistribuído num ISO.
+code
+aws-cli-v2
+wrangler

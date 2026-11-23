@@ -20,6 +20,12 @@ hl.config({
     dwindle = {
         preserve_split = true,
     },
+    -- Sem a janela "Hyprland updated to..." a cada versão nova (ela toma o
+    -- foco no primeiro login) e sem o pedido de doação.
+    ecosystem = {
+        no_update_news = true,
+        no_donation_nag = true,
+    },
     misc = {
         -- Se o Maré cair com a tela bloqueada, um Maré novo pode assumir o bloqueio.
         allow_session_lock_restore = true,

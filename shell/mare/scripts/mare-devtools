@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# As ferramentas de desenvolvimento do usuário (scripts/user/mise-tools.sh):
+# Node LTS, Python e as CLIs de IA, pelo mise, e a pasta ~/Work. Roda como
+# você, sem sudo, e precisa de internet. Feito para abrir num terminal (as
+# boas-vindas e `mk ferramentas` chamam): a janela fica até você dar Enter,
+# para o progresso e os erros ficarem à vista.
+set -uo pipefail
+
+here=$(cd "$(dirname "$0")/.." && pwd)
+script=""
+# Instalado: /usr/share/mk. Numa cópia do repositório: ao lado de shell/.
+for s in "${MK_SHARE:-/usr/share/mk}/scripts/user/mise-tools.sh" "$here/../../scripts/user/mise-tools.sh"; do
+  [[ -r $s ]] && script=$s && break
+done
+
+status=0
+if [[ -z $script ]]; then
+  echo "não achei o scripts/user/mise-tools.sh (o Mk está instalado em /usr/share/mk?)"
+  status=1
+elif ! command -v mise >/dev/null; then
+  echo "falta o mise: sudo pacman -S --needed mise"
+  status=1
+else
+  echo "Mk · ferramentas de desenvolvimento (mise): node, python, claude, codex, gemini"
+  echo
+  bash "$script" || status=$?
+  echo
+  if ((status == 0)); then
+    echo "pronto. Abra um terminal novo para as ferramentas aparecerem."
+  else
+    echo "parou com erro (saída $status). Para tentar de novo: mk ferramentas"
+  fi
+fi
+[[ -t 0 ]] && read -rp 'Enter fecha. ' _
+exit "$status"

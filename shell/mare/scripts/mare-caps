@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # O que esta máquina tem, para os Ajustes esconderem o que não faz sentido:
-# {"touchpad": bool, "bateria": bool, "brilho": bool}
+# {"touchpad": bool, "bateria": bool, "brilho": bool, "hibernar": bool, "sono": {...}}
+# "sono" é o que o scripts/mare-sleep diz sobre suspender e hibernar, inteiro;
+# "hibernar" é o hibernateReady dele (a hibernação está preparada e vale).
 # Só lê /proc e /sys. PROC e SYS trocam a raiz, para testar.
 set -uo pipefail
 
@@ -20,5 +22,12 @@ touchpad=$(awk '
 
 has() { compgen -G "$1" >/dev/null && echo true || echo false; }
 
-printf '{"touchpad":%s,"bateria":%s,"brilho":%s}\n' \
-  "${touchpad:-true}" "$(has "$sys/class/power_supply/BAT*")" "$(has "$sys/class/backlight/*")"
+# Sem resposta do mare-sleep: suspende como sempre, não hiberna, sem avisos.
+sono=$(PROC=$proc SYS=$sys bash "$(dirname "$0")/mare-sleep" status 2>/dev/null)
+[[ $sono == "{"*"}" ]] || sono='{"canSuspend":true,"canHibernate":false,"hibernateReady":false,"pending":false,"risky":[]}'
+hibernar=false
+[[ $sono == *'"hibernateReady":true'* ]] && hibernar=true
+
+printf '{"touchpad":%s,"bateria":%s,"brilho":%s,"hibernar":%s,"sono":%s}\n' \
+  "${touchpad:-true}" "$(has "$sys/class/power_supply/BAT*")" "$(has "$sys/class/backlight/*")" \
+  "$hibernar" "$sono"

@@ -6,7 +6,8 @@ import "Keybinds.js" as KB
 
 // Boas-vindas: uma folha no meio da tela, feita como a dos Ajustes, que
 // aparece no primeiro login (Welcome.qml decide quando) e apresenta o Mk em
-// quatro passos: a ilha, a tecla Super, os projetos e o cuidado com o sistema.
+// cinco passos: a ilha, a tecla Super, os projetos, as ferramentas de
+// desenvolvimento (opcional) e o cuidado com o sistema.
 // À esquerda, uma figura desenhada; à direita, o texto e as teclas; embaixo, o
 // carimbo com "pular", os passos e os botões.
 //
@@ -71,8 +72,9 @@ PanelWindow {
         return out;
     }
 
-    // Os quatro passos. Cada linha tem `what` e, à direita, teclas (`keys`,
-    // com uma `note` opcional) ou um texto (`value`).
+    // Os cinco passos. Cada linha tem `what` e, à direita, teclas (`keys`,
+    // com uma `note` opcional), um texto (`value`) ou um botão (`action`, com
+    // o rótulo em `label`).
     readonly property var steps: [
         {
             fig: "a ilha",
@@ -106,6 +108,16 @@ PanelWindow {
                 { what: "painel do projeto", keys: caps("mare.project", "SUPER + P", "") },
                 { what: "terminal na pasta", keys: caps("app.terminal", "SUPER + RETURN", "") },
                 { what: "lazygit", keys: caps("app.lazygit", "SUPER + G", "") }
+            ]
+        },
+        {
+            fig: "ferramentas",
+            title: "ferramentas de desenvolvimento",
+            lead: "Opcional. Um script instala pelo mise, só para o seu usuário e sem sudo: Node LTS, Python e as CLIs de IA (Claude Code, Codex e Gemini), e cria a pasta ~/Work. Precisa de internet e leva alguns minutos. Abre num terminal, que fica aberto para você ver o progresso e os erros. Dá para pular e fazer depois.",
+            rows: [
+                { what: "instalar agora", action: "devtools", label: "abrir no terminal" },
+                { what: "ou depois", value: "mk ferramentas" },
+                { what: "o que roda", value: "scripts/user/mise-tools.sh" }
             ]
         },
         {
@@ -337,7 +349,7 @@ PanelWindow {
                 }
             }
 
-            // As quatro figuras ocupam o mesmo lugar; só a do passo aparece.
+            // As cinco figuras ocupam o mesmo lugar; só a do passo aparece.
             Item {
                 id: figure
                 anchors.centerIn: parent
@@ -558,11 +570,67 @@ PanelWindow {
                     }
                 }
 
-                // 4 · snapshots: uma linha do tempo, com a volta desenhada.
+                // 4 · ferramentas: uma janela de terminal com o que o script instala.
+                Item {
+                    id: figTools
+                    anchors.fill: parent
+                    visible: win.step === 3
+
+                    Rectangle {
+                        id: toolsWindow
+                        x: 30
+                        y: 30
+                        width: 180
+                        height: 140
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Theme.line
+
+                        Rectangle {
+                            x: 0
+                            y: 16
+                            width: parent.width
+                            height: 1
+                            color: Theme.hairline
+                        }
+
+                        Column {
+                            x: 14
+                            y: 28
+                            spacing: 6
+
+                            Repeater {
+                                model: ["mise", "node", "python", "claude", "codex", "gemini"]
+
+                                Row {
+                                    id: toolLine
+                                    required property string modelData
+                                    required property int index
+                                    spacing: 6
+
+                                    Text {
+                                        text: toolLine.index === 0 ? "$" : "+"
+                                        color: toolLine.index === 0 ? Theme.copper : Theme.textFaint
+                                        font.family: Theme.mono
+                                        font.pixelSize: 10
+                                    }
+                                    Text {
+                                        text: toolLine.modelData
+                                        color: toolLine.index === 0 ? Theme.text : Theme.textDim
+                                        font.family: Theme.mono
+                                        font.pixelSize: 10
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5 · snapshots: uma linha do tempo, com a volta desenhada.
                 Item {
                     id: figCare
                     anchors.fill: parent
-                    visible: win.step === 3
+                    visible: win.step === 4
 
                     Canvas {
                         id: careCanvas
@@ -793,8 +861,15 @@ PanelWindow {
                             font.italic: true
                         }
 
+                        PillButton {
+                            visible: line.modelData.action !== undefined
+                            implicitHeight: 28
+                            text: line.modelData.label || ""
+                            onClicked: Welcome.act(line.modelData.action)
+                        }
+
                         Text {
-                            visible: !line.hasKeys
+                            visible: !line.hasKeys && line.modelData.action === undefined
                             Layout.maximumWidth: 300
                             text: line.modelData.value || ""
                             color: Theme.text

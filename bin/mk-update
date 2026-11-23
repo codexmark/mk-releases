@@ -250,6 +250,7 @@ if [[ $mk_available == true && $mode != --after-mk ]]; then
   sudo mv "$share.novo" "$share"
   sudo install -m755 "$share/bin/mk-session" /usr/bin/mk-session
   sudo install -m755 "$share/bin/mk-update" /usr/bin/mk-update
+  [[ -f $share/bin/mk-hibernate ]] && sudo install -m755 "$share/bin/mk-hibernate" /usr/bin/mk-hibernate
   sudo install -Dm644 "$share/system/mk/mk-os-release.hook" /etc/pacman.d/hooks/mk-os-release.hook
   for pair in hypr:config/hypr shell:shell/mare ghostty:config/ghostty fastfetch:config/fastfetch bash:config/bash; do
     dst=$cfg/${pair%%:*}

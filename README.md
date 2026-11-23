@@ -78,12 +78,30 @@ configura região, rede, boot, snapshots e serviços, cria o usuário e oferece
 reiniciar. O registro fica em `/var/log/mk-install.log`, no live e no sistema
 instalado. Se parar no meio, a última linha diz como desmontar e tentar de novo.
 
-No primeiro login o Maré mostra as boas-vindas, um passeio de quatro passos.
-Para instalar node, python e as CLIs de IA no seu usuário:
+No primeiro login o Maré mostra as boas-vindas, um passeio de cinco passos; o
+quarto oferece instalar as ferramentas de desenvolvimento do seu usuário
+(node, python e as CLIs de IA, pelo mise; opcional, sem sudo, num terminal).
+Para fazer isso depois:
 
 ```bash
-/usr/share/mk/scripts/user/mise-tools.sh
+mk ferramentas
 ```
+
+Já vêm instalados, sem passo extra:
+
+| Ferramenta | Comando | De onde vem | Como atualiza |
+|---|---|---|---|
+| VS Code (build aberto, "Code - OSS") | `code` | repositório oficial (`code`) | `mk atualizar` (pacman) |
+| AWS CLI v2 | `aws` | repositório oficial (`aws-cli-v2`) | `mk atualizar` (pacman) |
+| Cloudflare Wrangler | `wrangler` | repositório oficial (`wrangler`) | `mk atualizar` (pacman) |
+| Vercel CLI | `vercel` | AUR (`vercel`), compilado no ISO | `mk atualizar` (yay) |
+
+O `code` é o build aberto: usa o Open VSX no lugar da loja de extensões da
+Microsoft. Quem quiser o binário da Microsoft instala o
+`visual-studio-code-bin` pelo `yay`; o Mk não o traz porque ele não pode ser
+redistribuído num ISO. Se a CLI da Vercel não tiver sido compilada no ISO, o
+instalador avisa e o primeiro `mk atualizar` oferece instalá-la. Entrar nas
+contas (`aws configure`, `vercel login`, `wrangler login`) fica com você.
 
 O que o instalador faz por dentro está em
 [installer/README.md](installer/README.md).
@@ -409,6 +427,7 @@ Hyprland do Mk.
 | `bin/install-packages` | instala as listas num Arch já instalado; pede o perfil de hardware |
 | `bin/lib-packages.sh` | as funções que leem as listas, usadas por `install-packages`, `check-packages` e pelo instalador |
 | `bin/check-keybinds` | confere que `binds.lua` e `Keybinds.js` estão iguais |
+| `bin/mk-hibernate` | prepara (ou desfaz) a hibernação: swapfile em `/swap`, fstab e `resume=` no boot; roda como root |
 | `bin/check-shell` | abre um bash interativo com o `mk.bash` e confere que ele não cai |
 | `bin/dev-shot` | testa o Maré num Hyprland aninhado e tira uma captura |
 | `docs/` | `atualizacoes.md` e `desenvolvimento.md`: para quem mantém o Mk |

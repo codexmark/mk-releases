@@ -1031,6 +1031,7 @@ PanelWindow {
                                             required property var modelData
                                             text: modelData.label
                                             selected: line.value === modelData.v
+                                            visible: Schema.optionShown(line.modelData, modelData, Settings.values, Settings.caps)
                                             onClicked: Settings.set(line.modelData.key, modelData.v)
                                         }
                                     }
@@ -1038,6 +1039,12 @@ PanelWindow {
                             }
                         }
                     }
+                }
+
+                // Energia: o aviso da placa que não acorda e o preparo da hibernação.
+                SettingsSleepBlock {
+                    visible: win.page === "energia"
+                    Layout.fillWidth: true
                 }
 
                 // Páginas com conteúdo próprio (um arquivo cada). Recebem a largura

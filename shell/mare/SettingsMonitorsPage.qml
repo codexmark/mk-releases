@@ -21,6 +21,7 @@ ColumnLayout {
         : Monitors.neighbour(screens, Monitors.selected)
     readonly property string relation: Monitors.relationTo(screens, Monitors.selected, refName)
     property bool allModes: false
+    property bool allRates: false
 
     readonly property var places: [
         { v: "esquerda", label: "à esquerda" },
@@ -37,6 +38,7 @@ ColumnLayout {
         function onSelectedChanged() {
             page.refPick = "";
             page.allModes = false;
+            page.allRates = false;
         }
     }
 
@@ -293,6 +295,22 @@ ColumnLayout {
         text: page.current ? page.current.name.toUpperCase() : ""
     }
 
+    // O monitors.lua pessoal carrega por último: com regra lá, o que o painel
+    // grava não chega a esta tela.
+    Text {
+        visible: page.current !== null && Monitors.ruled.indexOf(page.current.name) >= 0
+        Layout.fillWidth: true
+        Layout.bottomMargin: 8
+        wrapMode: Text.WordWrap
+        text: (page.current ? page.current.name : "") + " tem regra em hypr/monitors.lua, que vale sobre este painel:"
+            + " o que mudar aqui não chega à tela enquanto a regra estiver lá"
+            + " (o painel só procura o nome e a descrição da tela no arquivo, não lê as regras)"
+        color: Theme.copper
+        font.family: Theme.serif
+        font.pixelSize: 13
+        font.italic: true
+    }
+
     Line {
         visible: page.current !== null && page.screens.length > 1
         label: "Ligada"
@@ -337,11 +355,27 @@ ColumnLayout {
     Line {
         id: rateLine
         readonly property var all: Monitors.rates(page.current)
+        // Acima da lista do monitor, dentro dos limites que ele declara: as
+        // duas mais altas, e sempre a que está em uso.
+        readonly property var extra: Monitors.extraRates(page.current)
+        readonly property var few: extra.filter((r, i) => i < 2 || (page.current && r === page.current.refresh))
 
         visible: page.current !== null && page.current.enabled && all.length > 0
         label: "Taxa"
-        desc: "Quadros por segundo nesta resolução"
+        desc: extra.length === 0 ? "Quadros por segundo nesta resolução"
+            : "Quadros por segundo nesta resolução. Com *, fora da lista do monitor:"
+                + " o sinal é calculado pelos limites que ele declara, e pode não pegar"
 
+        Repeater {
+            model: page.allRates ? rateLine.extra : rateLine.few
+
+            PillButton {
+                required property var modelData
+                text: Monitors.hz(modelData) + " *"
+                selected: page.current !== null && page.current.refresh === modelData
+                onClicked: Monitors.setMode(page.current.w, page.current.h, modelData)
+            }
+        }
         Repeater {
             model: rateLine.all
 
@@ -351,6 +385,11 @@ ColumnLayout {
                 selected: page.current !== null && page.current.refresh === modelData
                 onClicked: Monitors.setMode(page.current.w, page.current.h, modelData)
             }
+        }
+        PillButton {
+            visible: rateLine.extra.length > rateLine.few.length
+            text: page.allRates ? "menos" : "mais *"
+            onClicked: page.allRates = !page.allRates
         }
     }
 

@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Como esta máquina dorme, para os Ajustes (Energia), o painel de sessão e a
+# tela de bloqueio. Não pede root e não muda nada.
+#
+#   mare-sleep status    imprime
+#     {"canSuspend": bool, "canHibernate": bool, "hibernateReady": bool,
+#      "pending": bool, "risky": ["motivo", ...]}
+#
+# canSuspend / canHibernate   o que o logind aceita (respeita o sleep.conf);
+#                 sem logind, o /sys/power/state e um resume= no boot
+# hibernateReady  dá para hibernar e voltar: um swap do tamanho da memória
+#                 está ativo (zram não conta) e o kernel subiu com resume=
+# pending         o bin/mk-hibernate já preparou tudo; falta reiniciar
+# risky           hardware que sabidamente não volta do suspender (S3)
+#
+#   mare-sleep now       dorme do jeito escolhido em Ajustes › Energia
+#     (power.sleep no ajustes.json: suspender, hibernar ou nada). É o passo de
+#     dormir do config/hypr/hypridle.conf de fábrica, que não lê os Ajustes.
+#     Hibernar sem a hibernação pronta não faz nada (não troca por suspender).
+#     AJUSTES troca o ajustes.json.
+#
+# SYS, PROC e ETC trocam as raízes, para testar. Com uma raiz trocada o logind
+# não é consultado (ele falaria da máquina de verdade); LOGIND=1 força.
+set -uo pipefail
+
+sys=${SYS:-/sys}
+proc=${PROC:-/proc}
+etc=${ETC:-/etc}
+
+action=${1:-status}
+[[ $action == status || $action == now ]] || { echo "uso: mare-sleep status | now" >&2; exit 2; }
+
+# O logind responde yes, challenge (pede senha), inhibited (um app segura
+# agora), no ou na. Vazio = não deu para perguntar.
+logind() {
+  local ask=${LOGIND:-}
+  [[ -z $ask && $sys == /sys && $proc == /proc ]] && ask=1
+  [[ $ask == 1 ]] || return 0
+  busctl call org.freedesktop.login1 /org/freedesktop/login1 \
+    org.freedesktop.login1.Manager "$1" 2>/dev/null | sed -n 's/^s "\(.*\)"$/\1/p'
+}
+
+state=$(cat "$sys/power/state" 2>/dev/null)
+cmdline=$(cat "$proc/cmdline" 2>/dev/null)
+resume=false
+[[ " $cmdline " == *" resume="* ]] && resume=true
+
+case $(logind CanSuspend) in
+  yes | challenge | inhibited) can_suspend=true ;;
+  no | na) can_suspend=false ;;
+  *) [[ " $state " == *" mem "* || " $state " == *" freeze "* ]] && can_suspend=true || can_suspend=false ;;
+esac
+
+case $(logind CanHibernate) in
+  yes | challenge | inhibited) can_hibernate=true ;;
+  no | na) can_hibernate=false ;;
+  *) [[ " $state " == *" disk "* && $resume == true ]] && can_hibernate=true || can_hibernate=false ;;
+esac
+
+# O maior swap ativo que não é zram, em kB, contra a memória.
+mem=$(awk '/^MemTotal:/ { print $2; exit }' "$proc/meminfo" 2>/dev/null)
+swap=$(awk 'NR > 1 && $1 !~ /^\/dev\/zram/ && $3 > max { max = $3 } END { print max + 0 }' "$proc/swaps" 2>/dev/null)
+ready=false
+[[ $can_hibernate == true && $resume == true && ${mem:-0} -gt 0 && ${swap:-0} -ge ${mem:-0} ]] && ready=true
+
+# Preparado mas ainda sem reiniciar: o resume= já está no /etc/default/limine
+# e o swapfile existe, só o kernel de agora que subiu sem ele.
+pending=false
+if [[ $resume == false ]] && grep -qsE '^KERNEL_CMDLINE\[default\]\+?=.*[" ]resume=' "$etc/default/limine" &&
+  [[ ${swap:-0} -ge ${mem:-1} ]]; then
+  pending=true
+fi
+
+# Placas de vídeo (classe PCI 0x03) que não voltam do S3.
+#   AMD Navi 10 (RX 5600/5700): a SMU da amdgpu falha no resume, às vezes.
+#   https://gitlab.freedesktop.org/drm/amd/-/issues/4531
+navi10=" 0x7310 0x7312 0x7318 0x7319 0x731a 0x731b 0x731e 0x731f "
+risky=()
+for d in "$sys"/bus/pci/devices/*; do
+  [[ -r $d/class && -r $d/vendor && -r $d/device ]] || continue
+  read -r class <"$d/class"
+  read -r vendor <"$d/vendor"
+  read -r device <"$d/device"
+  [[ $class == 0x03* ]] || continue
+  device=${device,,}
+  if [[ ${vendor,,} == 0x1002 && $navi10 == *" $device "* ]]; then
+    risky+=("AMD Navi 10 (1002:${device#0x})")
+  fi
+done
+
+if [[ $action == now ]]; then
+  # ~/.config/mk/ajustes.json, ao lado do shell (como o Settings.qml acha).
+  ajustes=${AJUSTES:-$(cd "$(dirname "$0")/../.." && pwd)/ajustes.json}
+  mode=$(jq -r '."power.sleep" // "suspender"' "$ajustes" 2>/dev/null)
+  case ${mode:-suspender} in
+    hibernar) [[ $ready == true ]] && exec systemctl hibernate ;;
+    nada) ;;
+    *) [[ $can_suspend == true ]] && exec systemctl suspend ;;
+  esac
+  exit 0
+fi
+
+list=""
+for r in "${risky[@]}"; do list+="${list:+,}\"$r\""; done
+
+printf '{"canSuspend":%s,"canHibernate":%s,"hibernateReady":%s,"pending":%s,"risky":[%s]}\n' \
+  "$can_suspend" "$can_hibernate" "$ready" "$pending" "$list"

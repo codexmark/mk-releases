@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # As telas para a página Monitores dos Ajustes (Monitors.qml).
 #
-#   mare-monitors list [monitores.lua]
+#   mare-monitors list [monitores.lua] [hypr/monitors.lua]
 #       JSON: { "monitors": [...], "saved": [...] }. "monitors" são as saídas
 #       ligadas ao computador agora (hyprctl -j monitors all), já no formato
 #       que o painel usa; "saved" é o que o arquivo dado guardou da última vez
 #       (a linha "-- mk:telas"), para não perder as telas desconectadas.
+#       Cada saída leva "limits", os limites que o monitor declara no EDID
+#       (vmin/vmax em Hz, hmin/hmax em kHz, clock em MHz; null se não declara),
+#       e "ruled": o nome ou a descrição dela aparece no monitors.lua pessoal
+#       (o segundo arquivo), que carrega por último e vale sobre o painel.
 #   mare-monitors trial <segundos> <monitores.lua> <texto novo>
 #       Grava o arquivo, recarrega o Hyprland e deixa um vigia rodando fora do
 #       Maré: se ninguém confirmar em <segundos>, o vigia devolve o arquivo
@@ -25,15 +29,17 @@
 # login e volta sozinho.
 #
 # O Lua vem pronto do Monitors.qml; aqui nada é montado. MARE_HYPRCTL troca
-# o hyprctl por outro comando (os testes usam um falso).
+# o hyprctl por outro comando (os testes usam um falso) e MARE_DRM a pasta
+# onde o kernel mostra os EDIDs.
 set -euo pipefail
 
 hyprctl=${MARE_HYPRCTL:-hyprctl}
+drm=${MARE_DRM:-/sys/class/drm}
 session=${HYPRLAND_INSTANCE_SIGNATURE:-}
 token="${XDG_RUNTIME_DIR:-/tmp}/mk-monitores-${HYPRLAND_INSTANCE_SIGNATURE:-sessao}"
 
 usage() {
-  echo "uso: mare-monitors list [arquivo] | trial <segundos> <arquivo> <texto> | keep | revert" >&2
+  echo "uso: mare-monitors list [arquivo] [monitors.lua] | trial <segundos> <arquivo> <texto> | keep | revert" >&2
   exit 2
 }
 
@@ -75,8 +81,63 @@ watching() {
   kill -0 "$(<"$token.pid")" 2>/dev/null
 }
 
+# Os limites do EDID de uma saída (o bloco "Display Range Limits", marca
+# 0xFD num dos quatro descritores de 18 bytes do bloco base), como JSON; nada
+# se o EDID não está lá, não fecha a soma ou não traz o bloco. O byte 4 do
+# descritor soma 255 aos limites (EDID 1.4); com fórmula CVT (byte 10 = 4) o
+# byte 12 afina o pixel clock em passos de 0,25 MHz.
+limits() {
+  local f d flags vmin vmax hmin hmax khz sum i
+  local -a b
+  for f in "$drm"/card*-"$1"/edid; do
+    [[ -r $f ]] || continue
+    read -r -a b < <(od -An -v -tu1 -N128 "$f" 2>/dev/null | tr '\n' ' ') || true
+    [[ ${#b[@]} -eq 128 && "${b[*]:0:8}" == "0 255 255 255 255 255 255 0" ]] || continue
+    sum=0
+    for i in "${b[@]}"; do sum=$(( sum + i )); done
+    (( sum % 256 == 0 )) || continue
+    for d in 54 72 90 108; do
+      (( b[d] == 0 && b[d + 1] == 0 && b[d + 2] == 0 && b[d + 3] == 253 )) || continue
+      flags=${b[d + 4]}
+      vmin=${b[d + 5]} vmax=${b[d + 6]} hmin=${b[d + 7]} hmax=${b[d + 8]}
+      khz=$(( b[d + 9] * 10000 ))
+      (( (flags & 3) == 3 )) && vmin=$(( vmin + 255 ))
+      (( (flags & 2) == 2 )) && vmax=$(( vmax + 255 ))
+      (( (flags & 12) == 12 )) && hmin=$(( hmin + 255 ))
+      (( (flags & 8) == 8 )) && hmax=$(( hmax + 255 ))
+      (( b[d + 10] == 4 )) && khz=$(( khz - (b[d + 12] >> 2) * 250 ))
+      (( vmin > 0 && vmax >= vmin && hmin > 0 && hmax >= hmin && khz > 0 )) || continue
+      printf '{"vmin":%d,"vmax":%d,"hmin":%d,"hmax":%d,"khz":%d}' "$vmin" "$vmax" "$hmin" "$hmax" "$khz"
+      return 0
+    done
+  done
+  return 0
+}
+
+# O que não vem do hyprctl, por saída: { "DP-1": { limits, ruled } }. A
+# procura no monitors.lua pessoal é só de texto (o nome da saída inteiro, ou
+# a descrição), fora das linhas de comentário: não entende o Lua.
+extras() {
+  local raw=$1 rules=$2 text="" name desc lim ruled out="" edge='[^A-Za-z0-9_-]'
+  if [[ -n $rules && -r $rules ]]; then
+    text=$(grep -v '^[[:space:]]*--' "$rules" 2>/dev/null) || text=""
+  fi
+  while IFS=$'\t' read -r name desc; do
+    [[ $name =~ ^[A-Za-z0-9_-]+$ ]] || continue
+    lim=$(limits "$name")
+    ruled=false
+    if [[ -n $text ]]; then
+      if [[ $text =~ (^|$edge)"$name"($|$edge) ]] || [[ ${#desc} -ge 6 && $text == *"$desc"* ]]; then
+        ruled=true
+      fi
+    fi
+    out+="${out:+,}\"$name\":{\"limits\":${lim:-null},\"ruled\":$ruled}"
+  done < <(jq -r '.[] | [(.name // ""), (.description // "")] | @tsv' <<<"$raw" 2>/dev/null)
+  printf '{%s}' "$out"
+}
+
 list() {
-  local file=${1:-} raw saved="[]" line
+  local file=${1:-} raw saved="[]" line extra
   raw=$("$hyprctl" -j monitors all 2>/dev/null) || raw="[]"
   jq -e 'type == "array"' <<<"$raw" >/dev/null 2>&1 || raw="[]"
   if [[ -n $file && -r $file ]]; then
@@ -85,9 +146,11 @@ list() {
       saved=$line
     fi
   fi
+  extra=$(extras "$raw" "${2:-}")
+  jq -e 'type == "object"' <<<"$extra" >/dev/null 2>&1 || extra="{}"
   # FALLBACK é a tela de mentira que o Hyprland cria quando não sobra
   # nenhuma ligada, e HEADLESS-n são saídas virtuais: não são do computador.
-  jq -c --argjson saved "$saved" '
+  jq -c --argjson saved "$saved" --argjson extra "$extra" '
     (map({ key: (.id | tostring), value: .name }) | from_entries) as $names
     | { monitors: map(select(.name != "FALLBACK" and (.name | startswith("HEADLESS-") | not))) | map({
           name,
@@ -108,7 +171,10 @@ list() {
             | map(capture("^(?<w>[0-9]+)x(?<h>[0-9]+)@(?<r>[0-9.]+)Hz$")
                 | { w: (.w | tonumber), h: (.h | tonumber), r: (.r | tonumber) })
             | unique
-            | sort_by(-(.w * .h), -.w, -.r))
+            | sort_by(-(.w * .h), -.w, -.r)),
+          limits: (($extra[.name].limits // null)
+            | if . then { vmin, vmax, hmin, hmax, clock: (.khz / 1000) } else null end),
+          ruled: ($extra[.name].ruled // false)
         }) | sort_by(.x, .y, .name),
         saved: ($saved | map(select(.name != "FALLBACK" and (.name | startswith("HEADLESS-") | not)))) }' <<<"$raw"
 }
@@ -148,7 +214,7 @@ watch() {
 
 case ${1:-} in
   list)
-    list "${2:-}" ;;
+    list "${2:-}" "${3:-}" ;;
   trial)
     [[ $# -eq 4 && $2 =~ ^[0-9]+$ && -n $3 ]] || usage
     file=$3

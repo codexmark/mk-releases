@@ -1,0 +1,354 @@
+#!/usr/bin/env bash
+# Prepara (ou desfaz) a hibernação do Mk. Roda num terminal, como root; os
+# Ajustes abrem isto em Energia › "preparar a hibernação".
+#
+#   sudo mk-hibernate setup     cria o swapfile e põe o resume= no boot
+#   sudo mk-hibernate remove    desfaz exatamente o que o setup fez
+#   mk-hibernate status         mostra como está (não pede root)
+#
+# O que o setup faz (a receita do issue #10, testada numa RX 5700):
+#   1. subvolume btrfs /swap com chattr +C. Um subvolume próprio fica fora dos
+#      snapshots do snapper (e um subvolume com swap ativo nem pode ser copiado)
+#   2. /swap/swapfile do tamanho da memória (btrfs filesystem mkswapfile)
+#   3. "/swap/swapfile none swap defaults,pri=0 0 0" no /etc/fstab
+#   4. resume=... resume_offset=... DENTRO do KERNEL_CMDLINE[default]="..." de
+#      /etc/default/limine. Não num drop-in de /etc/limine-entry-tool.d: o
+#      /etc/default/limine atribui com "=" e apagaria um "+=" de lá
+#   5. limine-update (regera o menu) e o system/mk/boot/limine-default
+# Não mexe no mkinitcpio: o initramfs do Mk usa o hook "systemd"
+# (installer/mk-install, configure_boot), que já faz o resume sem o hook
+# "resume". Depois é reiniciar; aí "hibernar" aparece em Ajustes › Energia.
+#
+# Só aceita o que sabe fazer direito, e recusa o resto sem mexer em nada:
+#   raiz btrfs num dispositivo só, direto na partição   resume=UUID=<a raiz>
+#   ou sobre um LUKS aberto pelo sd-encrypt             resume=/dev/mapper/<nome>
+#     (rd.luks.name=...=<nome> no boot, como o instalador do Mk faz; o
+#     swapfile fica dentro do LUKS, então a imagem vai criptografada)
+#   LVM, RAID, btrfs em vários discos, LUKS pelo hook "encrypt" (cryptdevice=),
+#   initramfs sem o hook systemd, um resume= que já existe: recusa.
+#
+# Antes de editar, copia o /etc/fstab e o /etc/default/limine para
+# /var/lib/mk/hibernate/ (com a data). O que o setup criou fica anotado em
+# /var/lib/mk/hibernate/estado: o remove só desfaz o que está lá.
+#
+# Para testar sem tocar na máquina: MK_HIB_ROOT=<pasta> troca a raiz de tudo
+# que é lido e escrito (etc, proc, swap, var) e dispensa o root; os comandos
+# (btrfs, swapon, swapoff, findmnt, lsblk, df, chattr, limine-update) vêm do
+# PATH. MK_HIB_YES=1 não pergunta. MK_HIB_LIMINE_DEFAULT troca o limine-default.
+set -euo pipefail
+
+R=${MK_HIB_ROOT:-}
+share=${MK_SHARE:-$(cd "$(dirname "$(realpath "$0")")/.." && pwd)}
+# O limine-default do repositório ao lado deste script, senão o instalado.
+[[ -f $share/system/mk/boot/limine-default ]] || share=/usr/share/mk
+limine_default=${MK_HIB_LIMINE_DEFAULT:-$share/system/mk/boot/limine-default}
+
+swapdir=/swap
+swapfile=/swap/swapfile
+fstab=$R/etc/fstab
+limine=$R/etc/default/limine
+statedir=$R/var/lib/mk/hibernate
+state=$statedir/estado
+fstab_line="$swapfile none swap defaults,pri=0 0 0"
+
+say() { printf '%s\n' "$*"; }
+step() { printf '\n== %s\n' "$*"; }
+die() {
+  printf 'mk-hibernate: %s\n' "$*" >&2
+  exit 1
+}
+
+need_root() {
+  [[ -n $R ]] || ((EUID == 0)) || die "precisa de root: sudo mk-hibernate $1"
+}
+
+confirm() {
+  [[ ${MK_HIB_YES:-} == 1 ]] && return 0
+  local answer
+  read -rp "$1 [s/N] " answer || return 1
+  [[ $answer == [sS]* ]]
+}
+
+# O estado: linhas chave=valor do que o setup criou.
+state_get() { [[ -f $state ]] && sed -n "s/^$1=//p" "$state" | tail -n1 || true; }
+state_set() {
+  mkdir -p "$statedir"
+  [[ -f $state ]] && sed -i "/^$1=/d" "$state"
+  printf '%s=%s\n' "$1" "$2" >>"$state"
+}
+
+backup() {
+  local to n=1
+  mkdir -p "$statedir"
+  to=$statedir/$(basename "$1").$stamp
+  while [[ -e $to ]]; do to=$statedir/$(basename "$1").$stamp-$((++n)); done
+  cp -a -- "$1" "$to"
+  say "cópia: ${to#"$R"}"
+}
+
+mem_kb() { awk '/^MemTotal:/ { print $2; exit }' "$R/proc/meminfo"; }
+swap_active() { awk -v f="$swapfile" 'NR > 1 && $1 == f { found = 1 } END { exit !found }' "$R/proc/swaps"; }
+fstab_has() { awk -v f="$swapfile" '$1 == f && $3 == "swap" { found = 1 } END { exit !found }' "$fstab"; }
+
+# A linha KERNEL_CMDLINE[default]="..." do /etc/default/limine: tem de ser uma
+# só, numa linha, entre aspas. Deixa cmd_n (o número dela), cmd_head (até a
+# primeira aspa) e cmd_value (o que está dentro).
+cmd_n=0 cmd_head='' cmd_value=''
+read_cmdline() {
+  [[ -f $limine ]] || die "não achei ${limine#"$R"} (o boot desta máquina não é o limine do Mk)"
+  local found text
+  found=$(grep -nE '^KERNEL_CMDLINE\[default\]' "$limine" || true)
+  [[ -n $found && $found != *$'\n'* ]] ||
+    die "esperava uma linha KERNEL_CMDLINE[default]=\"...\" em ${limine#"$R"}, e só uma"
+  cmd_n=${found%%:*}
+  text=${found#*:}
+  [[ $text =~ ^(KERNEL_CMDLINE\[default\]\+?=\")([^\"]*)\"[[:space:]]*$ ]] ||
+    die "não entendi a linha $cmd_n de ${limine#"$R"} (esperava KERNEL_CMDLINE[default]=\"...\")"
+  cmd_head=${BASH_REMATCH[1]}
+  cmd_value=${BASH_REMATCH[2]}
+}
+
+# Grava cmd_value de volta na mesma linha (o arquivo mantém dono e permissões).
+write_cmdline() {
+  local tmp
+  tmp=$(mktemp)
+  NEW="$cmd_head$1\"" awk -v n="$cmd_n" 'NR == n { print ENVIRON["NEW"]; next } { print }' "$limine" >"$tmp"
+  cat "$tmp" >"$limine"
+  rm -f "$tmp"
+}
+
+# $1 sem as palavras de $2.
+without() {
+  local out=() words w
+  read -ra words <<<"$1"
+  for w in "${words[@]}"; do
+    [[ " $2 " == *" $w "* ]] || out+=("$w")
+  done
+  echo "${out[*]}"
+}
+
+regen_boot() {
+  step "menu de boot (limine-update)"
+  limine-update || die "o limine-update falhou; o resto está feito. Veja o erro acima e rode de novo: sudo mk-hibernate $1"
+  # O limine-update reescreve o menu: a entrada padrão volta a ser acertada.
+  if [[ -f $limine_default ]]; then
+    bash "$limine_default" || say "aviso: o limine-default falhou; o menu pode não iniciar sozinho"
+  fi
+}
+
+# Onde o kernel acha a imagem: o dispositivo da raiz. Deixa resume_dev, ou
+# morre dizendo por quê.
+resume_dev=''
+check_root_device() {
+  local fstype src kind name words w opened=0
+  fstype=$(findmnt -no FSTYPE /)
+  [[ $fstype == btrfs ]] || die "a raiz é $fstype, não btrfs: só sei preparar o swapfile no btrfs do Mk"
+  src=$(findmnt -no SOURCE /)
+  src=${src%%\[*}
+  (($(btrfs filesystem show / | grep -c 'devid') == 1)) ||
+    die "o btrfs da raiz usa mais de um disco: um swapfile não funciona assim"
+  kind=$(lsblk -dno TYPE "$src")
+  case $kind in
+    part | disk)
+      resume_dev="UUID=$(findmnt -no UUID /)"
+      [[ $resume_dev != UUID= ]] || die "não achei o UUID da raiz"
+      ;;
+    crypt)
+      name=${src#/dev/mapper/}
+      read -ra words <<<"$cmd_value"
+      for w in "${words[@]}"; do
+        [[ $w == rd.luks.name=*="$name" ]] && opened=1
+      done
+      [[ $src == /dev/mapper/* && $opened == 1 ]] ||
+        die "a raiz está num LUKS ($src) que o boot não abre com rd.luks.name=...=$name (sd-encrypt). Com o hook \"encrypt\" (cryptdevice=) o resume é outro, e eu não sei testar: nada foi mexido"
+      resume_dev=$src
+      ;;
+    *)
+      die "a raiz está em $src (tipo $kind): LVM e RAID eu não sei preparar. Nada foi mexido"
+      ;;
+  esac
+}
+
+# O initramfs precisa do hook systemd (é ele que faz o resume). Vale o último
+# HOOKS= do mkinitcpio.conf e dos .conf.d, como o mkinitcpio lê.
+check_initramfs() {
+  local files=() f hooks
+  [[ -f $R/etc/mkinitcpio.conf ]] && files+=("$R/etc/mkinitcpio.conf")
+  for f in "$R"/etc/mkinitcpio.conf.d/*.conf; do [[ -f $f ]] && files+=("$f"); done
+  ((${#files[@]})) || die "não achei a configuração do mkinitcpio: não sei como este initramfs faz o resume"
+  hooks=$(grep -hE '^HOOKS=' "${files[@]}" | tail -n1 || true)
+  [[ $hooks =~ [\(\ ]systemd[\ \)] ]] ||
+    die "o initramfs não usa o hook systemd (${hooks:-sem HOOKS}): aí o resume pede o hook \"resume\", e isso eu não mexo. Nada foi mexido"
+}
+
+setup() {
+  need_root setup
+  stamp=$(date +%Y%m%d-%H%M%S)
+
+  # Tudo conferido antes do primeiro passo que escreve.
+  read_cmdline
+  check_initramfs
+  check_root_device
+  command -v limine-update >/dev/null || die "falta o limine-update (limine-mkinitcpio-hook)"
+  [[ -f $fstab ]] || die "não achei ${fstab#"$R"}"
+
+  local ours others mem mib avail offset params value
+  ours=$(state_get cmdline)
+  others=$(without "$cmd_value" "$ours")
+  [[ " $others " != *" resume="* && " $others " != *" resume_offset="* ]] ||
+    die "o boot já tem um resume= que não fui eu que pus (${limine#"$R"}). Nada foi mexido"
+  if [[ -e $R$swapdir && -z $(state_get subvol) ]]; then
+    die "já existe um $swapdir que não fui eu que criei. Nada foi mexido"
+  fi
+  if fstab_has && [[ -z $(state_get fstab) ]]; then
+    die "o /etc/fstab já tem um $swapfile que não fui eu que pus. Nada foi mexido"
+  fi
+
+  mem=$(mem_kb)
+  [[ $mem =~ ^[1-9][0-9]*$ ]] || die "não li o tamanho da memória"
+  # A memória inteira, arredondada para cima, mais 1 MiB do cabeçalho do swap.
+  mib=$(((mem + 1023) / 1024 + 1))
+  if [[ ! -e $R$swapfile ]]; then
+    avail=$(df --output=avail -BM / | tail -n1 | tr -dc '0-9')
+    ((${avail:-0} >= mib + 2048)) ||
+      die "faltam $(((mib + 2048 - ${avail:-0}) / 1024 + 1)) GiB livres: o swapfile ocupa $((mib / 1024 + 1)) GiB (a memória inteira) e ainda sobram 2"
+  fi
+
+  say "Hibernação do Mk. O que vai acontecer:"
+  say "  - subvolume $swapdir e $swapfile de $((mib / 1024 + 1)) GiB (o tamanho da memória)"
+  say "  - uma linha no /etc/fstab"
+  say "  - resume=$resume_dev resume_offset=... no boot (/etc/default/limine) e o menu regerado"
+  say "Depois é reiniciar. Para desfazer: sudo mk-hibernate remove"
+  confirm "Continuar?" || die "cancelado; nada foi mexido"
+
+  step "subvolume $swapdir"
+  if [[ ! -e $R$swapdir ]]; then
+    btrfs subvolume create "$R$swapdir"
+    state_set subvol 1
+    chattr +C "$R$swapdir"
+  else
+    say "já existe"
+  fi
+
+  step "swapfile de $mib MiB"
+  if [[ ! -e $R$swapfile ]]; then
+    btrfs filesystem mkswapfile --size "${mib}m" --uuid clear "$R$swapfile"
+    state_set swapfile 1
+  else
+    say "já existe"
+  fi
+
+  step "/etc/fstab"
+  if ! fstab_has; then
+    backup "$fstab"
+    [[ -z $(tail -c1 "$fstab") ]] || echo >>"$fstab"
+    printf '%s\n' "$fstab_line" >>"$fstab"
+    state_set fstab 1
+  else
+    say "a linha já está lá"
+  fi
+
+  step "swap ligado"
+  if swap_active; then say "já está"; else swapon "$R$swapfile"; fi
+
+  step "resume= no boot"
+  offset=$(btrfs inspect-internal map-swapfile -r "$R$swapfile")
+  [[ $offset =~ ^[0-9]+$ ]] || die "o btrfs não disse onde o swapfile começa (resume_offset): $offset"
+  params="resume=$resume_dev resume_offset=$offset"
+  value="${others:+$others }$params"
+  if [[ $value != "$cmd_value" || $ours != "$params" ]]; then
+    backup "$limine"
+    write_cmdline "$value"
+    state_set cmdline "$params"
+    say "$params"
+  else
+    say "já está: $params"
+  fi
+
+  regen_boot setup
+
+  say
+  say "Pronto. Reinicie o computador: a hibernação passa a valer no próximo boot."
+  say "Depois, em Ajustes › Energia, escolha \"hibernar\" em Ao dormir."
+}
+
+remove() {
+  need_root remove
+  stamp=$(date +%Y%m%d-%H%M%S)
+  [[ -f $state ]] || {
+    say "Nada a desfazer: o mk-hibernate não preparou a hibernação desta máquina."
+    return 0
+  }
+  local ours value
+  ours=$(state_get cmdline)
+
+  say "Desfaz a hibernação do Mk: o swap sai, o $swapfile é apagado e o boot volta ao que era."
+  confirm "Continuar?" || die "cancelado; nada foi mexido"
+
+  step "swap desligado"
+  if swap_active; then swapoff "$R$swapfile"; else say "já estava"; fi
+
+  step "/etc/fstab"
+  if [[ -n $(state_get fstab) ]] && grep -qxF -- "$fstab_line" "$fstab"; then
+    backup "$fstab"
+    grep -vxF -- "$fstab_line" "$fstab" >"$statedir/fstab.novo" || true
+    cat "$statedir/fstab.novo" >"$fstab"
+    rm -f "$statedir/fstab.novo"
+  else
+    say "a linha não está lá"
+  fi
+
+  step "resume= fora do boot"
+  if [[ -n $ours ]]; then
+    read_cmdline
+    value=$(without "$cmd_value" "$ours")
+    if [[ $value != "$cmd_value" ]]; then
+      backup "$limine"
+      write_cmdline "$value"
+    else
+      say "já não estava"
+    fi
+    regen_boot remove
+  fi
+
+  step "swapfile e subvolume"
+  if [[ -n $(state_get swapfile) ]]; then rm -f -- "$R$swapfile"; fi
+  if [[ -n $(state_get subvol) && -d $R$swapdir ]]; then
+    btrfs subvolume delete "$R$swapdir"
+  fi
+
+  rm -f "$state"
+  say
+  say "Pronto. As cópias de antes ficam em ${statedir#"$R"}."
+  say "O kernel de agora ainda subiu com resume=; some no próximo boot."
+}
+
+status() {
+  local ok=sim ours booted=não
+  ours=$(state_get cmdline)
+  [[ " $(cat "$R/proc/cmdline" 2>/dev/null) " == *" resume="* ]] && booted=sim
+  say "preparado pelo mk-hibernate: $([[ -f $state ]] && echo sim || echo não)"
+  say "swapfile $swapfile:        $([[ -e $R$swapfile ]] && echo existe || echo não existe)"
+  say "swap ligado:                 $(swap_active 2>/dev/null && echo sim || echo não)"
+  say "linha no /etc/fstab:         $(fstab_has 2>/dev/null && echo sim || echo não)"
+  say "resume= no boot configurado: ${ours:-não}"
+  say "kernel subiu com resume=:    $booted"
+  [[ -f $state && -n $ours && -e $R$swapfile ]] && swap_active 2>/dev/null || ok=não
+  if [[ $ok == sim && $booted == sim ]]; then
+    say "A hibernação está pronta."
+  elif [[ $ok == sim ]]; then
+    say "Falta reiniciar para a hibernação valer."
+  else
+    say "A hibernação não está preparada: sudo mk-hibernate setup"
+  fi
+}
+
+case ${1:-} in
+  setup) setup ;;
+  remove) remove ;;
+  status) status ;;
+  *)
+    sed -n '2,7s/^# \{0,1\}//p' "$0"
+    exit 2
+    ;;
+esac

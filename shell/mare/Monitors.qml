@@ -18,11 +18,16 @@ Singleton {
 
     readonly property string luaPath: Settings.dir + "/monitores.lua"
     readonly property string script: Quickshell.shellPath("scripts/mare-monitors")
+    // O monitors.lua pessoal, ao lado do hyprland.lua: carrega por último e
+    // vale sobre o monitores.lua do painel.
+    readonly property string userRules: Settings.dir + "/hypr/monitors.lua"
     readonly property int trialSeconds: 15
 
     property var live: []
     property var saved: []
     property var draft: []
+    // As saídas com regra no monitors.lua pessoal (procura de texto do script).
+    property var ruled: []
     property string selected: ""
     property bool loaded: false
 
@@ -49,8 +54,11 @@ Singleton {
     // Daqui até "puro: fim" nada toca no Maré nem no Hyprland: são funções de
     // lista para lista e de lista para texto, testadas fora do shell com node.
     // Uma tela: { name, description, w, h, refresh, mode, x, y, scale,
-    // transform, enabled, mirror, auto, modes: [{ w, h, r }] }. w/h são os
-    // pontos do modo; x/y e o tamanho lógico já contam escala e rotação.
+    // transform, enabled, mirror, auto, modes: [{ w, h, r }], limits }. w/h
+    // são os pontos do modo; x/y e o tamanho lógico já contam escala e rotação.
+    // limits é o que o monitor declara no EDID ({ vmin, vmax (Hz), hmin, hmax
+    // (kHz), clock (MHz) }, ou null); mode é "LxA@taxa" ou, numa taxa fora da
+    // lista do monitor, o "modeline ..." calculado em timing().
     // transform é o do Hyprland, 0 a 7: a rotação é transform % 4 e de 4 em
     // diante a imagem está invertida (flipped), o que o painel só preserva.
 
@@ -142,6 +150,100 @@ Singleton {
         return best;
     }
 
+    // Menos linhas de intervalo vertical que isto e a imagem falha (12 foram
+    // poucas num Dell P2319H; com 25 ficou boa).
+    readonly property int minVblank: 25
+
+    // O sinal de uma taxa que o monitor não lista, dentro dos limites que ele
+    // declara; null se não cabe. Horizontal como no CVT-RBv2 (80 pontos de
+    // intervalo: 8 + 32 + 40). No vertical, o intervalo do CVT com blanking
+    // reduzido (460 µs) se couber; se não, o maior que os limites deixam: a
+    // frequência de linha fica 0,1 kHz abaixo do teto (o EDID o dá em kHz
+    // inteiros) e o pixel clock não passa do máximo. O `WxH@taxa` do Hyprland
+    // usa o CVT de blanking normal, que estoura esses limites.
+    function timing(w, h, r, limits) {
+        const l = limits;
+        if (!l || !(w > 0 && h > 0 && r > 0) || !(l.vmax > 0 && l.hmax > 0 && l.clock > 0))
+            return null;
+        if (r > l.vmax || r < (l.vmin || 0))
+            return null;
+        const htotal = w + 80;
+        const vtotal = Math.min(Math.ceil(h / (1 - 460e-6 * r)),
+            Math.floor((l.hmax * 1000 - 100) / r),
+            Math.floor(l.clock * 1e6 / (htotal * r)));
+        if (!(vtotal - h >= minVblank) || vtotal * r < (l.hmin || 0) * 1000)
+            return null;
+        // O Hyprland guarda o clock em kHz inteiros.
+        return { w: w, h: h, r: r, htotal: htotal, vtotal: vtotal, khz: Math.floor(htotal * vtotal * r / 1000) };
+    }
+
+    // "modeline 165.75 1920 1928 1960 2000 1080 1083 1088 1105 +hsync -vsync"
+    function modeline(t) {
+        return ["modeline", String(t.khz / 1000), t.w, t.w + 8, t.w + 40, t.htotal,
+            t.h, t.h + 3, t.h + 8, t.vtotal, "+hsync", "-vsync"].join(" ");
+    }
+
+    // O que um "modeline ..." guardado mostra: { w, h, r }, ou null.
+    function modelineInfo(mode) {
+        const p = String(mode || "").trim().split(/\s+/);
+        if (p[0] !== "modeline" || p.length < 10)
+            return null;
+        const n = p.slice(1, 10).map(Number);
+        if (!n.every(v => v > 0))
+            return null;
+        return { w: n[1], h: n[5], r: n[0] * 1e6 / (n[4] * n[8]) };
+    }
+
+    // A taxa está na lista do monitor para a resolução em uso?
+    function listed(m, r) {
+        return rates(m).some(x => Math.abs(x - r) < 0.006);
+    }
+
+    // As taxas inteiras acima da maior da lista, até o teto vertical do EDID,
+    // que cabem nos limites (ver timing). Da mais alta para a mais baixa.
+    function extraRates(m) {
+        const all = rates(m);
+        if (!m || !m.limits || all.length === 0)
+            return [];
+        const out = [];
+        for (let r = Math.floor(m.limits.vmax); r > Math.round(Math.max.apply(null, all)); r--)
+            if (timing(m.w, m.h, r, m.limits))
+                out.push(r);
+        return out;
+    }
+
+    // O modo que vai para a regra: o da lista pelo nome; fora dela, o
+    // modeline calculado. Sem limites para calcular (o EDID sumiu), vale o
+    // modeline que já estava guardado para esta resolução e taxa.
+    function modeFor(m) {
+        if (!listed(m, m.refresh)) {
+            const t = timing(m.w, m.h, m.refresh, m.limits);
+            if (t)
+                return modeline(t);
+            const had = modelineInfo(m.mode);
+            if (had && had.w === m.w && had.h === m.h && Math.abs(had.r - m.refresh) < 0.5)
+                return m.mode;
+        }
+        return modeText(m.w, m.h, m.refresh);
+    }
+
+    // A taxa que o painel mostra para o que o Hyprland informa. Num modeline
+    // ele informa 74,66 para 75: vale a taxa fora da lista que o arquivo
+    // guardou, ou a que o painel ofereceria, se estiver mais perto que
+    // qualquer modo da lista.
+    function shownRate(m, old) {
+        const near = nearestMode(m);
+        const gap = near ? Math.abs(near.r - m.refresh) : Infinity;
+        if (old && old.w === m.w && old.h === m.h && modelineInfo(old.mode)
+            && Math.abs(old.refresh - m.refresh) < Math.min(1, gap))
+            return Number(old.refresh);
+        let best = null;
+        for (const r of extraRates(m))
+            if (Math.abs(r - m.refresh) < Math.min(0.6, gap) && (best === null || Math.abs(r - m.refresh) < Math.abs(best - m.refresh)))
+                best = r;
+        return best !== null ? best : near ? near.r : m.refresh;
+    }
+
     // O que o `mare-monitors list` devolve -> a tela do painel. Uma tela
     // desligada vale pelo que o arquivo guardou dela, se guardou.
     function entry(raw, saved) {
@@ -151,7 +253,7 @@ Singleton {
             x: Number(raw.x) || 0, y: Number(raw.y) || 0, scale: Number(raw.scale) || 1,
             transform: (Number(raw.transform) || 0) % 8, enabled: raw.enabled !== false,
             mirror: String(raw.mirror || ""), auto: false, mode: "preferred",
-            modes: raw.modes || []
+            modes: raw.modes || [], limits: raw.limits || null
         };
         const old = find(saved, m.name);
         if (!m.enabled && old && old.w > 0) {
@@ -160,10 +262,10 @@ Singleton {
             m.scale = m.scale || 1;
         }
         if (m.w > 0 && m.h > 0) {
-            const near = nearestMode(m);
-            if (near)
-                m.refresh = near.r;
-            m.mode = modeText(m.w, m.h, m.refresh);
+            m.refresh = shownRate(m, old);
+            if (old && modelineInfo(old.mode))
+                m.mode = old.mode;
+            m.mode = modeFor(m);
             m.scale = fitScale(m.w, m.h, m.scale);
         } else {
             m.auto = true;
@@ -235,7 +337,7 @@ Singleton {
         Object.assign(m, patch);
         if (m.w > 0 && m.h > 0) {
             m.scale = fitScale(m.w, m.h, m.scale);
-            m.mode = modeText(m.w, m.h, m.refresh);
+            m.mode = modeFor(m);
         }
         const after = logical(m);
         if (placed(m))
@@ -468,6 +570,9 @@ Singleton {
                 return false;
             if (w.mirror || !(w.w > 0))
                 continue;
+            // Um modeline recusado deixa a tela na taxa de antes.
+            if (Math.abs(w.refresh - g.refresh) > 1)
+                return false;
             if (w.w !== g.w || w.h !== g.h || w.transform !== g.transform || !sameScale(w.scale, g.scale))
                 return false;
             if (!w.auto && (Math.abs(w.x - g.x) > 1 || Math.abs(w.y - g.y) > 1))
@@ -620,6 +725,7 @@ Singleton {
     function fileText(list) {
         return "-- Gerado pelos Ajustes do Mk (Super + ,), página Monitores. Não edite: o painel reescreve.\n"
             + "-- Uma regra por tela, pelo nome da saída; valem sobre a regra geral do ajustes.lua.\n"
+            + "-- Um mode \"modeline ...\" é uma taxa fora da lista do monitor, calculada pelos limites do EDID.\n"
             + "-- A regra troca a da saída inteira: o que o painel não tem (vrr, bitdepth, cm...) vai\n"
             + "-- no seu hypr/monitors.lua, que carrega depois e vale sobre este arquivo.\n"
             + "-- mk:telas " + JSON.stringify((list || []).map(slim)) + "\n"
@@ -744,6 +850,7 @@ Singleton {
         const names = l => l.map(m => m.name).sort().join("\n");
         const keepDraft = dirty && names(list) === names(live);
         saved = data.saved || [];
+        ruled = (data.monitors || []).filter(m => m.ruled === true).map(m => String(m.name));
         live = list;
         if (comeback && !pending) {
             // Só enquanto as telas forem as mesmas; e a última releitura
@@ -768,7 +875,7 @@ Singleton {
 
     Process {
         id: lister
-        command: ["bash", root.script, "list", root.luaPath]
+        command: ["bash", root.script, "list", root.luaPath, root.userRules]
         stdout: StdioCollector {
             onStreamFinished: {
                 // Com outra leitura na fila, a que fecha é a próxima.

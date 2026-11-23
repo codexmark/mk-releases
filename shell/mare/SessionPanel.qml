@@ -3,8 +3,10 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 
-// Sessão: bloquear e suspender agem na hora; sair, reiniciar e desligar
+// Sessão: bloquear e dormir agem na hora; sair, reiniciar e desligar
 // pedem um segundo clique (o botão vira "confirmar" por 3 segundos).
+// Dormir é o que Ajustes › Energia escolheu (Settings.sleepMode): suspender,
+// hibernar, ou nenhum botão.
 Item {
     id: panel
 
@@ -12,11 +14,12 @@ Item {
 
     readonly property var actions: [
         { id: "lock", icon: "󰌾", label: "bloquear", confirm: false, cmd: ["loginctl", "lock-session"] },
-        { id: "suspend", icon: "󰤄", label: "suspender", confirm: false, cmd: ["systemctl", "suspend"] },
+        { id: "suspend", icon: "󰤄", label: "suspender", confirm: false, cmd: ["systemctl", "suspend"], sleep: "suspender" },
+        { id: "hibernate", icon: "󰤄", label: "hibernar", confirm: false, cmd: ["systemctl", "hibernate"], sleep: "hibernar" },
         { id: "logout", icon: "󰍃", label: "sair", confirm: true, cmd: ["sh", "-c", "uwsm stop || hyprctl dispatch 'hl.dsp.exit()'"] },
         { id: "reboot", icon: "󰜉", label: "reiniciar", confirm: true, cmd: ["systemctl", "reboot"] },
         { id: "poweroff", icon: "󰐥", label: "desligar", confirm: true, cmd: ["systemctl", "poweroff"] }
-    ]
+    ].filter(a => a.sleep === undefined || a.sleep === Settings.sleepMode)
 
     implicitWidth: 520
     implicitHeight: column.implicitHeight + 40
