@@ -1,3 +1,2 @@
-MkTunes: o player de música do Mk vem pronto em apps/mktunes
-Instalador: não para na pergunta do limine-mkinitcpio-hook
-iso/build: aproveita o pacote do AUR já compilado na mesma versão
+MkTunes: volume e posição voltam a receber o clique
+MkTunes: daemon sem o aviso de acesso nativo do Java 27

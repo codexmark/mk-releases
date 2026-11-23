@@ -10,6 +10,8 @@ Rectangle {
     readonly property bool hasTrack: now.status !== "idle"
     readonly property bool playing: now.status === "playing"
     property int nowPanelTab: 0
+    // Para o teste de fumaça: os controles de arrastar precisam de área para receber o clique.
+    readonly property var draggables: ({ seek: seek, volume: volume })
     color: Theme.surface
     Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Theme.hairline }
 
@@ -66,10 +68,11 @@ Rectangle {
                 Slider {
                     id: seek
                     Layout.fillWidth: true
+                    implicitHeight: 20
                     enabled: bar.hasTrack && bar.progress.duration > 0 && !bar.now.live
                     from: 0
                     to: Math.max(1, bar.progress.duration)
-                    Binding on value { value: bar.progress.position; when: !seek.pressed }
+                    Binding on value { value: bar.progress.position; when: !seek.pressed; restoreMode: Binding.RestoreNone }
                     onPressedChanged: if (!pressed) daemon.send({ cmd: "seek", seconds: value })
                     Accessible.name: "Posição da música"
                     background: Rectangle {
@@ -167,10 +170,13 @@ Rectangle {
             Slider {
                 id: volume
                 Layout.preferredWidth: 88
+                // O fundo é desenhado à mão e não diz a altura: sem isto o controle fica com altura 0
+                // e nenhum clique chega nele.
+                implicitHeight: 24
                 from: 0
                 to: 100
                 stepSize: 1
-                Binding on value { value: daemon.volume.level; when: !volume.pressed }
+                Binding on value { value: daemon.volume.level; when: !volume.pressed; restoreMode: Binding.RestoreNone }
                 onMoved: if (Math.round(value) !== daemon.volume.level) daemon.send({ cmd: "volume", level: Math.round(value) })
                 Accessible.name: "Volume"
                 WheelHandler {

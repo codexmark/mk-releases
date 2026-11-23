@@ -99,6 +99,17 @@ Rectangle {
         function lyrics(): void { app.showPanel(1); }
         function queue(): void { app.showPanel(0); }
         function full(): void { app.fullNow = !app.fullNow; }
+        // Os controles de arrastar e o tamanho que receberam (o check-qml confere que não é zero).
+        function controls(): string {
+            const out = {};
+            for (const name in playerBar.draggables) {
+                const item = playerBar.draggables[name];
+                const at = item.mapToItem(null, 0, 0);
+                out[name] = { x: at.x, y: at.y, width: item.width, height: item.height };
+            }
+            out.window = { width: app.Window.width, height: app.Window.height, app: [app.width, app.height] };
+            return JSON.stringify(out);
+        }
         function library(section: int): void { app.goTo(3); app.ensureTab(3).get(0).section = section; }
         // Joga a página atual como um gesto rápido de rolagem (negativo sobe).
         function scroll(velocity: int): void { const page = app.stack().currentItem; if (page && page.flick) page.flick(0, -velocity); }
