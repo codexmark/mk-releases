@@ -35,6 +35,14 @@ cava
 qt6-imageformats
 libnotify
 
+# MkTunes, o player de música do Mk (apps/mktunes): o núcleo roda no Java só de
+# linha de comando (sem a parte gráfica), o som sai pelo mpv e as tags das
+# músicas do computador vêm do ffprobe. mpv e ffmpeg também estão em
+# apps.packages; aqui é porque o MkTunes não é opcional
+jre-openjdk-headless
+mpv
+ffmpeg
+
 # Captura de tela, área de transferência e mídia
 grim
 slurp

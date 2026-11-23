@@ -1,1 +1,3 @@
-Painéis: teclado garantido e encaixe por monitor; página Controle (xone)
+MkTunes: o player de música do Mk vem pronto em apps/mktunes
+Instalador: não para na pergunta do limine-mkinitcpio-hook
+iso/build: aproveita o pacote do AUR já compilado na mesma versão

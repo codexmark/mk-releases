@@ -123,6 +123,20 @@ while ((i < ${#queue[@]})); do
     in_repos "$dep" || enqueue "$dep"
   done
 
+  # Já compilado nesta versão numa rodada anterior? Aproveita, em vez de
+  # exigir de novo as dependências de compilação (o gradle, por exemplo).
+  # Pacotes -git têm a versão calculada na hora e são sempre recompilados.
+  ver=$(sed -n 's/^[[:space:]]*pkgver = //p' "$dir/.SRCINFO" | head -1)-$(sed -n 's/^[[:space:]]*pkgrel = //p' "$dir/.SRCINFO" | head -1)
+  epoch=$(sed -n 's/^[[:space:]]*epoch = //p' "$dir/.SRCINFO" | head -1)
+  [[ -n $epoch ]] && ver=$epoch:$ver
+  cached=$(find "$aur_pkg/$base" -name "$name-$ver-*.pkg.tar.*" ! -name '*.sig' 2>/dev/null | sort | tail -1)
+  if [[ -n $cached && $name != *-git ]]; then
+    cp "$cached" "$aur_repo/"
+    built+=("$name")
+    printf 'ok      %s  %s (já compilado)\n' "$name" "$(basename "$cached")" | tee -a "$report"
+    continue
+  fi
+
   # O que falta no host para compilar.
   # shellcheck disable=SC2046 # uma dependência por palavra
   mapfile -t missing < <(pacman -T $(srcinfo_field "$dir/.SRCINFO" makedepends) $(srcinfo_field "$dir/.SRCINFO" depends) 2>/dev/null || true)

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MkTunes
+GenericName=Player de música
+Comment=Músicas, álbuns, rádios e letras, sem conta
+Exec=mktunes
+Icon=mktunes
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=música;musica;player;rádio;radio;letra;playlist;

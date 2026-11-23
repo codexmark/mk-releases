@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#141211"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="25.5" fill="none" stroke="#cdc4ba" stroke-opacity=".16"/>
+  <!-- Ondas de som subindo e descendo, em osso, com a do meio em cobre. -->
+  <g stroke-linecap="round" stroke-width="9" fill="none">
+    <path d="M34 54v20" stroke="#cdc4ba"/>
+    <path d="M49 42v44" stroke="#cdc4ba"/>
+    <path d="M64 30v68" stroke="#ce5e32"/>
+    <path d="M79 42v44" stroke="#cdc4ba"/>
+    <path d="M94 54v20" stroke="#cdc4ba"/>
+  </g>
+</svg>

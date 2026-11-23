@@ -562,6 +562,8 @@ install_desktop() {
 
   install -Dm755 "$src/bin/mk-session" "$target/usr/bin/mk-session"
   install -Dm755 "$src/bin/mk-update" "$target/usr/bin/mk-update"
+  # O MkTunes (apps/mktunes): comando, atalho no menu e ícone.
+  bash "$src/system/mk/mktunes-links" "$target"
   install -Dm644 /dev/stdin "$target/usr/share/wayland-sessions/mk.desktop" <<'EOF'
 [Desktop Entry]
 Name=Mk
@@ -738,7 +740,11 @@ limine_conf_ok() {
 
 finish_boot() {
   step "mkinitcpio"
-  arch-chroot "$target" mkinitcpio -P
+  # O mkinitcpio de verdade, pelo caminho inteiro: o limine-mkinitcpio-hook põe
+  # um /usr/local/bin/mkinitcpio na frente que pergunta "rodar o
+  # limine-mkinitcpio agora? [Y/n]" e parava a instalação à espera da resposta.
+  # Quem escreve as entradas do limine é o limine-update, logo abaixo.
+  arch-chroot "$target" /usr/bin/mkinitcpio -P
 
   # Com o limine-mkinitcpio-hook, ele escreve as entradas; sem ele (ou se o
   # resultado não for bootável), ficam as entradas fixas do Mk.

@@ -392,6 +392,7 @@ Hyprland do Mk.
 | `config/ghostty/`, `config/fastfetch/` | terminal e a ficha que ele mostra ao abrir |
 | `config/mimeapps.list` | os apps padrão de fábrica |
 | `shell/mare/` | o Maré: QML numa pasta só, mais `scripts/` (o que ele roda por fora) |
+| `apps/` | apps do Mk que vêm prontos, como o player de música `mktunes`; gerados nos repositórios deles (veja `apps/README.md`) |
 | `installer/` | `mk-install` e um arquivo de respostas de exemplo, para testes |
 | `iso/` | `build` (gera o ISO), `vm` (VM de teste no QEMU), `profile/` (o que muda no archiso) |
 | `migrations/` | `system/` e `user/`: o que o `mk-update` faz uma vez em cada Mk já instalado |

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Abre o MkTunes: sobe o mktunesd se ninguém responde no socket e abre a janela (Quickshell).
+# Se a janela já está aberta, só a traz para a frente.
+#   MKTUNES_HOME   onde estão daemon/ e qml/ (padrão: a pasta acima deste script)
+set -euo pipefail
+home=${MKTUNES_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
+sock=${XDG_RUNTIME_DIR:-/tmp}/mktunes/mktunes.sock
+log=${XDG_CACHE_HOME:-$HOME/.cache}/mktunes/mktunesd.log
+
+# Falta algo do sistema: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
+missing() {
+  local text="O MkTunes precisa $1. Rode mk-update ou: sudo pacman -S $2"
+  notify-send -a MkTunes -i mktunes "MkTunes" "$text" 2>/dev/null || true
+  echo "mktunes: $text" >&2
+  exit 1
+}
+command -v mpv >/dev/null || missing "do mpv" "mpv"
+command -v qs >/dev/null || missing "do Quickshell" "quickshell"
+
+daemon_bin=$home/daemon/bin/mktunesd
+[[ -x $daemon_bin ]] || daemon_bin=$home/daemon/build/install/mktunesd/bin/mktunesd
+
+# Depois de um mk-update, o daemon que já rodava ainda é o da versão velha: ele segura os jars
+# que a atualização apagou. Esse para (salva a sessão ao sair) e sobe o novo.
+for pid in $(pgrep -f "dev.mk.mktunes.desktop.MainKt" || true); do
+  if ls -l "/proc/$pid/fd" 2>/dev/null | grep -q "$home/daemon/lib/.*(deleted)"; then
+    kill "$pid" 2>/dev/null || true
+    for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+  fi
+done
+
+if ! python3 -c "import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1])" "$sock" 2>/dev/null; then
+  mkdir -p "$(dirname "$log")"
+  # O daemon abre a janela por aqui quando a ilha pede ("Raise" do MPRIS).
+  export MKTUNES_LAUNCHER=$(readlink -f "$0")
+  if command -v java >/dev/null; then
+    setsid -f "$daemon_bin" >"$log" 2>&1
+  elif [[ -x $home/../gradlew ]] && command -v mise >/dev/null; then
+    # Rodando do repositório: o Java vem do mise.
+    setsid -f mise exec -C "$home/.." -- "$daemon_bin" >"$log" 2>&1
+  else
+    missing "do Java" "jre-openjdk-headless"
+  fi
+fi
+
+# Uma janela só: se já há uma, foca (Hyprland com configuração em Lua, como no Mk, ou a clássica).
+if qs list --all 2>/dev/null | grep -q "Config path: $home/qml/shell.qml"; then
+  addr=$(hyprctl clients -j 2>/dev/null | python3 -c "import json,sys; print(next((c['address'] for c in json.load(sys.stdin) if c['title'] == 'MkTunes'), ''))")
+  if [[ -n $addr ]]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 ||
+      hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
+    exit 0
+  fi
+fi
+exec qs -p "$home/qml" "$@"
