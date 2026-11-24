@@ -113,6 +113,12 @@ correção.
   arquivo `.mkcomprimir-*.parcial.*` escondido ao lado do vídeo.
 - **MkTunes continua em Java.** O porte para Go espera o repositório dele, que
   não está na máquina onde os outros apps foram feitos.
+- **Controles (Super + Esc):** vistos abrindo na sessão aninhada, com Esc
+  fechando e a troca para outro painel; os botões e as chaves não foram
+  clicados, e a cafeína segurando de fato o descanso de tela não foi vista. A
+  ordem dos blocos é fixa (dá para escondê-los em Ajustes › Ilha, não
+  reordenar). Quem tinha Super + Esc para o painel Sessão passa a abrir os
+  Controles; a Sessão foi para Super + Ctrl + Esc.
 - **`mare-wifi-qr`:** duas conexões salvas com o mesmo nome se confundem, e
   uma rede WEP por frase-senha gera um QR que o celular pode não aceitar.
 - **`mare-shot`:** duas capturas no mesmo segundo usam o mesmo nome de arquivo.

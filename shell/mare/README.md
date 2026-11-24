@@ -111,6 +111,7 @@ Cada nome de `Mare.panels` é um arquivo, carregado pelo `Tide` quando o
 | `wallpaper` | `WallpaperPanel.qml` | Os papéis de parede, 12 por página. |
 | `capture` | `CapturePanel.qml` | Capturar uma área, a janela, a tela, ou gravar um vídeo. |
 | `emoji` | `EmojiPanel.qml` | Procurar um emoji (português ou inglês) e digitá-lo na janela em foco. |
+| `controls` | `ControlsPanel.qml` | Os controles rápidos (Super + Esc): leituras da máquina, Wi-Fi e Bluetooth, perfil de energia, volume e brilho, a sessão e os alternadores (luz noturna, cafeína, não perturbe, microfone). Cada bloco usa o singleton do painel dele e o título leva ao painel inteiro; os blocos ligam e desligam em Ajustes › Ilha. A lista de ações de sessão é a do `SessionActions.js`, a mesma do painel Sessão; a cafeína é o singleton `Caffeine` (um inibidor de ociosidade do systemd). |
 
 Dois modos passageiros não são painéis e não aceitam `toggle`: `toast`
 (`ToastView.qml`, a pílula cresce com uma notificação) e `osd` (`OsdView.qml`,

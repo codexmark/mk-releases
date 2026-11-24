@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import "SessionActions.js" as SessionActions
 
 // Sessão: bloquear e dormir agem na hora; sair, reiniciar e desligar
 // pedem um segundo clique (o botão vira "confirmar" por 3 segundos).
@@ -12,13 +13,7 @@ Item {
 
     property string armed: ""
 
-    readonly property var actions: [
-        { id: "lock", icon: "󰌾", label: "bloquear", confirm: false, cmd: ["loginctl", "lock-session"] },
-        { id: "suspend", icon: "󰤄", label: "suspender", confirm: false, cmd: ["systemctl", "suspend"], sleep: "suspender" },
-        { id: "logout", icon: "󰍃", label: "sair", confirm: true, cmd: ["sh", "-c", "uwsm stop || hyprctl dispatch 'hl.dsp.exit()'"] },
-        { id: "reboot", icon: "󰜉", label: "reiniciar", confirm: true, cmd: ["systemctl", "reboot"] },
-        { id: "poweroff", icon: "󰐥", label: "desligar", confirm: true, cmd: ["systemctl", "poweroff"] }
-    ].filter(a => a.sleep === undefined || a.sleep === Settings.sleepMode)
+    readonly property var actions: SessionActions.actions(Settings.sleepMode)
 
     implicitWidth: 520
     implicitHeight: column.implicitHeight + 40

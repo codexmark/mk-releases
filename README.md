@@ -319,7 +319,8 @@ podem mudar de tecla, mas nunca ficam sem atalho.
 | `Super + C` | calendário |
 | `Super + N` | notificações |
 | `Super + Shift + N` | não perturbe |
-| `Super + Esc` | sair, bloquear, desligar |
+| `Super + Esc` | controles rápidos: leituras, Wi-Fi, Bluetooth, energia, volume, brilho, sessão e alternadores |
+| `Super + Ctrl + Esc` | sair, bloquear, desligar |
 | `Super + W` | papel de parede |
 | `Super + Shift + V` | área de transferência |
 | `Super + .` | emoji |

@@ -81,6 +81,18 @@ var rows = [
     { page: "ilha", group: "CONTEÚDO", key: "island.showWeather", label: "Clima",
       desc: "Temperatura lá fora, ao lado do relógio", ctl: "switch", def: true, kw: "tempo previsão" },
 
+    // Os blocos do painel Controles (Super + Esc). A sessão e os alternadores
+    // ficam sempre.
+    { page: "ilha", group: "CONTROLES (SUPER + ESC)", key: "controls.showStats", label: "Leituras",
+      desc: "CPU, memória, rede e disco, com o último minuto em gráfico", ctl: "switch", def: true,
+      kw: "controles rápidos super esc cpu memória" },
+    { page: "ilha", group: "CONTROLES (SUPER + ESC)", key: "controls.showRadios", label: "Wi-Fi e Bluetooth",
+      desc: "Ligar e desligar os dois, com a rede em uso", ctl: "switch", def: true, kw: "controles rápidos rede" },
+    { page: "ilha", group: "CONTROLES (SUPER + ESC)", key: "controls.showPower", label: "Perfil de energia",
+      desc: "Economia, balanceado ou desempenho", ctl: "switch", def: true, kw: "controles rápidos bateria" },
+    { page: "ilha", group: "CONTROLES (SUPER + ESC)", key: "controls.showLevels", label: "Volume e brilho",
+      desc: "Os dois níveis, para arrastar", ctl: "switch", def: true, kw: "controles rápidos som tela" },
+
     // Fundo
     { page: "fundo", group: "DESENHO", key: "backdrop.letter", label: "Letra do workspace",
       desc: "O α grande no canto e o convite num workspace vazio", ctl: "switch", def: true,

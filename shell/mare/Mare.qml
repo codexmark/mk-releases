@@ -12,7 +12,7 @@ Singleton {
 
     readonly property var panels: ["project", "volume", "power", "network", "calendar", "picker",
         "launcher", "switcher", "notifications", "session", "media", "bluetooth", "display", "system",
-        "clipboard", "wallpaper", "settings", "capture", "emoji"]
+        "clipboard", "wallpaper", "settings", "capture", "emoji", "controls"]
     readonly property var transients: ["toast", "osd"]
 
     // O descanso de tela está na tela (ScreenSaver.qml, um por monitor).
