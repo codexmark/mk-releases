@@ -494,9 +494,19 @@ Na mesma pasta ficam os seis **autorais**, criados por quem mantém o Mk e
 assinados "Mk_ by codexmark": Entropia (`00-1-entropia`), Núcleo
 (`00-2-nucleo`), Origem (`00-3-origem`), Monólito (`00-4-monolito`),
 Singularidade (`00-5-singularidade`) e Maré (`00-6-mare`). Não saem de script:
-o arquivo no repositório é o original, em JPEG, sem metadados. O `00-` no nome
+o arquivo no repositório é o original ampliado, em JPEG, sem metadados. O `00-` no nome
 faz o painel mostrá-los antes dos desenhados por código, e o gerador não toca
-neles. Estão em 1672x941; uma exportação maior entra no lugar com o mesmo nome. Com argumentos, refaz só os
+neles. Os originais saem em 1672x941; no repositório estão em 2560x1440, como os
+outros: ampliados duas vezes com o `waifu2x-ncnn-vulkan` (modelo de foto, sem
+redução de ruído) e reduzidos para o tamanho final. Para refazer um:
+
+```bash
+waifu2x-ncnn-vulkan -i original.png -o dobro.png -n 0 -s 2 -m /usr/share/waifu2x-ncnn-vulkan/models-upconv_7_photo
+```
+
+```bash
+magick dobro.png -filter Lanczos -resize 2560x1440^ -gravity center -extent 2560x1440 -strip -sampling-factor 4:4:4 -quality 92 shell/mare/wallpapers/00-1-entropia.jpg
+``` Com argumentos, refaz só os
 que tiverem o texto no nome:
 
 ```bash

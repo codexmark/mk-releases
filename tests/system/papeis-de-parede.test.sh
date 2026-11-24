@@ -50,6 +50,12 @@ for f in "$dir"/*; do
   ok python3 -I -c "import sys; sys.exit(0 if abs($w / $h - 16 / 9) < 0.01 else 1)"
 done
 
+t "todos em 2560x1440, os autorais também (ampliados dos originais de 1672x941)"
+for f in "$dir"/*; do
+  read -r w h _ < <(medida "$f")
+  eq "2560 1440" "$w $h" "$(basename "$f")"
+done
+
 t "nenhuma imagem pesa mais de 1,5 MB (a pasta inteira vai em cada ~/.config/mk)"
 for f in "$dir"/*; do
   ((($(stat -c %s "$f")) <= 1500000)) || _fail "$(basename "$f") tem $(($(stat -c %s "$f") / 1024)) KiB"
