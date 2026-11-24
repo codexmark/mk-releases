@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# apps/mkcorte/src: o motor do MkCorte, em Go. Os testes dele são `go test`
+# (com pastas falsas e um ffmpeg e um ffprobe de mentira, que só anotam os
+# argumentos); aqui eles entram na suíte do Mk, junto com o formato (gofmt), o
+# go vet, a conferência de que o binário que vai no pacote é o do código que
+# está no repositório e as regras que o código não pode quebrar (nunca shell,
+# só o ffmpeg e o ffprobe, o nome do arquivo nunca chega a eles).
+. "$(dirname "$0")/../lib.sh"
+
+command -v go >/dev/null || skip "falta o go"
+
+src=$REPO/apps/mkcorte/src
+bin=$REPO/apps/mkcorte/bin/mkcorte-motor
+# O cache de compilação fica fora da caixa de areia, para não recompilar tudo
+# a cada rodada; o resto (HOME, módulos) continua dentro dela.
+export GOCACHE=${MK_GOCACHE:-/var/tmp/mk-gocache-$(id -u)}
+# -buildvcs=false: sem isso o go chama o git (que aqui é um guarda) para carimbar o binário.
+export GOFLAGS="-mod=mod -buildvcs=false" GOPROXY=off GOTOOLCHAIN=local
+cd "$src" || exit 1
+
+t "o módulo não tem dependência de fora: só a biblioteca padrão"
+eq "" "$(grep -E '^\s*require|^\s+[a-z0-9.-]+\.[a-z]+/' go.mod || true)"
+absent "$src/go.sum"
+
+t "gofmt: todo arquivo está formatado"
+eq "" "$(gofmt -l . 2>&1)"
+
+t "go vet: nenhum aviso"
+out=$(go vet ./... 2>&1) || _fail "$out"
+
+t "go test: a suíte do motor passa"
+out=$(go test ./... 2>&1) || _fail "$(tail -40 <<<"$out")"
+hasnt "$out" "FAIL"
+
+t "todo pacote do motor tem teste"
+while read -r pacote; do
+  compgen -G "$src/$pacote"'/*_test.go' >/dev/null || _fail "sem teste: $pacote"
+done < <(go list ./... 2>/dev/null | grep -v '^mkcorte$' | sed 's|^mkcorte/||' |
+  grep -v -e '/dubles$') # os dublês dos próprios testes
+compgen -G "$src/*_test.go" >/dev/null || _fail "sem teste: o pacote principal"
+
+# O código que vai no binário (sem os testes nem o que só os testes usam).
+mapfile -t fontes < <(find "$src" -name '*.go' ! -name '*_test.go' ! -path '*/dubles/*' | sort)
+
+t "o motor nunca pede senha nem roda como root"
+eq "" "$(grep -nE '"(sudo|su|doas|run0|pkexec)"' "${fontes[@]}" || true)"
+
+t "nenhum nome de arquivo passa por shell: não há sh -c nem bash no motor"
+eq "" "$(grep -nE '"(sh|bash|/bin/sh|/bin/bash|zsh|env)"|"-c"' "${fontes[@]}" || true)"
+
+t "o motor só roda o ffmpeg e o ffprobe, achados no PATH por nome fixo"
+while read -r chamada; do
+  like "$chamada" 'exec\.Command(Context)?\((ffmpeg|ctx, caminho)[,)]' "programa que não é um comando fixo: $chamada"
+done < <(grep -hoE 'exec\.Command(Context)?\([^)]*' "${fontes[@]}")
+while read -r nome; do
+  like "$nome" '^(nome|"ffmpeg")$' "LookPath de algo que não é nome fixo: $nome"
+done < <(grep -hoE 'exec\.LookPath\([^)]*\)' "${fontes[@]}" | sed 's/exec\.LookPath(//; s/)$//')
+n=0
+while read -r nome; do
+  n=$((n + 1))
+  like " ffprobe ffmpeg " " $nome " "comando que o contrato não lista: $nome"
+done < <(grep -hoE 'base\.Roda\("[a-z0-9-]+"' "${fontes[@]}" | grep -oE '"[a-z0-9-]+"' | tr -d '"' | sort -u)
+eq 2 "$n"
+
+t "o ffmpeg e o ffprobe só recebem atalhos: toda entrada (-i) é um link, a lista ou um marcador do plano"
+# Depois de um "-i" vem sempre um atalho (link, links[0]), a lista do modo
+# rápido ou um marcador ({fonteN}, {lista}) que o motor troca pelo atalho.
+while read -r entrada; do
+  like "$entrada" '^"-i", ("\{lista\}"|"\{fonte"\+strconv\.Itoa\(c\.Fonte|link|links\[0\])' "entrada que não é um atalho: $entrada"
+done < <(grep -hoE '"-i", [^,)]+' "${fontes[@]}")
+ok grep -q 'os.Symlink(abs, links\[i\])' "$src/internal/midia/sonda.go"
+
+t "a saída nunca é escrita direto no nome final: sempre num .parcial, que só no fim ganha o nome"
+eq 2 "$(grep -c 'os.CreateTemp(destino, ".mkcorte-\*.parcial")' "$src/internal/midia/exporta.go" "$src/internal/midia/quadro.go" | awk -F: '{s+=$2} END {print s}')"
+# Dar o nome é um link físico (que falha se o nome existe), nunca um rename por cima.
+ok grep -q 'os.Link(parcial, destino)' "$src/internal/midia/exporta.go"
+eq "" "$(grep -n 'os.Rename(parcial.Name()' "${fontes[@]}" || true)"
+
+t "o binário do pacote existe, é estático e executável"
+exists "$bin"
+ok test -x "$bin"
+like "$(file -b "$bin")" 'statically linked'
+
+t "o binário do pacote saiu do código que está no repositório (rode apps/mkcorte/pack depois de mexer em src/)"
+# O pack anota a assinatura do código (um resumo de todos os .go e do go.mod)
+# ao lado do binário. Comparar os bytes do binário dependeria da versão do Go
+# de cada máquina.
+eq "$("$REPO/apps/mkcorte/assinatura")" "$(head -1 "$bin.de" 2>/dev/null)"
+
+t "o pack e a assinatura do MkCorte são os do MkUtil, só muda o nome"
+eq "$(sed 's/mkutil/mkcorte/g' "$REPO/apps/mkutil/assinatura")" "$(<"$REPO/apps/mkcorte/assinatura")"
+eq "$(grep -v '^#' "$REPO/apps/mkutil/pack" | sed 's/mkutil/mkcorte/g')" "$(grep -v '^#' "$REPO/apps/mkcorte/pack")"
+
+t "o binário responde ao contrato: sem subcomando, o uso em JSON e saída 1"
+out=$("$bin" 2>/dev/null)
+eq 1 $?
+like "$(jq -r .erro <<<"$out")" '^uso: mkcorte-motor <'
+contrato=$(<"$REPO/apps/mkcorte/CONTRATO.md")
+for c in sondar miniaturas plano exportar quadro; do
+  has "$out" "$c" "subcomando do contrato"
+  has "$contrato" "\`mkcorte-motor $c" "o contrato não descreve: $c"
+done
+
+t "o binário, sem ffprobe na máquina, diz o que falta (e não roda nada)"
+printf 'x' >"$SBX/a.mp4"
+out=$(PATH=$(path_sem ffprobe ffmpeg) "$bin" sondar -- "$SBX/a.mp4")
+eq 1 $?
+has "$(jq -r .erro <<<"$out")" "pacote ffmpeg"
+
+t "o binário com ffmpeg e ffprobe de mentira: exporta ao lado, com nome difícil, sem sobrescrever"
+# shellcheck disable=SC2016 # é o corpo do stub: expande quando ele roda
+stub ffprobe 'echo "{\"streams\":[{\"index\":0,\"codec_name\":\"h264\",\"codec_type\":\"video\",\"width\":1280,\"height\":720,\"avg_frame_rate\":\"30/1\"}],\"format\":{\"format_name\":\"mov,mp4\",\"duration\":\"30.0\"}}"'
+# shellcheck disable=SC2016
+stub ffmpeg 'for a in "$@"; do ultimo=$a; done; printf "out_time_us=1000000\nprogress=end\n"; printf feito >"$ultimo"'
+mkdir -p "$SBX/meus vídeos"
+video="$SBX/meus vídeos/-a 'b' \"c\": d.mp4"
+printf 'original' >"$video"
+edicao=$(jq -cn --arg v "$video" '{fontes: [$v], clipes: [{fonte: 0, inicio: 1, fim: 5}, {fonte: 0, inicio: 10, fim: 12.5}]}')
+out=$("$bin" plano --json "$edicao")
+eq 0 $?
+eq "6.5" "$(jq -r .duracao_s <<<"$out")"
+eq "$SBX/meus vídeos/-a 'b' \"c\": d (corte).mp4" "$(jq -r .saida <<<"$out")"
+not_called "ffmpeg"
+absent "$SBX/meus vídeos/-a 'b' \"c\": d (corte).mp4"
+out=$("$bin" exportar --json "$edicao")
+eq 0 $?
+eq "plano exportando fim" "$(jq -r .fase <<<"$out" | tr '\n' ' ' | sed 's/ $//')"
+eq "feito" "$(<"$SBX/meus vídeos/-a 'b' \"c\": d (corte).mp4")"
+eq "original" "$(<"$video")"
+# O ffmpeg e o ffprobe nunca viram o nome de verdade.
+hasnt "$(<"$SBX/calls")" "d.mp4"
+called "/fonte0.mp4"
+called "concat=n=2:v=1:a=0[v]"
+out=$("$bin" exportar --json "$edicao" | tail -1)
+eq "$SBX/meus vídeos/-a 'b' \"c\": d (corte) (2).mp4" "$(jq -r .saida <<<"$out")"
+eq 3 "$(find "$SBX/meus vídeos" -mindepth 1 | wc -l)"

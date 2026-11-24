@@ -111,6 +111,25 @@ correção.
   validação só aceita minúsculas).
 - **MkComprimir:** fechar a janela no meio de uma codificação pode deixar um
   arquivo `.mkcomprimir-*.parcial.*` escondido ao lado do vídeo.
+- **MkCalc, MkCorte e MkEscrita: o que foi visto.** Na sessão aninhada, pelo
+  teclado: a conta com prévia, o histórico e o erro do MkCalc; abrir, dividir,
+  remover e exportar (modo exato) no MkCorte, com o arquivo conferido; abrir,
+  digitar, continuar lista, salvar sozinho e a pré-visualização no MkEscrita.
+  **Não visto:** nada com o mouse (arrastar alça e clipe na linha do tempo do
+  MkCorte, as teclas da tela do MkCalc), tocar a edição com troca de vídeo
+  entre clipes, o modo rápido pela janela, o seletor de arquivo, copiar e
+  colar, o conflito e o rascunho recuperado do MkEscrita na tela, e nenhum dos
+  três com o mouse numa instalação. Na VM, depois de um `mk-update` de
+  verdade (que instalou o `qt6-multimedia`), os três abriram e fizeram o mesmo
+  pelo teclado, e um clique no histórico do MkCalc funcionou.
+- **MkCorte:** fechar a janela pelo compositor não pergunta pela edição não
+  exportada (só o `Q` pergunta). A pré-visualização para no fim de cada clipe
+  com precisão de dezenas de milissegundos; a exportação é exata. Aparar o
+  início arrastando a alça funciona, mas a alça não acompanha o ponteiro: o
+  caminho firme é `Ctrl+Espaço`.
+- **MkEscrita:** não imprime (exporte HTML e imprima pelo navegador); cada
+  marcação aplicada por atalho conta como dois passos de desfazer; arquivo
+  que não é UTF-8 ou passa de 4 MB é recusado.
 - **MkTunes continua em Java.** O porte para Go espera o repositório dele, que
   não está na máquina onde os outros apps foram feitos.
 - **Controles (Super + Esc):** vistos abrindo na sessão aninhada, com Esc

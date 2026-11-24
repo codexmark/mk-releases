@@ -15,7 +15,7 @@ eq /usr/share/mk/apps/mkpacotes/bin/mkpacotes "$(readlink "$R/usr/bin/mkpacotes"
 eq /usr/share/mk/apps/mkutil/bin/mkinstalar "$(readlink "$R/usr/bin/mkinstalar")"
 eq /usr/share/mk/apps/mkutil/bin/mkcomprimir "$(readlink "$R/usr/bin/mkcomprimir")"
 eq /usr/share/mk/apps/mkutil/share/mkcomprimir.desktop "$(readlink "$R/usr/share/applications/mkcomprimir.desktop")"
-eq 9 "$(find "$R" -type l | wc -l)"
+eq 18 "$(find "$R" -type l | wc -l)" # o apps-links de hoje liga também os apps que vieram depois
 eq "" "$(cat "$ERR")"
 
 de_novo

@@ -1,0 +1,11 @@
+{ "modo": "exato", "duracao_s": 41.6, "clipes": 3, "largura": 1920, "altura": 1080, "fps": 29.97, "tem_audio": true,
+  "tamanho_estimado_bytes": 32832000,
+  "sem_recodificar": { "pode": true, "motivo": "",
+    "aviso": "Sem recodificar, o corte cai no quadro-chave anterior: cada clipe pode começar um pouco antes do ponto marcado (até alguns segundos, conforme o vídeo) e a duração final pode passar da prevista. Para o corte exato ao quadro, use o modo exato." },
+  "saida": "/exemplo/passeio na praia (corte).mp4",
+  "comando": ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats",
+    "-ss", "0.000", "-t", "41.600", "-i", "fonte0.mp4",
+    "-filter_complex", "[0:0]trim=duration=41.600,setpts=PTS-STARTPTS,setsar=1,format=yuv420p[v];[0:1]atrim=duration=41.600,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a]",
+    "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "-f", "mp4", "/exemplo/passeio na praia (corte).mp4"],
+  "avisos": [] }

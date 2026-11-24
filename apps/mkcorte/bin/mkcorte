@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Abre o MkCorte, o editor de cortes de vídeo do Mk: apara, divide, remove
+# trechos, junta outros vídeos e exporta. É também o alvo de "abrir com" de
+# vídeos.
+#   mkcorte [arquivos…]   abre no primeiro vídeo e junta os outros, na ordem
+#   MKCORTE_RAIZ   onde estão bin/ e qml/ (padrão: a pasta acima deste script)
+# Sem arquivo e com a janela já aberta, só a traz para a frente. Com arquivo,
+# abre uma janela nova neles.
+set -euo pipefail
+raiz=${MKCORTE_RAIZ:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
+titulo=MkCorte
+
+# Falta algo: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
+missing() {
+  local text="O $titulo precisa $1. Rode mk atualizar."
+  notify-send -a "$titulo" "$titulo" "$text" 2>/dev/null || true
+  echo "${0##*/}: $text" >&2
+  exit 1
+}
+command -v qs >/dev/null || missing "do Quickshell"
+command -v jq >/dev/null || missing "do jq"
+[[ -x $raiz/bin/mkcorte-motor ]] || missing "do motor (bin/mkcorte-motor)"
+
+# Os arquivos vão para a janela como uma lista JSON de caminhos absolutos:
+# nome com espaço, aspas ou começando com "-" chega inteiro.
+arquivos=()
+for a in "$@"; do
+  [[ $a == /* ]] || a=$PWD/$a
+  arquivos+=("$a")
+done
+
+# Uma janela só: sem arquivo novo, se já há uma, foca.
+if ((${#arquivos[@]} == 0)) && qs list --all 2>/dev/null | grep -qF "Config path: $raiz/qml/shell.qml"; then
+  addr=$(hyprctl clients -j 2>/dev/null | jq -r --arg t "$titulo" 'first(.[] | select(.title == $t) | .address) // empty' 2>/dev/null || true)
+  if [[ $addr =~ ^0x[0-9a-f]+$ ]]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 || true
+    exit 0
+  fi
+fi
+
+MKCORTE_ARQUIVOS=$(jq -cn '$ARGS.positional' --args -- "${arquivos[@]}")
+export MKCORTE_ARQUIVOS
+exec qs -p "$raiz/qml"

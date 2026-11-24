@@ -83,5 +83,33 @@ Dois utilitários com um motor em Go (`mkutil/src/`, `mkutil/bin/mkutil-motor`):
   ffmpeg, com predefinições (inclusive "caber em N MB"), a estimativa antes de
   começar, progresso, cancelar e fila. Nunca sobrescreve o original.
 
-O sistema liga os três por `system/mk/apps-links`.
+## mkcalc
+
+A calculadora (`mkcalc`): contas **exatas** (`0,1 + 0,2` dá `0,3`; o motor usa
+frações, não ponto flutuante), parênteses, potência, raiz e o percentual de
+calculadora de mesa (`200 + 10%` = `220`). O resultado aparece enquanto se
+digita, tudo funciona pelo teclado, e as contas confirmadas ficam num
+histórico (`Ctrl+H`). O motor (`mkcalc-motor servir`) fica de pé e responde
+uma linha por pedido.
+
+## mkcorte
+
+O editor de cortes de vídeo (`mkcorte [arquivos]`): aparar as pontas, dividir,
+remover trechos, juntar outros vídeos, reordenar, desfazer, ver o resultado e
+exportar em MP4. Dois modos de exportar: **exato** (recodifica; o corte cai no
+quadro marcado) e **rápido** (copia o vídeo como está, em segundos; o corte
+cai no quadro-chave anterior). Nunca escreve por cima de um arquivo. A janela
+mostra o vídeo pelo QtMultimedia (`qt6-multimedia`, `qt6-multimedia-ffmpeg`);
+o motor (`mkcorte-motor`) monta e roda o ffmpeg. `?` mostra os atalhos.
+
+## mkescrita
+
+O editor de Markdown (`mkescrita [arquivo]`): uma coluna de texto, salvamento
+automático depois que o documento tem nome (escrita atômica; se o arquivo
+mudou por fora, para e pergunta), rascunho do que ainda não foi salvo
+recuperado na abertura seguinte, pré-visualização ao lado (`Ctrl+Shift+P`),
+sumário dos títulos, busca e substituição, exportar HTML. O conversor de
+Markdown é do próprio motor (`mkescrita-motor`). `F1` mostra os atalhos.
+
+O sistema liga todos estes (do MkPacotes em diante) por `system/mk/apps-links`.
 

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=MkEscrita
+GenericName=Editor de Markdown
+Comment=Escrever em Markdown sem distração, com salvamento automático
+Exec=mkescrita %F
+Icon=mkescrita
+Terminal=false
+Categories=Office;TextEditor;Utility;
+MimeType=text/markdown;text/plain;
+Keywords=escrever;texto;markdown;editor;notas;rascunho;md;

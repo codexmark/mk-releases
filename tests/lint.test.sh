@@ -44,7 +44,7 @@ fi
 
 t "todo executável de bin/ e scripts do shell tem o bit de execução"
 for f in bin/* shell/mare/scripts/* tests/run tests/hooks/* apps/mkpulso/bin/mkpulso apps/mkpacotes/bin/mkpacotes apps/mkutil/bin/mkinstalar \
-  apps/mkutil/bin/mkcomprimir apps/mk*/pack apps/mk*/assinatura; do
+  apps/mkutil/bin/mkcomprimir apps/mkcalc/bin/mkcalc apps/mkcorte/bin/mkcorte apps/mkescrita/bin/mkescrita apps/mk*/pack apps/mk*/assinatura; do
   [[ -f $f && $f != bin/lib-packages.sh ]] || continue
   [[ -x $f ]] || _fail "sem +x: $f"
 done

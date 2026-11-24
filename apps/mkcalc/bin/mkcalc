@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Abre o MkCalc, a calculadora do Mk. Se a janela já está aberta, só a traz
+# para a frente.
+#   mkcalc               abre a calculadora
+#   mkcalc "2 + 2"       abre já com a expressão (uma janela nova)
+#   MKCALC_RAIZ   onde estão bin/ e qml/ (padrão: a pasta acima deste script)
+set -euo pipefail
+raiz=${MKCALC_RAIZ:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
+titulo=MkCalc
+
+# Falta algo: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
+missing() {
+  local text="O $titulo precisa $1. Rode mk atualizar."
+  notify-send -a "$titulo" "$titulo" "$text" 2>/dev/null || true
+  echo "${0##*/}: $text" >&2
+  exit 1
+}
+command -v qs >/dev/null || missing "do Quickshell"
+[[ -x $raiz/bin/mkcalc-motor ]] || missing "do motor (bin/mkcalc-motor)"
+
+# A expressão vai para a janela por variável de ambiente, nunca por shell: ela
+# passa pelo mesmo filtro do que é colado (qml/Calc.js).
+expressao=$*
+
+# Uma janela só: sem expressão nova, se já há uma, foca.
+if [[ -z $expressao ]] && qs list --all 2>/dev/null | grep -qF "Config path: $raiz/qml/shell.qml"; then
+  addr=$(hyprctl clients -j 2>/dev/null | jq -r --arg t "$titulo" 'first(.[] | select(.title == $t) | .address) // empty' 2>/dev/null || true)
+  if [[ $addr =~ ^0x[0-9a-f]+$ ]]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 || true
+    exit 0
+  fi
+fi
+
+[[ -z $expressao ]] || export MKCALC_EXPR=$expressao
+exec qs -p "$raiz/qml"

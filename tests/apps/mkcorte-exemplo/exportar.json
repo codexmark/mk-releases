@@ -1,0 +1,8 @@
+[
+  { "fase": "plano", "modo": "exato", "duracao_s": 41.6, "clipes": 3, "largura": 1920, "altura": 1080, "fps": 29.97, "tem_audio": true,
+    "tamanho_estimado_bytes": 32832000, "sem_recodificar": { "pode": true, "motivo": "", "aviso": "" },
+    "saida": "/exemplo/passeio na praia (corte).mp4", "comando": ["ffmpeg"], "avisos": [] },
+  { "fase": "exportando", "pct": 18.4, "velocidade": null, "resta_s": null, "tamanho_bytes": 5800000 },
+  { "fase": "exportando", "pct": 73.0, "velocidade": 2.8, "resta_s": 4, "tamanho_bytes": 23500000 },
+  { "fase": "fim", "ok": true, "saida": "/exemplo/passeio na praia (corte).mp4", "modo": "exato", "duracao_s": 41.6, "tamanho_bytes": 31900000 }
+]

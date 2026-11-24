@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>MkCorte</title>
+  <rect width="64" height="64" rx="12" fill="#0b0b0b"/>
+  <path d="M10 22h17v20H10zM37 22h17v20H37z" fill="none" stroke="#cdc4ba" stroke-opacity=".6" stroke-width="2" stroke-linejoin="miter"/>
+  <path d="M32 12v40M27 12h10M27 52h10" fill="none" stroke="#ce5e32" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

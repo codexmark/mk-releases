@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MkCalc
+GenericName=Calculadora
+Comment=Calculadora de teclado, com a conta exata, a prévia enquanto se digita e histórico
+Exec=mkcalc
+Icon=mkcalc
+Terminal=false
+Categories=Utility;Calculator;
+Keywords=calculadora;calcular;conta;soma;porcentagem;percentual;raiz;matemática;

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=MkCorte
+GenericName=Editor de cortes de vídeo
+Comment=Apara, divide, remove trechos e junta vídeos, e exporta sem mexer no original
+Exec=mkcorte %F
+Icon=mkcorte
+Terminal=false
+Categories=AudioVideo;Video;AudioVideoEditing;
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mpeg;video/x-m4v;video/3gpp;video/ogg;video/mp2t;video/x-flv;video/x-ms-wmv;
+Keywords=cortar;corte;aparar;dividir;juntar;vídeo;video;editor;clipe;ffmpeg;

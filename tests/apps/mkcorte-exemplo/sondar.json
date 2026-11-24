@@ -1,0 +1,4 @@
+{ "arquivo": "/exemplo/passeio na praia.mp4", "tamanho_bytes": 48000000, "duracao_s": 62.4, "largura": 1920, "altura": 1080,
+  "fps": 29.97, "fps_fracao": "30000/1001", "codec": "h264", "perfil": "High", "formato_de_pixel": "yuv420p", "sar": "1:1", "rotacao": 0,
+  "taxa_bps": 6153846, "trilha": 0, "tem_audio": true,
+  "audio": { "codec": "aac", "taxa_bps": 128000, "canais": 2, "amostragem_hz": 48000, "trilha": 1 } }

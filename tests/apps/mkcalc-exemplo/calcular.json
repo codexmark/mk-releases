@@ -1,0 +1,14 @@
+{
+  "200+10%": {"expressao": "200 + 10%", "resultado": "220", "cru": "220", "aproximado": false},
+  "0,1+0,2": {"expressao": "0,1 + 0,2", "resultado": "0,3", "cru": "0,3", "aproximado": false},
+  "2÷3": {"expressao": "2 ÷ 3", "resultado": "0,666666666667", "cru": "0,666666666667", "aproximado": true},
+  "1÷0": {"erro": "divisão por zero", "incompleta": false},
+  "2+": {"erro": "expressão incompleta", "incompleta": true},
+  "*": {"expressao": "1234,5 × 1000", "resultado": "1.234.500", "cru": "1234500", "aproximado": false,
+    "itens": [
+      {"id": 4, "expressao": "1234,5 × 1000", "resultado": "1.234.500", "cru": "1234500", "aproximado": false, "quando_s": 1795000300},
+      {"id": 3, "expressao": "2 ÷ 3", "resultado": "0,666666666667", "cru": "0,666666666667", "aproximado": true, "quando_s": 1795000200},
+      {"id": 2, "expressao": "200 + 10%", "resultado": "220", "cru": "220", "aproximado": false, "quando_s": 1795000100},
+      {"id": 1, "expressao": "√(3^2 + 4^2)", "resultado": "5", "cru": "5", "aproximado": false, "quando_s": 1795000000}
+    ]}
+}

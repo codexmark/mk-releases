@@ -7,6 +7,7 @@ tags:
   - catálogo
 fontes:
   - "migrations/system/20261130-mkpacotes-mkutil.sh"
+  - "migrations/system/20261201-mkcalc-mkcorte-mkescrita.sh"
   - "migrations/system/20261129-mkpulso.sh"
   - "migrations/user/20261128-papel-de-fabrica.sh"
   - "migrations/system/20261128-entrada-marca.sh"
@@ -57,6 +58,7 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261128-shellcheck.sh` | só avisa se o `shellcheck` não veio | `shellcheck` |
 | `20261129-mkpulso.sh` | os links do MkPulso (comando, atalho, ícone); avisa se o coletor não veio | |
 | `20261130-mkpacotes-mkutil.sh` | os links do MkPacotes, do MkInstalar e do MkComprimir (`apps-links`) | |
+| `20261201-mkcalc-mkcorte-mkescrita.sh` | os links do MkCalc, do MkCorte e do MkEscrita (`apps-links`) | `qt6-multimedia`, `qt6-multimedia-ffmpeg` |
 
 ### De usuário (`migrations/user/`)
 

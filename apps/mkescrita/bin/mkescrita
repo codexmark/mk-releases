@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Abre o MkEscrita: o editor de Markdown do Mk, uma coluna de texto e mais
+# nada. É também o alvo de "abrir com" de arquivos de texto e Markdown.
+#   mkescrita              traz a janela que já existe para a frente (ou abre uma)
+#   mkescrita <arquivo…>   abre cada arquivo numa janela nova
+#   mkescrita --nova       abre uma janela nova, vazia, mesmo que já haja outra
+#   mkescrita --help       esta ajuda
+#   MKESCRITA_RAIZ   onde estão bin/ e qml/ (padrão: a pasta acima deste script)
+# Um arquivo cujo nome começa com "-" vai depois de "--".
+set -euo pipefail
+raiz=${MKESCRITA_RAIZ:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
+titulo=MkEscrita
+
+uso() {
+  cat <<'USO'
+MkEscrita: escrever em Markdown sem distração.
+
+  mkescrita              traz a janela que já existe para a frente (ou abre uma)
+  mkescrita <arquivo…>   abre cada arquivo numa janela nova
+  mkescrita --nova       abre uma janela nova, vazia
+  mkescrita --help       esta ajuda
+
+Um arquivo cujo nome começa com "-" vai depois de "--".
+Dentro da janela, F1 mostra os atalhos.
+USO
+}
+
+# Os arquivos vão para a janela como caminhos absolutos, um por janela: nome
+# com espaço, aspas ou começando com "-" chega inteiro (pelo ambiente, nunca
+# por uma linha de comando montada).
+nova=0
+arquivos=()
+so_arquivos=0
+for a in "$@"; do
+  if ((!so_arquivos)); then
+    case $a in
+      -h | --help) uso; exit 0 ;;
+      --nova) nova=1; continue ;;
+      --) so_arquivos=1; continue ;;
+      -?*)
+        echo "${0##*/}: não conheço a opção $a (para um arquivo cujo nome começa com \"-\", ponha -- antes)" >&2
+        uso >&2
+        exit 2
+        ;;
+    esac
+  fi
+  [[ -n $a ]] || continue
+  [[ $a == /* ]] || a=$PWD/$a
+  arquivos+=("$a")
+done
+
+# Falta algo: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
+missing() {
+  local text="O $titulo precisa $1. Rode mk atualizar."
+  notify-send -a "$titulo" "$titulo" "$text" 2>/dev/null || true
+  echo "${0##*/}: $text" >&2
+  exit 1
+}
+command -v qs >/dev/null || missing "do Quickshell"
+command -v jq >/dev/null || missing "do jq"
+[[ -x $raiz/bin/mkescrita-motor ]] || missing "do motor (bin/mkescrita-motor)"
+
+# Sem arquivo e sem --nova: se já há uma janela, só a traz para a frente. O
+# título muda com o documento ("notas.md — MkEscrita"); o de nascença, não.
+if ((${#arquivos[@]} == 0 && !nova)) && qs list --all 2>/dev/null | grep -qF "Config path: $raiz/qml/shell.qml"; then
+  addr=$(hyprctl clients -j 2>/dev/null | jq -r --arg t "$titulo" \
+    'first(.[] | select(.initialTitle == $t or .title == $t) | .address) // empty' 2>/dev/null || true)
+  if [[ $addr =~ ^0x[0-9a-f]+$ ]]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 || true
+    exit 0
+  fi
+fi
+
+# Uma janela por arquivo: as primeiras ficam soltas, a última é este processo.
+n=${#arquivos[@]}
+for ((i = 0; i < n - 1; i++)); do
+  MKESCRITA_ARQUIVO=${arquivos[i]} qs -p "$raiz/qml" >/dev/null 2>&1 &
+  disown
+done
+if ((n > 0)); then
+  export MKESCRITA_ARQUIVO=${arquivos[n - 1]}
+else
+  export MKESCRITA_ARQUIVO=
+fi
+exec qs -p "$raiz/qml"

@@ -32,6 +32,10 @@ quickshell
 cava
 # qt6-imageformats: o Maré abre papéis de parede em WebP, AVIF e TIFF
 qt6-imageformats
+# qt6-multimedia: o MkCorte (apps/mkcorte) mostra o vídeo que está sendo
+# cortado; o -ffmpeg é quem decodifica
+qt6-multimedia
+qt6-multimedia-ffmpeg
 libnotify
 
 # MkTunes, o player de música do Mk (apps/mktunes): o núcleo roda no Java só de
