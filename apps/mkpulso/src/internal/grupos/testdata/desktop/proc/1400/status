@@ -1,0 +1,10 @@
+Name:	nautilus
+Umask:	0022
+State:	S
+Pid:	1400
+PPid:	800
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	  160000 kB
+VmRSS:	   80000 kB
+Threads:	1

@@ -1,0 +1,10 @@
+Name:	pipewire
+Umask:	0022
+State:	S
+Pid:	820
+PPid:	800
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	   30000 kB
+VmRSS:	   15000 kB
+Threads:	1

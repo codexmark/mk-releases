@@ -81,3 +81,19 @@ exists "$mare/wallpapers/$fabrica"
 has "$w" "fresh && !marked"
 has "$w" 'current === ""'
 exists "$REPO/migrations/user/20261128-papel-de-fabrica.sh"
+
+t "o painel Sistema abre o MkPulso (o monitor do Mk), não mais o btop num terminal"
+sis=$(<"$mare/SystemPanel.qml")
+has "$sis" 'Hypr.exec("mkpulso")'
+hasnt "$sis" '"btop"'
+exists "$REPO/apps/mkpulso/bin/mkpulso"
+
+t "desbloquear devolve o teclado à janela que estava em foco"
+# Visto na VM: com o ponteiro parado em cima da ilha, depois de desbloquear
+# nenhuma janela ficava com o foco e o que se digitava se perdia.
+trava=$(<"$mare/Lock.qml")
+has "$trava" "Hyprland.activeToplevel"
+has "$(sed -n '/function lock()/,/^    }/p' "$mare/Lock.qml")" "hadFocus ="
+has "$trava" "Hypr.focusWindow(hadFocus)"
+# Só um endereço de janela de verdade entra no comando.
+like "$trava" '\^\(0x\)\?\[0-9a-f\]\+\$'

@@ -1,0 +1,10 @@
+Name:	dbus-broker
+Umask:	0022
+State:	S
+Pid:	311
+PPid:	310
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+VmPeak:	    4000 kB
+VmRSS:	    2000 kB
+Threads:	1

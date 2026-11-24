@@ -51,6 +51,15 @@ eq 0 "$rc" "$out"
 eq 1 "$(grep -c '^pacstrap ' "$SBX/calls")"
 called "pacstrap -K -C $SBX/pacman.conf $target "
 
+t "o pacman da instalação roda sem os ganchos do snap-pac (SNAP_PAC_SKIP)"
+# No pacstrap ainda não há configuração do snapper no disco novo: o gancho do
+# snap-pac escrevia "fatal library error, lookup self" no meio da instalação.
+stub pacstrap 'echo "snap=${SNAP_PAC_SKIP:-}" >>"$SBX/env-pacstrap"'
+rm -f "$SBX/env-pacstrap"
+roda com install_packages
+eq "snap=y" "$(sort -u "$SBX/env-pacstrap")"
+stub pacstrap
+
 t "install_packages: base, desktop e dev sempre entram"
 p=$(pacotes)
 for x in base linux limine snapper hyprland quickshell sddm ghostty neovim; do
@@ -587,6 +596,23 @@ for f in bin/mk-update bin/mk-session tests/run tests/hooks/pre-push shell/mare/
 done
 ok test -x "$share/bin/mk-update"
 ok test -x "$share/shell/mare/scripts/mare-caps"
+
+t "install_desktop: um binário compilado (o coletor do MkPulso) também volta a ser executável"
+# O fix_exec olhava só o #! dos scripts: um ELF copiado do ISO ficaria 644.
+mkdir -p "$SBX/src/apps/elf"
+printf '\177ELF\002\001\001\000binario' >"$SBX/src/apps/elf/programa"
+printf 'ELF não: texto que começa parecido' >"$SBX/src/apps/elf/texto"
+chmod a-x "$SBX/src/apps/elf/programa" "$SBX/src/apps/elf/texto"
+rm -rf "${share:?}" "${skel:?}/.config/mk"
+roda com install_desktop
+eq 0 "$rc" "$out"
+ok test -x "$share/apps/elf/programa"
+fails test -x "$share/apps/elf/texto"
+[[ ! -e $share/apps/mkpulso/bin/mkpulso-coletor ]] || ok test -x "$share/apps/mkpulso/bin/mkpulso-coletor"
+
+t "install_desktop: o MkPulso fica ligado por links para /usr/share/mk"
+eq /usr/share/mk/apps/mkpulso/bin/mkpulso "$(readlink "$target/usr/bin/mkpulso")"
+eq /usr/share/mk/apps/mkpulso/share/mkpulso.desktop "$(readlink "$target/usr/share/applications/mkpulso.desktop")"
 
 t "install_desktop: o que não é script continua sem bit de execução"
 for f in README.md system/packages/base.packages config/hypr/hyprland.lua shell/mare/Mare.qml bin/lib-packages.sh; do

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Sintaxe e lint do repositório inteiro: nada que não passa aqui é lançado.
-# apps/ (o MkTunes) e as pastas de trabalho da ISO ficam de fora.
+# apps/mktunes (gerado no repositório do MkTunes) e as pastas de trabalho da
+# ISO ficam de fora.
 . "$(dirname "$0")/lib.sh"
 
 cd "$REPO" || exit 1
 mapfile -t all < <(find . -type f \
-  -not -path './.git/*' -not -path './apps/*' -not -path './iso/work/*' -not -path './iso/out/*' |
+  -not -path './.git/*' -not -path './apps/mktunes/*' -not -path './iso/work/*' -not -path './iso/out/*' |
   sed 's|^\./||' | sort)
 
 # shells: os que têm #! de bash; libs: os que são carregados com `.` (sem #!).
@@ -42,7 +43,7 @@ else
 fi
 
 t "todo executável de bin/ e scripts do shell tem o bit de execução"
-for f in bin/* shell/mare/scripts/* tests/run tests/hooks/*; do
+for f in bin/* shell/mare/scripts/* tests/run tests/hooks/* apps/mkpulso/bin/mkpulso apps/mkpulso/pack apps/mkpulso/assinatura; do
   [[ -f $f && $f != bin/lib-packages.sh ]] || continue
   [[ -x $f ]] || _fail "sem +x: $f"
 done
@@ -59,7 +60,7 @@ fi
 
 t "JavaScript do shell: sintaxe válida"
 if command -v node >/dev/null; then
-  for f in shell/mare/*.js; do
+  for f in shell/mare/*.js apps/mkpulso/qml/*.js; do
     out=$(grep -vE '^\.(pragma|import) ' "$f" | node --check - 2>&1) || _fail "$f" "$out"
   done
 else

@@ -1,0 +1,10 @@
+Name:	firefox
+Umask:	0022
+State:	S
+Pid:	1234
+PPid:	800
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	  800000 kB
+VmRSS:	  400000 kB
+Threads:	1

@@ -1,0 +1,657 @@
+{
+ "t_ms": 1795480000000,
+ "maquina": "mk",
+ "nucleos": 4,
+ "cpu": {
+  "pct": 37.5,
+  "por_nucleo": [
+   62.0,
+   31.0,
+   48.0,
+   9.0
+  ],
+  "freq_mhz": 2400,
+  "temp_c": 61.0,
+  "carga": [
+   1.2,
+   0.9,
+   0.7
+  ]
+ },
+ "mem": {
+  "total_kb": 8000000,
+  "usado_kb": 5200000,
+  "disponivel_kb": 2800000,
+  "cache_kb": 1900000,
+  "swap_total_kb": 0,
+  "swap_usado_kb": 0
+ },
+ "discos": [
+  {
+   "nome": "nvme0n1",
+   "leitura_bps": 0,
+   "escrita_bps": 8192
+  }
+ ],
+ "montagens": [
+  {
+   "onde": "/",
+   "fs": "btrfs",
+   "total_kb": 250000000,
+   "usado_kb": 88000000
+  },
+  {
+   "onde": "/boot",
+   "fs": "vfat",
+   "total_kb": 2000000,
+   "usado_kb": 310000
+  }
+ ],
+ "rede": [
+  {
+   "nome": "wlan0",
+   "rx_bps": 1400,
+   "tx_bps": 300
+  }
+ ],
+ "gpus": [
+  {
+   "nome": "Intel HD Graphics 520",
+   "uso_pct": null,
+   "mem_usada_kb": null,
+   "mem_total_kb": null,
+   "temp_c": null
+  }
+ ],
+ "bateria": {
+  "pct": 75,
+  "carregando": false,
+  "watts": 9.4
+ },
+ "totais": {
+  "processos": 18,
+  "grupos": 11,
+  "threads": 612
+ },
+ "grupos": [
+  {
+   "id": "servico:docker.service",
+   "tipo": "servico",
+   "nome": "docker",
+   "icone": "",
+   "unidade": "docker.service",
+   "escopo": "sistema",
+   "janelas": [],
+   "n": 2,
+   "pid": 700,
+   "cpu_pct": 13.5,
+   "mem_kb": 274000,
+   "disco_bps": 8192,
+   "gpu_pct": null,
+   "energia": "alta",
+   "processos": [
+    {
+     "pid": 700,
+     "ppid": 1,
+     "nome": "dockerd",
+     "cmd": "/usr/bin/dockerd -H fd://",
+     "usuario": "mark",
+     "estado": "rodando",
+     "cpu_pct": 12.4,
+     "mem_kb": 210000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    },
+    {
+     "pid": 731,
+     "ppid": 1,
+     "nome": "containerd",
+     "cmd": "containerd --config /var/run/docker/containerd/containerd.toml",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 1.1,
+     "mem_kb": 64000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 10.8,
+    "cpu_pct_3m": 8.1,
+    "mem_kb_1m": 274000,
+    "mem_kb_3m": 274000,
+    "disco_bps_1m": 8192,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "app:firefox",
+   "tipo": "app",
+   "nome": "Firefox",
+   "icone": "",
+   "unidade": "app-firefox-1234.scope",
+   "escopo": "usuario",
+   "janelas": [
+    {
+     "titulo": "Arch Wiki — Firefox",
+     "workspace": "2",
+     "endereco": "0x55d0"
+    }
+   ],
+   "n": 3,
+   "pid": 1234,
+   "cpu_pct": 5.9,
+   "mem_kb": 839000,
+   "disco_bps": 0,
+   "gpu_pct": 4.0,
+   "energia": "baixa",
+   "processos": [
+    {
+     "pid": 1234,
+     "ppid": 1,
+     "nome": "firefox",
+     "cmd": "/usr/lib/firefox/firefox",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 3.1,
+     "mem_kb": 412000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    },
+    {
+     "pid": 1240,
+     "ppid": 1234,
+     "nome": "Web Content",
+     "cmd": "/usr/lib/firefox/firefox -contentproc -childID 3",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 2.2,
+     "mem_kb": 301000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    },
+    {
+     "pid": 1251,
+     "ppid": 1234,
+     "nome": "Isolated Web Co",
+     "cmd": "/usr/lib/firefox/firefox -contentproc -childID 7",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.6,
+     "mem_kb": 126000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 4.7,
+    "cpu_pct_3m": 3.5,
+    "mem_kb_1m": 839000,
+    "mem_kb_3m": 839000,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "app:mkpulso",
+   "tipo": "app",
+   "nome": "MkPulso",
+   "icone": "",
+   "unidade": "",
+   "escopo": "usuario",
+   "janelas": [
+    {
+     "titulo": "MkPulso",
+     "workspace": "4",
+     "endereco": "0x5600"
+    }
+   ],
+   "n": 1,
+   "pid": 3100,
+   "cpu_pct": 5.9,
+   "mem_kb": 46000,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "moderada",
+   "processos": [
+    {
+     "pid": 3100,
+     "ppid": 1,
+     "nome": "qs",
+     "cmd": "qs -p /usr/share/mk/apps/mkpulso/qml",
+     "usuario": "mark",
+     "estado": "rodando",
+     "cpu_pct": 5.9,
+     "mem_kb": 46000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 4.7,
+    "cpu_pct_3m": 3.5,
+    "mem_kb_1m": 46000,
+    "mem_kb_3m": 46000,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "servico:mare.service",
+   "tipo": "servico",
+   "nome": "Maré",
+   "icone": "",
+   "unidade": "app-mare.scope",
+   "escopo": "usuario",
+   "janelas": [],
+   "n": 1,
+   "pid": 950,
+   "cpu_pct": 1.8,
+   "mem_kb": 140000,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "baixa",
+   "processos": [
+    {
+     "pid": 950,
+     "ppid": 1,
+     "nome": "qs",
+     "cmd": "qs -p ~/.config/mk/shell",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 1.8,
+     "mem_kb": 140000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 1.4,
+    "cpu_pct_3m": 1.1,
+    "mem_kb_1m": 140000,
+    "mem_kb_3m": 140000,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "app:ghostty",
+   "tipo": "app",
+   "nome": "Ghostty",
+   "icone": "",
+   "unidade": "app-ghostty-2001.scope",
+   "escopo": "usuario",
+   "janelas": [
+    {
+     "titulo": "~/Work/mk",
+     "workspace": "1",
+     "endereco": "0x55e0"
+    },
+    {
+     "titulo": "nvim README.md",
+     "workspace": "1",
+     "endereco": "0x55f0"
+    }
+   ],
+   "n": 3,
+   "pid": 2001,
+   "cpu_pct": 0.7,
+   "mem_kb": 135200,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "muito baixa",
+   "processos": [
+    {
+     "pid": 2001,
+     "ppid": 1,
+     "nome": "ghostty",
+     "cmd": "/usr/bin/ghostty",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.4,
+     "mem_kb": 88000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    },
+    {
+     "pid": 2010,
+     "ppid": 2001,
+     "nome": "bash",
+     "cmd": "-bash",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.0,
+     "mem_kb": 6200,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    },
+    {
+     "pid": 2044,
+     "ppid": 2010,
+     "nome": "nvim",
+     "cmd": "nvim README.md",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.3,
+     "mem_kb": 41000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 0.6,
+    "cpu_pct_3m": 0.4,
+    "mem_kb_1m": 135200,
+    "mem_kb_3m": 135200,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "servico:pipewire.service",
+   "tipo": "servico",
+   "nome": "pipewire",
+   "icone": "",
+   "unidade": "pipewire.service",
+   "escopo": "usuario",
+   "janelas": [],
+   "n": 1,
+   "pid": 900,
+   "cpu_pct": 0.6,
+   "mem_kb": 18000,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "muito baixa",
+   "processos": [
+    {
+     "pid": 900,
+     "ppid": 1,
+     "nome": "pipewire",
+     "cmd": "/usr/bin/pipewire",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.6,
+     "mem_kb": 18000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 0.5,
+    "cpu_pct_3m": 0.4,
+    "mem_kb_1m": 18000,
+    "mem_kb_3m": 18000,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "sistema:kernel",
+   "tipo": "sistema",
+   "nome": "Kernel",
+   "icone": "",
+   "unidade": "",
+   "escopo": "",
+   "janelas": [],
+   "n": 3,
+   "pid": 2,
+   "cpu_pct": 0.3,
+   "mem_kb": 0,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "nenhuma",
+   "processos": [
+    {
+     "pid": 2,
+     "ppid": 1,
+     "nome": "kthreadd",
+     "cmd": "",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.0,
+     "mem_kb": 0,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    },
+    {
+     "pid": 15,
+     "ppid": 1,
+     "nome": "ksoftirqd/0",
+     "cmd": "",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.1,
+     "mem_kb": 0,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    },
+    {
+     "pid": 40,
+     "ppid": 1,
+     "nome": "kworker/1:1",
+     "cmd": "",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.2,
+     "mem_kb": 0,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 0.2,
+    "cpu_pct_3m": 0.2,
+    "mem_kb_1m": 0,
+    "mem_kb_3m": 0,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "app:mktunes",
+   "tipo": "app",
+   "nome": "MkTunes",
+   "icone": "",
+   "unidade": "",
+   "escopo": "usuario",
+   "janelas": [],
+   "n": 1,
+   "pid": 3300,
+   "cpu_pct": 0.2,
+   "mem_kb": 91000,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "muito baixa",
+   "processos": [
+    {
+     "pid": 3300,
+     "ppid": 1,
+     "nome": "mktunesd",
+     "cmd": "mktunesd",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.2,
+     "mem_kb": 91000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 0.2,
+    "cpu_pct_3m": 0.1,
+    "mem_kb_1m": 91000,
+    "mem_kb_3m": 91000,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "servico:NetworkManager.service",
+   "tipo": "servico",
+   "nome": "NetworkManager",
+   "icone": "",
+   "unidade": "NetworkManager.service",
+   "escopo": "sistema",
+   "janelas": [],
+   "n": 1,
+   "pid": 512,
+   "cpu_pct": 0.0,
+   "mem_kb": 21000,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "nenhuma",
+   "processos": [
+    {
+     "pid": 512,
+     "ppid": 1,
+     "nome": "NetworkManager",
+     "cmd": "/usr/bin/NetworkManager --no-daemon",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.0,
+     "mem_kb": 21000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 0.0,
+    "cpu_pct_3m": 0.0,
+    "mem_kb_1m": 21000,
+    "mem_kb_3m": 21000,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "servico:sddm.service",
+   "tipo": "servico",
+   "nome": "sddm",
+   "icone": "",
+   "unidade": "sddm.service",
+   "escopo": "sistema",
+   "janelas": [],
+   "n": 1,
+   "pid": 480,
+   "cpu_pct": 0.0,
+   "mem_kb": 9000,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "nenhuma",
+   "processos": [
+    {
+     "pid": 480,
+     "ppid": 1,
+     "nome": "sddm",
+     "cmd": "/usr/bin/sddm",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.0,
+     "mem_kb": 9000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 0.0,
+    "cpu_pct_3m": 0.0,
+    "mem_kb_1m": 9000,
+    "mem_kb_3m": 9000,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  },
+  {
+   "id": "sistema:outros",
+   "tipo": "sistema",
+   "nome": "Outros",
+   "icone": "",
+   "unidade": "",
+   "escopo": "",
+   "janelas": [],
+   "n": 1,
+   "pid": 1,
+   "cpu_pct": 0.0,
+   "mem_kb": 14000,
+   "disco_bps": 0,
+   "gpu_pct": null,
+   "energia": "nenhuma",
+   "processos": [
+    {
+     "pid": 1,
+     "ppid": 1,
+     "nome": "systemd",
+     "cmd": "/sbin/init",
+     "usuario": "mark",
+     "estado": "dormindo",
+     "cpu_pct": 0.0,
+     "mem_kb": 14000,
+     "disco_bps": 0,
+     "gpu_pct": null,
+     "threads": 12,
+     "nice": 0,
+     "inicio_s": 1795470000
+    }
+   ],
+   "media": {
+    "cpu_pct_1m": 0.0,
+    "cpu_pct_3m": 0.0,
+    "mem_kb_1m": 14000,
+    "mem_kb_3m": 14000,
+    "disco_bps_1m": 0,
+    "disco_bps_3m": 0
+   }
+  }
+ ]
+}

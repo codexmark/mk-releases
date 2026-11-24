@@ -1,0 +1,11 @@
+# o da home ganha do sistema
+[Desktop Entry]
+Name=Firefox
+Name[pt]=Raposa
+Name[pt_BR]=Navegador Firefox
+Name[de]=Feuerfuchs
+Icon=firefox
+
+[Desktop Action new-window]
+Name=Nova janela
+Icon=outro

@@ -1,0 +1,10 @@
+Name:	carga
+Umask:	0022
+State:	S
+Pid:	321
+PPid:	320
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+VmPeak:	     200 kB
+VmRSS:	     100 kB
+Threads:	1

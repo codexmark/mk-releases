@@ -1,0 +1,28 @@
+Id=app-claude\x2ddesktop@autostart.service
+Description=Claude
+ActiveEnterTimestamp=@1795480100
+MainPID=25127
+MemoryCurrent=412090368
+
+Id=pipewire.service
+Description=PipeWire Multimedia Service
+ActiveEnterTimestamp=@1795145759
+MainPID=896
+MemoryCurrent=45801472
+
+Id=pipewire.socket
+Description=PipeWire Multimedia System Sockets
+ActiveEnterTimestamp=@1795145759
+MemoryCurrent=8192
+
+Id=syncthing.service
+Description=Syncthing - Open Source Continuous File Synchronization
+ActiveEnterTimestamp=@1795145800
+MainPID=0
+MemoryCurrent=[not set]
+
+Id=wireplumber.service
+Description=Multimedia Service Session Manager
+ActiveEnterTimestamp=
+MainPID=0
+MemoryCurrent=[not set]

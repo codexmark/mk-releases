@@ -1,0 +1,19 @@
+{
+ "linhas": [
+  {
+   "t_s": 1795479000,
+   "nivel": "info",
+   "texto": "Started Syncthing."
+  },
+  {
+   "t_s": 1795479020,
+   "nivel": "aviso",
+   "texto": "Listen (BEP/tcp): address already in use"
+  },
+  {
+   "t_s": 1795479021,
+   "nivel": "erro",
+   "texto": "Failed with result 'exit-code'."
+  }
+ ]
+}

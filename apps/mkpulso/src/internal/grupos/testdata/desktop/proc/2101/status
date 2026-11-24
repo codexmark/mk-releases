@@ -1,0 +1,10 @@
+Name:	bash
+Umask:	0022
+State:	S
+Pid:	2101
+PPid:	2100
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	    8000 kB
+VmRSS:	    4000 kB
+Threads:	1

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 
 // Sistema: quatro blocos com valor atual e o último minuto em gráfico,
-// mais o disco e um atalho para o btop.
+// mais o disco e um atalho para o MkPulso (o monitor do Mk, apps/mkpulso).
 Item {
     id: panel
 
@@ -90,9 +90,9 @@ Item {
             }
 
             PillButton {
-                text: "btop"
+                text: "MkPulso"
                 onClicked: {
-                    Projects.openIn("", "btop");
+                    Hypr.exec("mkpulso");
                     Mare.close();
                 }
             }

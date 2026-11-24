@@ -1,0 +1,10 @@
+Name:	vim
+Umask:	0022
+State:	S
+Pid:	2102
+PPid:	2101
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	   18000 kB
+VmRSS:	    9000 kB
+Threads:	1

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# A assinatura do código do coletor: um resumo (sha256) de todos os .go (menos
+# os de teste) e do go.mod de src/, em ordem de nome. O pack a anota ao lado do
+# binário; os testes do Mk a refazem para ver se o binário ainda é desse código.
+set -euo pipefail
+here=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+cd "$here/src"
+find . -type f \( -name '*.go' ! -name '*_test.go' -o -name go.mod \) -print0 | LC_ALL=C sort -z |
+  xargs -0 sha256sum | sha256sum | cut -d' ' -f1

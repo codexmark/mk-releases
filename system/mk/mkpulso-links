@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Liga o MkPulso (apps/mkpulso) ao sistema: o comando mkpulso, o atalho no menu
+# e o ícone. São links para /usr/share/mk, então a versão que o mk-update traz
+# vale sozinha, sem rodar isto de novo.
+#   mkpulso-links [raiz]   o instalador passa a raiz do sistema novo
+set -euo pipefail
+root=${1:-/}
+root=${root%/}
+app=/usr/share/mk/apps/mkpulso
+
+link() {
+  mkdir -p "$root$(dirname "$2")"
+  ln -sfn "$app/$1" "$root$2"
+}
+link bin/mkpulso /usr/bin/mkpulso
+link share/mkpulso.desktop /usr/share/applications/mkpulso.desktop
+link share/mkpulso.svg /usr/share/icons/hicolor/scalable/apps/mkpulso.svg
+
+# No sistema em uso, o menu e os ícones percebem já.
+if [[ -z $root ]]; then
+  update-desktop-database -q /usr/share/applications 2>/dev/null || true
+  gtk-update-icon-cache -qtf /usr/share/icons/hicolor 2>/dev/null || true
+fi

@@ -54,6 +54,27 @@ eq 1 $?
 hasnt "$out" "TERM=xterm-256color"
 has "$out" "o bash interativo caiu (TERM=xterm-ghostty"
 
+t "uma queda isolada (a máquina ocupada, o terminal que não respondeu a tempo) não reprova: tenta de novo"
+# Visto num lançamento: com a máquina carregada o bash subiu, saiu com 0 e a
+# resposta não veio. Na tentativa seguinte passou. Um mk.bash quebrado de
+# verdade cai em todas.
+rm -f "$SBX/carregou"
+cat >"$falso/config/bash/mk.bash" <<'RC'
+echo x >>"$SBX/carregou"
+# Cai só na primeira vez em que é carregado.
+[[ $(wc -l <"$SBX/carregou") -eq 1 ]] && exit 0
+RC
+out=$(confere)
+eq 0 $?
+has "$out" "bash do Mk: sobe e sai limpo"
+ok test "$(wc -l <"$SBX/carregou")" -ge 3
+
+t "mk.bash quebrado de verdade cai em todas as tentativas: sai com 1, e diz quantas foram"
+echo 'exit 3' >"$falso/config/bash/mk.bash"
+out=$(confere)
+eq 1 $?
+has "$out" "3 tentativas"
+
 t "mk.bash com um comando que falha, mas não derruba o shell: passa"
 echo 'false; comando-que-nao-existe 2>/dev/null; true' >"$falso/config/bash/mk.bash"
 confere >/dev/null

@@ -1,6 +1,8 @@
 # O sistema se chama Mk: "Welcome to Mk!" no boot, Mk no login e no
 # hostnamectl. O pacote filesystem traz o /etc/os-release do Arch; a cada
-# instalação ou atualização dele, este gancho põe o do Mk no lugar.
+# instalação ou atualização dele, este gancho põe o do Mk no lugar. Sem os
+# arquivos do Mk no disco (o pacstrap da instalação roda este gancho antes de
+# o instalador copiá-los), não faz nada.
 [Trigger]
 Operation = Install
 Operation = Upgrade
@@ -11,4 +13,4 @@ Target = filesystem
 Description = Nome do sistema: Mk
 When = PostTransaction
 Depends = coreutils
-Exec = /usr/bin/sh -c 'rm -f /etc/os-release && cp /usr/share/mk/system/mk/os-release /etc/os-release && cp /usr/share/mk/system/mk/issue /etc/issue'
+Exec = /usr/bin/sh -c '[ -f /usr/share/mk/system/mk/os-release ] || exit 0; rm -f /etc/os-release && cp /usr/share/mk/system/mk/os-release /etc/os-release && cp /usr/share/mk/system/mk/issue /etc/issue'

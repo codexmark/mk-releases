@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Pam
 
@@ -45,9 +46,21 @@ Singleton {
 
     signal shake
 
+    // A janela que tinha o teclado ao bloquear. Ao desbloquear o Hyprland dá o
+    // foco à janela debaixo do ponteiro; com o ponteiro parado em cima da ilha
+    // não há nenhuma, e o que se digitava depois se perdia.
+    property string hadFocus: ""
+
+    function refocus() {
+        if (/^(0x)?[0-9a-f]+$/.test(hadFocus))
+            Hypr.focusWindow(hadFocus);
+        hadFocus = "";
+    }
+
     function lock() {
         if (locked)
             return;
+        hadFocus = Hyprland.activeToplevel ? String(Hyprland.activeToplevel.address || "") : "";
         password = "";
         failed = false;
         message = "";
@@ -241,6 +254,7 @@ Singleton {
         ScriptAction {
             script: {
                 root.locked = false;
+                root.refocus();
                 root.busy = false;
                 root.password = "";
                 root.windup = 0;

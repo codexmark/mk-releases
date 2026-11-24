@@ -1,0 +1,54 @@
+{
+ "maquina": "mk",
+ "modelo": "Máquina de exemplo",
+ "placa": "Placa X1",
+ "firmware": "1.60",
+ "cpu": {
+  "nome": "Processador de exemplo",
+  "nucleos": 2,
+  "threads": 4,
+  "max_mhz": 3000
+ },
+ "mem_total_kb": 8000000,
+ "gpus": [
+  {
+   "nome": "Intel HD Graphics 520",
+   "driver": "i915"
+  }
+ ],
+ "discos": [
+  {
+   "nome": "nvme0n1",
+   "modelo": "SSD de exemplo",
+   "tamanho_kb": 250000000,
+   "rotativo": false,
+   "saude": "ok"
+  }
+ ],
+ "bateria": {
+  "modelo": "BAT0",
+  "ciclos": 984,
+  "saude_pct": 71,
+  "capacidade_wh": 33.1
+ },
+ "telas": [
+  {
+   "nome": "eDP-1",
+   "descricao": "Painel interno",
+   "largura": 1366,
+   "altura": 768,
+   "hz": 60.0,
+   "escala": 1.0
+  }
+ ],
+ "sistema": {
+  "nome": "Mk",
+  "versao_mk": "4c4ea04fc26e",
+  "data_mk": "2026-11-23",
+  "kernel": "7.3.5-arch1-1",
+  "compositor": "Hyprland 0.57.2",
+  "ligado_ha_s": 11520,
+  "instalado_em_s": 1795000000,
+  "pacotes": 812
+ }
+}

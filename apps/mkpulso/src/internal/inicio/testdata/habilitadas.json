@@ -1,0 +1,1 @@
+[{"unit_file":"syncthing.service","state":"enabled","preset":"enabled"},{"unit_file":"pipewire.socket","state":"enabled","preset":"enabled"},{"unit_file":"backup.timer","state":"enabled","preset":"enabled"}]

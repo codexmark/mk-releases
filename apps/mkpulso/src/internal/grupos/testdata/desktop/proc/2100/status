@@ -1,0 +1,10 @@
+Name:	kitty
+Umask:	0022
+State:	S
+Pid:	2100
+PPid:	1
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	  120000 kB
+VmRSS:	   60000 kB
+Threads:	1

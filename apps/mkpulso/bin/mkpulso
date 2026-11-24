@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Abre o MkPulso, o monitor de sistema do Mk. Se a janela já está aberta, só a
+# traz para a frente.
+#   mkpulso [processos|desempenho|sistema|inicio|servicos]   abre direto na área
+#   MKPULSO_HOME   onde estão bin/ e qml/ (padrão: a pasta acima deste script)
+set -euo pipefail
+home=${MKPULSO_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
+
+# Falta algo: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
+missing() {
+  local text="O MkPulso precisa $1. Rode mk atualizar."
+  notify-send -a MkPulso "MkPulso" "$text" 2>/dev/null || true
+  echo "mkpulso: $text" >&2
+  exit 1
+}
+command -v qs >/dev/null || missing "do Quickshell"
+[[ -x $home/bin/mkpulso-coletor ]] || missing "do coletor (bin/mkpulso-coletor)"
+
+area=${1:-}
+case $area in
+  "" | processos | desempenho | sistema | inicio | servicos) ;;
+  *)
+    echo "uso: mkpulso [processos | desempenho | sistema | inicio | servicos]" >&2
+    exit 2
+    ;;
+esac
+
+# Uma janela só: se já há uma, foca.
+if qs list --all 2>/dev/null | grep -qF "Config path: $home/qml/shell.qml"; then
+  addr=$(hyprctl clients -j 2>/dev/null | jq -r 'first(.[] | select(.title == "MkPulso") | .address) // empty' 2>/dev/null || true)
+  if [[ $addr =~ ^0x[0-9a-f]+$ ]]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 || true
+    exit 0
+  fi
+fi
+[[ -z $area ]] || export MKPULSO_AREA=$area
+exec qs -p "$home/qml"

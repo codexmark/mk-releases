@@ -1,0 +1,10 @@
+Name:	dbus-broker-lau
+Umask:	0022
+State:	S
+Pid:	810
+PPid:	800
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	    5000 kB
+VmRSS:	    2500 kB
+Threads:	1

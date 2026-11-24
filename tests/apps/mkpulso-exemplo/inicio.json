@@ -1,0 +1,49 @@
+{
+ "itens": [
+  {
+   "id": "mk:mare",
+   "origem": "Mk",
+   "nome": "Maré (a ilha e os painéis)",
+   "comando": "mare-start",
+   "ligado": true,
+   "do_sistema": true,
+   "mudavel": false
+  },
+  {
+   "id": "mk:hypridle",
+   "origem": "Mk",
+   "nome": "Ociosidade (hypridle)",
+   "comando": "hypridle -c ~/.config/mk/hypr/hypridle.conf",
+   "ligado": true,
+   "do_sistema": true,
+   "mudavel": false
+  },
+  {
+   "id": "desktop:/etc/xdg/autostart/localsend.desktop",
+   "origem": "atalho",
+   "nome": "LocalSend",
+   "comando": "localsend --hidden",
+   "ligado": true,
+   "do_sistema": true,
+   "mudavel": true
+  },
+  {
+   "id": "desktop:~/.config/autostart/notas.desktop",
+   "origem": "atalho",
+   "nome": "Notas",
+   "comando": "notas --tray",
+   "ligado": false,
+   "do_sistema": false,
+   "mudavel": true
+  },
+  {
+   "id": "unidade:syncthing.service",
+   "origem": "serviço de usuário",
+   "nome": "syncthing.service",
+   "comando": "/usr/bin/syncthing serve",
+   "ligado": true,
+   "do_sistema": false,
+   "mudavel": true
+  }
+ ]
+}

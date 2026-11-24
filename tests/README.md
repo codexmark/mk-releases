@@ -38,6 +38,7 @@ O `git push` e o `bin/mk-release` rodam `tests/run` e param se algo falhar
 | `tests/system/` | `system/` e `scripts/` (listas de pacotes, arquivos de sistema) |
 | `tests/migrations/` | cada migração de `migrations/` |
 | `tests/config/` | `config/` (Lua do Hyprland, `mk.bash`, hypridle) |
+| `tests/apps/` | os apps de `apps/`: o MkPulso (os testes em Go do coletor, a lógica e a estrutura da janela, o lançador) |
 | `tests/docs/` | a documentação contra o código |
 
 Um arquivo de teste por arquivo testado, com o mesmo nome:

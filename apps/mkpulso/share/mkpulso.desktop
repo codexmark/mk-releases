@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MkPulso
+GenericName=Monitor do sistema
+Comment=Processos, desempenho, serviços e o que sobe no login
+Exec=mkpulso
+Icon=mkpulso
+Terminal=false
+Categories=System;Monitor;
+Keywords=processos;tarefas;monitor;cpu;memória;memoria;serviços;servicos;systemd;desempenho;inicialização;

@@ -1,4 +1,5 @@
-Limites: o VERSION vazio de um Mk antigo e o peso do shellcheck
-Versão instalada resiste a um desligamento à força
-Descanso de tela, arranjador de monitores e uma rodada de correções
-mk-update: uma confirmação só, trava entre rodadas e limpeza
+MkPulso cabe em tela pequena
+Desbloquear devolve o foco, e a checagem do bash tenta de novo
+MkPulso flutua no centro, no tamanho dele
+MkPulso: o monitor de sistema do Mk
+Instalação sem "fatal library error" nem "command failed" no log

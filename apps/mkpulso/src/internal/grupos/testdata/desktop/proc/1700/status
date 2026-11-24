@@ -1,0 +1,10 @@
+Name:	guarda
+Umask:	0022
+State:	S
+Pid:	1700
+PPid:	800
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	    1800 kB
+VmRSS:	     900 kB
+Threads:	1

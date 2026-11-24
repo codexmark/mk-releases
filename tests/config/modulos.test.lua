@@ -72,6 +72,15 @@ T.t("rules: diálogos de arquivo flutuam no centro, em inglês e em português",
     T.has(r.match.title, "Salvar arquivo")
 end)
 
+T.t("rules: o MkPulso flutua no centro, no tamanho dele (lado a lado ele não cabe)", function()
+    -- Visto na VM: aberto num workspace com dois terminais, virou uma coluna
+    -- estreita e a tabela ficou cortada. É um utilitário: flutua.
+    local r = rule(T.session({ only = "mare.rules" }), "float-mkpulso")
+    T.eq(true, r.float)
+    T.eq(true, r.center)
+    T.eq("^MkPulso$", r.match.title)
+end)
+
 T.t("rules: nenhuma janela se maximiza sozinha", function()
     local r = rule(T.session({ only = "mare.rules" }), "no-maximize-requests")
     T.eq(".*", r.match.class)

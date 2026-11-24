@@ -1,0 +1,70 @@
+{
+ "servicos": [
+  {
+   "unidade": "pipewire.service",
+   "escopo": "usuario",
+   "descricao": "PipeWire Multimedia Service",
+   "estado": "ativo",
+   "sub": "running",
+   "habilitado": "sim",
+   "pid": 900,
+   "mem_kb": 18000,
+   "desde_s": 1795470000
+  },
+  {
+   "unidade": "wireplumber.service",
+   "escopo": "usuario",
+   "descricao": "Multimedia Service Session Manager",
+   "estado": "ativo",
+   "sub": "running",
+   "habilitado": "sim",
+   "pid": 910,
+   "mem_kb": 22000,
+   "desde_s": 1795470000
+  },
+  {
+   "unidade": "gcr-ssh-agent.socket",
+   "escopo": "usuario",
+   "descricao": "GCR ssh-agent wrapper",
+   "estado": "ativo",
+   "sub": "listening",
+   "habilitado": "sim",
+   "pid": null,
+   "mem_kb": null,
+   "desde_s": 1795470000
+  },
+  {
+   "unidade": "syncthing.service",
+   "escopo": "usuario",
+   "descricao": "Syncthing - Open Source Continuous File Synchronization",
+   "estado": "falhou",
+   "sub": "failed",
+   "habilitado": "sim",
+   "pid": null,
+   "mem_kb": null,
+   "desde_s": null
+  },
+  {
+   "unidade": "mako.service",
+   "escopo": "usuario",
+   "descricao": "Notification daemon",
+   "estado": "inativo",
+   "sub": "dead",
+   "habilitado": "não",
+   "pid": null,
+   "mem_kb": null,
+   "desde_s": null
+  },
+  {
+   "unidade": "dbus-broker.service",
+   "escopo": "usuario",
+   "descricao": "D-Bus User Message Bus",
+   "estado": "ativo",
+   "sub": "running",
+   "habilitado": "estático",
+   "pid": 820,
+   "mem_kb": 4100,
+   "desde_s": 1795470000
+  }
+ ]
+}

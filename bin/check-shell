@@ -11,11 +11,21 @@ rc=$(mktemp)
 trap 'rm -f "$rc"' EXIT
 printf 'MK_NO_FETCH=1\nsource %q\n' "$PWD/config/bash/mk.bash" >"$rc"
 status=0
+# Até três tentativas por terminal: com a máquina ocupada o bash às vezes sobe
+# e sai sem a resposta chegar. Um mk.bash quebrado de verdade cai nas três.
+tries=3
 for term in xterm-256color xterm-ghostty; do
-  out=$(printf 'echo mk-ok-$((40+2))\nexit\n' |
-    TERM=$term timeout 30 script -qec "bash --rcfile '$rc' -i" /dev/null 2>&1) && code=0 || code=$?
-  if [[ $code -ne 0 || $out != *mk-ok-42* ]]; then
-    echo "check-shell: o bash interativo caiu (TERM=$term, saída $code)" >&2
+  good=0 code=0
+  for _ in $(seq 1 "$tries"); do
+    out=$(printf 'echo mk-ok-$((40+2))\nexit\n' |
+      TERM=$term timeout 30 script -qec "bash --rcfile '$rc' -i" /dev/null 2>&1) && code=0 || code=$?
+    if [[ $code -eq 0 && $out == *mk-ok-42* ]]; then
+      good=1
+      break
+    fi
+  done
+  if ((!good)); then
+    echo "check-shell: o bash interativo caiu (TERM=$term, saída $code, $tries tentativas)" >&2
     status=1
   fi
 done

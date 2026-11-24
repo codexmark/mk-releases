@@ -50,7 +50,7 @@ like "$exec_" '^/usr/bin/sh -c '
 while IFS= read -r c; do
   exists "$REPO/${c#/usr/share/mk/}"
 done < <(grep -o '/usr/share/mk/[A-Za-z0-9_./-]*' <<<"$exec_")
-eq 2 "$(grep -o '/usr/share/mk/[A-Za-z0-9_./-]*' <<<"$exec_" | wc -l)"
+eq 2 "$(grep -o '/usr/share/mk/[A-Za-z0-9_./-]*' <<<"$exec_" | sort -u | wc -l)"
 
 t "gancho: o comando, com os caminhos trocados, deixa o os-release e o issue do Mk"
 mkdir -p "$SBX/etc" "$SBX/usr/lib"
@@ -74,6 +74,29 @@ fi
 t "gancho: o os-release do pacote filesystem não é escrito por cima (o link é trocado por um arquivo)"
 fails test -L "$SBX/etc/os-release"
 eq 'NAME="Arch Linux"' "$(<"$SBX/usr/lib/os-release")"
+
+t "gancho: sem os arquivos do Mk (a instalação ainda não os copiou) não faz nada e não acusa erro"
+# Visto no log da instalação: o gancho do live roda no pacstrap, antes de o
+# instalador copiar /usr/share/mk para o disco. O cp falhava ("cannot stat",
+# "command failed to execute correctly") e o /etc/os-release já tinha sido
+# apagado.
+mkdir -p "$SBX/vazio/etc"
+echo 'NAME="Arch Linux"' >"$SBX/vazio/etc/os-release"
+echo 'Arch Linux' >"$SBX/vazio/etc/issue"
+semmk=${exec_#/usr/bin/sh -c }
+semmk=${semmk#\'}
+semmk=${semmk%\'}
+semmk=${semmk//\/usr\/share\/mk\//$SBX/nao-existe/}
+semmk=${semmk//\/etc\//$SBX/vazio/etc/}
+if grep -q -E "(^|[ =])/(etc|usr|boot|var)/" <<<"$semmk"; then
+  _fail "sobrou caminho de fora de \$SBX: $semmk"
+else
+  saida=$(sh -c "$semmk" 2>&1)
+  eq 0 $?
+  eq "" "$saida"
+  eq 'NAME="Arch Linux"' "$(<"$SBX/vazio/etc/os-release")"
+  eq 'Arch Linux' "$(<"$SBX/vazio/etc/issue")"
+fi
 
 t "gancho: o instalador e o iso/build o instalam em /etc/pacman.d/hooks"
 has "$(<"$REPO/installer/mk-install")" 'etc/pacman.d/hooks/mk-os-release.hook'

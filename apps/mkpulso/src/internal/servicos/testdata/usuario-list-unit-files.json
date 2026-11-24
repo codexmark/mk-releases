@@ -1,0 +1,1 @@
+[{"unit_file":"app-claude\\x2ddesktop@autostart.service","state":"generated","preset":null},{"unit_file":"pipewire.service","state":"disabled","preset":"enabled"},{"unit_file":"syncthing.service","state":"enabled","preset":"enabled"},{"unit_file":"wireplumber.service","state":"enabled","preset":"enabled"},{"unit_file":"pipewire.socket","state":"enabled","preset":"enabled"}]

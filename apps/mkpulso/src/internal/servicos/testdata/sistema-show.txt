@@ -1,0 +1,81 @@
+Id=NetworkManager.service
+Description=Network Manager
+ActiveEnterTimestamp=@1795470010
+MainPID=640
+MemoryCurrent=21504000
+
+Id=bluetooth.service
+Description=Bluetooth service
+ActiveEnterTimestamp=@1795470011
+MainPID=702
+MemoryCurrent=3145728
+
+Id=cups.service
+Description=CUPS Scheduler
+ActiveEnterTimestamp=
+MainPID=0
+MemoryCurrent=[not set]
+
+Id=cups.socket
+Description=CUPS Scheduler
+ActiveEnterTimestamp=@1795470002
+MemoryCurrent=0
+
+Id=dbus-broker.service
+Description=D-Bus System Message Bus
+ActiveEnterTimestamp=@1795470003
+MainPID=588
+MemoryCurrent=4194304
+
+Id=fstrim.timer
+Description=Discard unused filesystem blocks once a week
+ActiveEnterTimestamp=@1795470004
+MemoryCurrent=[not set]
+
+Id=getty@tty1.service
+Description=Getty on tty1
+ActiveEnterTimestamp=
+MainPID=0
+MemoryCurrent=[not set]
+
+Id=lvm2-monitor.service
+Description=lvm2-monitor.service
+ActiveEnterTimestamp=
+MainPID=0
+MemoryCurrent=[not set]
+
+Id=man-db.service
+Description=Daily man-db regeneration
+ActiveEnterTimestamp=
+MainPID=20311
+MemoryCurrent=9175040
+
+Id=sddm.service
+Description=Simple Desktop Display Manager
+ActiveEnterTimestamp=@1795470020
+MainPID=733
+MemoryCurrent=61337600
+
+Id=sshd.service
+Description=OpenSSH Daemon
+ActiveEnterTimestamp=@1795470000
+MainPID=812
+MemoryCurrent=5529600
+
+Id=systemd-boot-update.service
+Description=Automatic Boot Loader Update
+ActiveEnterTimestamp=
+MainPID=0
+MemoryCurrent=[not set]
+
+Id=systemd-journald.service
+Description=Journal Service
+ActiveEnterTimestamp=@1795469990
+MainPID=301
+MemoryCurrent=33554432
+
+Id=user@1000.service
+Description=User Manager for UID 1000
+ActiveEnterTimestamp=@1795470030
+MainPID=807
+MemoryCurrent=734003200

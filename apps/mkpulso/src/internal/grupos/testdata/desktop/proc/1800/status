@@ -1,0 +1,10 @@
+Name:	emacs
+Umask:	0022
+State:	S
+Pid:	1800
+PPid:	800
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	  140000 kB
+VmRSS:	   70000 kB
+Threads:	1

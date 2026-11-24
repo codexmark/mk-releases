@@ -1,0 +1,10 @@
+Name:	solto
+Umask:	0022
+State:	S
+Pid:	3100
+PPid:	800
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+VmPeak:	     200 kB
+VmRSS:	     100 kB
+Threads:	1

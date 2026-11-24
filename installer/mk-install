@@ -22,6 +22,10 @@ fi
 aur_repo=${MK_AUR_REPO:-$src/aur-repo}
 [[ -d $aur_repo ]] || aur_repo=$src/iso/work/aur/repo
 target=/mnt
+# Durante a instalação o pacman roda no disco novo sem configuração do snapper
+# (ela só vem no fim): os ganchos do snap-pac não teriam o que fotografar e
+# escreviam "fatal library error, lookup self" no meio do log.
+export SNAP_PAC_SKIP=y
 log=/var/log/mk-install.log
 # A raiz do live. Vazia no uso normal; os testes (tests/installer) carregam
 # este arquivo com `source` e apontam esta, $target e $log para uma pasta.
@@ -567,13 +571,14 @@ place() {
   touch "$2/$marker"
 }
 
-# Devolve o bit de execução aos scripts de uma pasta (os que começam com #!).
+# Devolve o bit de execução aos scripts de uma pasta (os que começam com #!) e
+# aos binários compilados (ELF, como o coletor do MkPulso).
 # O mkarchiso grava o /usr/share/mk do live inteiro como 644: copiado assim, o
 # Mk instalado ficava sem nenhum script executável (o comando mktunes, que é
 # um link para lá, não rodava).
 fix_exec() {
   find "$1" -type f ! -perm -u+x -exec env LC_ALL=C awk \
-    'FNR == 1 { if (/^#!/) printf "%s\0", FILENAME; nextfile }' {} + | xargs -0r chmod 755
+    'FNR == 1 { if (/^#!/ || /^\177ELF/) printf "%s\0", FILENAME; nextfile }' {} + | xargs -0r chmod 755
 }
 
 install_desktop() {
@@ -595,6 +600,8 @@ install_desktop() {
   install -Dm755 "$src/bin/mk-update" "$target/usr/bin/mk-update"
   # O MkTunes (apps/mktunes): comando, atalho no menu e ícone.
   bash "$src/system/mk/mktunes-links" "$target"
+  # O MkPulso (apps/mkpulso), o monitor de sistema: idem.
+  bash "$src/system/mk/mkpulso-links" "$target"
   install -Dm644 /dev/stdin "$target/usr/share/wayland-sessions/mk.desktop" <<'EOF'
 [Desktop Entry]
 Name=Mk

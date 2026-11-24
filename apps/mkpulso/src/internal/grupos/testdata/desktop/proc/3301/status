@@ -1,0 +1,10 @@
+Name:	nginx
+Umask:	0022
+State:	S
+Pid:	3301
+PPid:	3300
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+VmPeak:	    3000 kB
+VmRSS:	    1500 kB
+Threads:	1
