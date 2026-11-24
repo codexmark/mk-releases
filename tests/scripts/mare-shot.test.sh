@@ -28,7 +28,7 @@ path_sem() {
   local d c p
   d=$(mktemp -d "$SBX/sem.XXXXXX")
   mkdir "$d/s" "$d/g"
-  for c in bash sh env jq awk sed grep head tail cut tr cat rm mv mkdir dirname basename date timeout; do
+  for c in bash sh env jq awk sed grep head tail cut tr cat rm mv mkdir mktemp sort paste dirname basename date timeout; do
     p=$(PATH=/usr/bin:/bin command -v "$c") && ln -s "$p" "$d/s/$c"
   done
   cp "$SBX"/guard/* "$d/g/"
@@ -204,7 +204,7 @@ t "subcomando desconhecido: uso, saída 2 e nenhuma captura"
 zera
 out=$(run bobagem 2>&1)
 eq 2 $?
-has "$out" "uso: mare-shot copiar | area | janela | tela | pasta | gravacao"
+has "$out" "uso: mare-shot copiar | area | janela | tela | ler | pasta | gravacao"
 not_called "grim"
 not_called "slurp"
 not_called "notify-send"
@@ -294,3 +294,146 @@ stub gpu-screen-recorder 'echo "usage: ..."'
 run gravacao >/dev/null
 called "timeout 3 gpu-screen-recorder --help"
 rm -f "$SBX/bin/timeout"
+
+# ---------------------------------------------------------------- ler
+
+# zbarimg: imprime o que o código diz, ou sai com 4 (nenhum código na imagem).
+stub zbarimg '[[ -s $SBX/qr ]] || exit 4; cat "$SBX/qr"'
+# tesseract: os idiomas instalados, ou o texto da imagem (com o \f do fim).
+stub tesseract '
+if [[ $1 == --list-langs ]]; then cat "$SBX/idiomas"; exit 0; fi
+[[ ! -e $SBX/ocr-falha ]] || exit 1
+cat "$SBX/ocr" 2>/dev/null; printf "\f"'
+stub grim '
+for a; do f=$a; done
+if [[ $f == - ]]; then printf "PNG-da-area"; else printf "PNG-em-arquivo" >"$f"; fi'
+export XDG_RUNTIME_DIR=$SBX/run
+mkdir -p "$XDG_RUNTIME_DIR"
+zera_ler() {
+  zera
+  rm -f "$SBX/qr" "$SBX/ocr" "$SBX/ocr-falha"
+  printf 'List of available languages in "/usr/share/tessdata/" (3):\neng\nosd\npor\n' >"$SBX/idiomas"
+}
+sobras() { find "$XDG_RUNTIME_DIR" -type f | sort; }
+
+t "ler: a área escolhida vira uma imagem temporária (em dobro, que o texto pequeno lê melhor), fora de Capturas"
+zera_ler
+printf 'Primeira linha\nsegunda linha\n' >"$SBX/ocr"
+ok run ler
+called "slurp -b 0b0b0b66 -c ce5e32 -w 1"
+like "$(grep '^grim' "$SBX/calls")" "^grim -s 2 -g 100,200 640x480 $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+\.png$"
+absent "$dir"
+
+t "ler: o texto da imagem vai para a área de transferência, sem o lixo do fim"
+eq $'Primeira linha\nsegunda linha' "$(<"$SBX/clip")"
+called "wl-copy"
+not_called "wl-copy --type image/png"
+
+t "ler: lê em português e inglês quando os dois idiomas estão instalados"
+like "$(grep '^tesseract [^-]' "$SBX/calls")" "^tesseract $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+\.png - -l por\+eng$"
+
+t "ler: o aviso diz que copiou o texto e mostra o começo dele"
+called "notify-send -a Mk Texto copiado Primeira linha (2 linhas)"
+
+t "ler: a imagem temporária some no fim"
+eq "" "$(sobras)"
+
+t "ler: uma linha só, o aviso não conta linhas"
+zera_ler
+echo "Só isto" >"$SBX/ocr"
+ok run ler
+called "notify-send -a Mk Texto copiado Só isto"
+not_called "linhas)"
+
+t "ler: linhas em branco no começo e no fim saem; as do meio ficam"
+zera_ler
+printf '\n  \nUm\n\nDois\n\n \n' >"$SBX/ocr"
+ok run ler
+eq $'Um\n\nDois' "$(<"$SBX/clip")"
+
+t "ler: uma primeira linha comprida é cortada no aviso, não na cópia"
+zera_ler
+longa=$(printf 'x%.0s' {1..200})
+echo "$longa" >"$SBX/ocr"
+ok run ler
+eq "$longa" "$(<"$SBX/clip")"
+called "notify-send -a Mk Texto copiado $(printf 'x%.0s' {1..80})…"
+
+t "ler: com um QR code na área, vale o que o código diz, e o texto nem é lido"
+zera_ler
+echo "https://exemplo.org/pagina?a=1" >"$SBX/qr"
+echo "texto em volta" >"$SBX/ocr"
+ok run ler
+like "$(grep '^zbarimg' "$SBX/calls")" "^zbarimg -q --raw $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+\.png$"
+eq "https://exemplo.org/pagina?a=1" "$(<"$SBX/clip")"
+called "notify-send -a Mk Código lido https://exemplo.org/pagina?a=1"
+not_called "tesseract"
+eq "" "$(sobras)"
+
+t "ler: só com o inglês instalado, lê em inglês"
+zera_ler
+printf 'List of available languages (2):\neng\nosd\n' >"$SBX/idiomas"
+echo "hello" >"$SBX/ocr"
+ok run ler
+called " - -l eng"
+not_called "por"
+
+t "ler: sem texto nem código na área, avisa, não copia e sai com 1"
+zera_ler
+printf '  \n\n' >"$SBX/ocr"
+run ler
+eq 1 $?
+called "notify-send -a Mk Nada para ler"
+not_called "wl-copy"
+absent "$SBX/clip"
+eq "" "$(sobras)"
+
+t "ler: o tesseract falhando dá o mesmo aviso, não um fim mudo"
+zera_ler
+: >"$SBX/ocr-falha"
+run ler
+eq 1 $?
+called "notify-send -a Mk Nada para ler"
+not_called "wl-copy"
+eq "" "$(sobras)"
+
+t "ler: cancelar a escolha (Esc) sai com 0 sem capturar, ler nem avisar"
+zera_ler
+: >"$SBX/slurp-cancela"
+ok run ler
+not_called "grim"
+not_called "zbarimg"
+not_called "tesseract"
+not_called "notify-send"
+eq "" "$(sobras)"
+rm -f "$SBX/slurp-cancela"
+
+t "ler: o grim falhando sai com erro, sem ler nem avisar, e sem sobra"
+zera_ler
+stub grim 'exit 1'
+fails run ler
+not_called "tesseract"
+not_called "notify-send"
+eq "" "$(sobras)"
+stub grim '
+for a; do f=$a; done
+if [[ $f == - ]]; then printf "PNG-da-area"; else printf "PNG-em-arquivo" >"$f"; fi'
+
+t "ler: sem o zbar instalado, ainda lê texto"
+zera_ler
+echo "texto" >"$SBX/ocr"
+rm -f "$SBX/bin/zbarimg"
+ok env PATH="$(path_sem zbarimg)" bash "$shot_sh" ler
+eq "texto" "$(<"$SBX/clip")"
+
+t "ler: sem o tesseract instalado e sem código, diz o que falta e sai com 1"
+zera_ler
+rm -f "$SBX/bin/tesseract"
+PATH=$(path_sem zbarimg tesseract) bash "$shot_sh" ler
+eq 1 $?
+called "notify-send -a Mk Não dá para ler texto falta o tesseract"
+not_called "wl-copy"
+eq "" "$(sobras)"
+
+t "ler: não cria a pasta de Capturas"
+absent "$dir"

@@ -109,7 +109,7 @@ Cada nome de `Mare.panels` é um arquivo, carregado pelo `Tide` quando o
 | `system` | `SystemPanel.qml` | CPU, memória, disco e temperatura, com o último minuto em gráfico. |
 | `clipboard` | `ClipboardPanel.qml` | Histórico da área de transferência (cliphist). |
 | `wallpaper` | `WallpaperPanel.qml` | Os papéis de parede, 12 por página. |
-| `capture` | `CapturePanel.qml` | Capturar uma área, a janela, a tela, ou gravar um vídeo. |
+| `capture` | `CapturePanel.qml` | Capturar uma área, a janela, a tela, ler o texto ou o QR de uma área, ou gravar um vídeo. |
 | `emoji` | `EmojiPanel.qml` | Procurar um emoji (português ou inglês) e digitá-lo na janela em foco. |
 | `controls` | `ControlsPanel.qml` | Os controles rápidos (Super + Esc): leituras da máquina, Wi-Fi e Bluetooth, perfil de energia, volume e brilho, a sessão e os alternadores (luz noturna, cafeína, não perturbe, microfone). Cada bloco usa o singleton do painel dele e o título leva ao painel inteiro; os blocos ligam e desligam em Ajustes › Ilha. A lista de ações de sessão é a do `SessionActions.js`, a mesma do painel Sessão; a cafeína é o singleton `Caffeine` (um inibidor de ociosidade do systemd). |
 
@@ -190,7 +190,7 @@ aqui. O alvo é `mare`, declarado no `IpcHandler` do `Mare.qml`.
 | `settings` | `page` | Abre os Ajustes na página dada; `""` abre na última. |
 | `set` | `key`, `value` | Muda um ajuste, como o painel faria. Devolve `chave = valor`, ou `ajuste desconhecido: ...`. |
 | `switcher` | `direction` | Alt+Tab: `prev` volta; qualquer outro valor avança. |
-| `shot` | `mode` | Captura sem abrir painel: `copiar`, `area`, `janela` ou `tela`. |
+| `shot` | `mode` | Captura sem abrir painel: `copiar`, `area`, `janela`, `tela` ou `ler` (copia o texto, ou o que um QR code diz, em vez da imagem). |
 | `record` | | Começa ou para a gravação da tela. |
 | `lock` | | Bloqueia a tela. |
 | `welcome` | `action` | `abrir`, `continuar`, `fechar`, `fim`, `seguir`, `voltar` ou `estado`. Devolve o estado da folha. |
@@ -307,7 +307,7 @@ administrador, pelo `pkexec`, quando o CUPS recusa uma ação.
 | `mare-wifi` | Redes Wi-Fi guardadas: `list-saved`, `forget`, `autoconnect`. | `NetworkPanel.qml` |
 | `mare-wifi-qr` | Gera o PNG do QR code do Wi-Fi atual e imprime o nome da rede. O PNG contém a senha. | `NetworkPanel.qml` |
 | `mare-vpn` | VPNs do NetworkManager: `list`, `status`, `up`, `down`, `delete`, `autoconnect`, `check`, `import`, `ask`, `watch`. | `Vpn.qml` (`status`, `watch`), `SettingsVpnPage.qml` |
-| `mare-shot` | Captura de tela (`copiar`, `area`, `janela`, `tela`); `pasta` e `gravacao` só respondem. | `Capture.qml` |
+| `mare-shot` | Captura de tela (`copiar`, `area`, `janela`, `tela`); `ler` copia o texto (tesseract) ou o QR code (zbar) de uma área, sem guardar a imagem; `pasta` e `gravacao` só respondem. | `Capture.qml` |
 | `mare-emoji` | `pick` copia (e digita, com `wtype`) o emoji; `tem-wtype`; `gerar` refaz o `Emoji.js`. | `EmojiPanel.qml`; `gerar` é para quem mantém o Mk |
 | `mare-monitors` | `list` lê as telas; `trial` grava o `monitores.lua`, recarrega o Hyprland e deixa um vigia; `keep` e `revert` respondem ao vigia. | `Monitors.qml` |
 | `mare-default-apps` | Apps padrão: `list`, `set`, `terminal`, `open`. | `SettingsAppsPage.qml`; `binds.lua` (`open navegador`) |

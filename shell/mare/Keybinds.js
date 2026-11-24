@@ -60,6 +60,7 @@ var actions = [
     { id: "shot.area", group: "TELA", desc: "recortar e copiar", combo: "PRINT" },
     { id: "shot.screen", group: "TELA", desc: "salvar a tela inteira", combo: "SHIFT + PRINT" },
     { id: "shot.panel", group: "TELA", desc: "painel de captura (área, janela, vídeo)", combo: "SUPER + PRINT" },
+    { id: "shot.read", group: "TELA", desc: "ler o texto ou o QR de uma área", combo: "SUPER + SHIFT + T" },
     { id: "shot.record", group: "TELA", desc: "gravar a tela / parar", combo: "SUPER + SHIFT + R" },
 
     { id: "media.volume.up", group: "TECLAS DE MÍDIA", desc: "aumentar o volume", combo: "XF86AudioRaiseVolume", fixed: true },

@@ -169,7 +169,7 @@ Singleton {
         }
 
 
-        // Captura direta, sem painel: shot copiar | area | janela | tela
+        // Captura direta, sem painel: shot copiar | area | janela | tela | ler
         function shot(mode: string): void {
             root.close();
             Capture.shot(mode);

@@ -15,7 +15,8 @@ Item {
         { key: "copiar", glyph: "󰆏", title: "área, só copiar", detail: "PRINT" },
         { key: "area", glyph: "󰩭", title: "área", detail: "salva e copia" },
         { key: "janela", glyph: "󰖯", title: "janela em foco", detail: "salva e copia" },
-        { key: "tela", glyph: "󰍹", title: "tela inteira", detail: "SHIFT + PRINT" }
+        { key: "tela", glyph: "󰍹", title: "tela inteira", detail: "SHIFT + PRINT" },
+        { key: "ler", glyph: "󱄽", title: "ler texto ou QR", detail: "SUPER + SHIFT + T" }
     ]
 
     ColumnLayout {

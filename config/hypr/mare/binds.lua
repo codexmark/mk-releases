@@ -134,6 +134,8 @@ local actions = {
       run = shell("shot tela") },
     { id = "shot.panel", group = "TELA", desc = "painel de captura (área, janela, vídeo)", combo = "SUPER + PRINT",
       run = shell("toggle capture") },
+    { id = "shot.read", group = "TELA", desc = "ler o texto ou o QR de uma área", combo = "SUPER + SHIFT + T",
+      run = shell("shot ler") },
     { id = "shot.record", group = "TELA", desc = "gravar a tela / parar", combo = "SUPER + SHIFT + R",
       run = shell("record") },
 

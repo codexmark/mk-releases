@@ -63,6 +63,11 @@ matugen
 # qrencode: QR code para o celular entrar no Wi-Fi (painel de rede)
 qrencode
 gpu-screen-recorder
+# tesseract e zbar: o "ler" da captura (texto e QR code de uma área da tela)
+tesseract
+tesseract-data-por
+tesseract-data-eng
+zbar
 
 # Tema
 gnome-themes-extra

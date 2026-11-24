@@ -141,6 +141,10 @@ correção.
 - **`mare-wifi-qr`:** duas conexões salvas com o mesmo nome se confundem, e
   uma rede WEP por frase-senha gera um QR que o celular pode não aceitar.
 - **`mare-shot`:** duas capturas no mesmo segundo usam o mesmo nome de arquivo.
+- **Ler a tela (`mare-shot ler`):** o texto sai tão bom quanto o tesseract
+  consegue: letra muito pequena, texto sobre foto e fontes de ícone erram. Só
+  português e inglês. Um código vale antes do texto: numa área com os dois, o
+  texto não é lido.
 - **Descanso de tela:** ele desliga quando a tela é bloqueada (aos 5 min, de
   fábrica), e daí em diante quem aparece é a tela de bloqueio, até a tela
   apagar aos 30. Com "Bloquear" em 0 ele fica até a tela apagar.

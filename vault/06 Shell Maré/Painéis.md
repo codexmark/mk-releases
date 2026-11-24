@@ -43,7 +43,7 @@ Cada painel é uma função do sistema ao alcance de um clique na ilha, de um at
 | `system` | `SystemPanel.qml` | CPU, memória, temperatura, rede, disco, com o último minuto em gráfico; atalho para o [[MkPulso]], o monitor do Mk (antes era o btop) |
 | `clipboard` | `ClipboardPanel.qml` | histórico da área de transferência (`cliphist`) |
 | `wallpaper` | `WallpaperPanel.qml` | [[Papéis de parede]], 12 por página |
-| `capture` | `CapturePanel.qml` | capturar área, janela, tela, ou gravar um vídeo |
+| `capture` | `CapturePanel.qml` | capturar área, janela, tela, ler texto ou QR, ou gravar um vídeo |
 | `emoji` | `EmojiPanel.qml` | [[Emoji]] |
 | `settings` | (`SettingsWindow.qml`) | os [[Ajustes]]: não desce da ilha |
 
@@ -51,6 +51,7 @@ Detalhes que valem registro:
 
 - **Sessão**: bloquear e suspender agem na hora; sair, reiniciar e desligar pedem um segundo clique (o botão vira "confirmar" por 3 segundos). O botão de suspender some quando Ajustes › Energia diz "não dormir".
 - **Captura**: as capturas rodam `mare-shot` **depois** de o painel fechar, para ele não sair na foto. Salvam em `<Imagens>/Capturas`, copiam e avisam. A gravação usa o `gpu-screen-recorder` com o som do sistema; enquanto grava, a ilha mostra o tempo e um clique nela para. Antes, uma sondagem (só a ajuda do gravador) diz se dá para gravar.
+- **Ler** (`SUPER + SHIFT + T`, ou a linha "ler texto ou QR" do painel): escolhe uma área e copia o que está escrito nela. Um QR code (ou código de barras) na área vale primeiro, pelo `zbar`; sem código, o texto, pelo `tesseract` em português e inglês. A área é capturada em dobro (`grim -s 2`), porque letra pequena de tela o tesseract erra; a imagem fica só em `XDG_RUNTIME_DIR` e some no fim. O aviso mostra o começo do que foi copiado, para dar para conferir um endereço antes de colar. A ideia veio das ferramentas de OCR e de QR do Ryoku; o código é do Mk.
 - **Projeto**: só abre num workspace ligado a um projeto e não marcado como livre; fora disso `Mare.mode` vira `"project"` mas o `Tide` o trata como `"rest"`.
 - **Seletor (`picker`)**: só abre quando chamado ([[Projetos e workspaces]]).
 

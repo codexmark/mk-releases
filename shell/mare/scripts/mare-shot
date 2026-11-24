@@ -5,6 +5,8 @@
 #   mare-shot area      escolhe uma área e salva
 #   mare-shot janela    a janela em foco
 #   mare-shot tela      a tela inteira
+#   mare-shot ler       escolhe uma área e copia o que está escrito nela (ou o
+#                       que um QR code diz); a imagem não é guardada
 #   mare-shot pasta     imprime a pasta das capturas
 #   mare-shot gravacao  imprime por que não dá para gravar (nada = dá)
 set -euo pipefail
@@ -31,16 +33,16 @@ fi
 # digitação só mostra o uso.
 modo=${1:-area}
 case $modo in
-  copiar | area | janela | tela) ;;
+  copiar | area | janela | tela | ler) ;;
   *)
-    echo "uso: mare-shot copiar | area | janela | tela | pasta | gravacao" >&2
+    echo "uso: mare-shot copiar | area | janela | tela | ler | pasta | gravacao" >&2
     exit 2 ;;
 esac
 
 # A área da captura ("x,y LxA", como o grim pede). Vazia = a tela inteira.
 geo=""
 case $modo in
-  copiar | area)
+  copiar | area | ler)
     geo=$(slurp -b 0b0b0b66 -c ce5e32 -w 1) || exit 0 ;;
   janela)
     # O hyprctl falhando, uma resposta que não é JSON ou uma janela sem
@@ -60,6 +62,47 @@ if [[ $modo == copiar ]]; then
   notify-send -a Mk "Captura copiada" "A área está na área de transferência."
   exit 0
 fi
+
+# Ler a área: um QR code (ou código de barras) vale primeiro; sem código, o
+# texto, pelo tesseract. A imagem fica só na memória (XDG_RUNTIME_DIR) e some
+# no fim; o que vai para a área de transferência é texto.
+if [[ $modo == ler ]]; then
+  tmp=$(mktemp --suffix=.png "${XDG_RUNTIME_DIR:-/tmp}/mare-ler.XXXXXX")
+  trap 'rm -f "$tmp"' EXIT
+  # Em dobro: letra pequena de tela o tesseract erra; ampliada, acerta.
+  grim -s 2 -g "$geo" "$tmp"
+
+  lido="" titulo="Texto copiado"
+  if command -v zbarimg >/dev/null; then
+    lido=$(zbarimg -q --raw "$tmp" 2>/dev/null) || lido=""
+    [[ -z $lido ]] || titulo="Código lido"
+  fi
+  if [[ -z $lido ]]; then
+    command -v tesseract >/dev/null || {
+      notify-send -a Mk "Não dá para ler texto" "falta o tesseract"
+      exit 1
+    }
+    # Os idiomas que houver, o português na frente.
+    idiomas=$(tesseract --list-langs 2>/dev/null | grep -xE 'por|eng' | sort -r | paste -sd+) || idiomas=""
+    # O tesseract fecha a página com um \f; linhas só de espaço no começo e no
+    # fim saem (o $(...) já tira as quebras de linha do fim).
+    lido=$(tesseract "$tmp" - ${idiomas:+-l "$idiomas"} 2>/dev/null | tr -d '\f' |
+      sed -e 's/[[:space:]]*$//' | sed -e '/./,$!d') || lido=""
+  fi
+  [[ -n $lido ]] || {
+    notify-send -a Mk "Nada para ler" "Não achei texto nem código nessa área."
+    exit 1
+  }
+
+  printf '%s' "$lido" | wl-copy
+  resumo=${lido%%$'\n'*}
+  ((${#resumo} <= 80)) || resumo=${resumo:0:80}…
+  linhas=$(grep -c '' <<<"$lido")
+  ((linhas == 1)) || resumo+=" ($linhas linhas)"
+  notify-send -a Mk "$titulo" "$resumo"
+  exit 0
+fi
+
 
 # A pasta só nasce quando há o que salvar (depois do Esc e do "sem janela").
 mkdir -p "$dir"
