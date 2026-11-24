@@ -39,6 +39,19 @@ Mudou algo fora de `~/.config/mk` (em `/etc`, `/usr/share`, no boot, no
   o `mk-update` passa. As de sistema rodam com `sudo env MK_SHARE=…`: `$HOME` e
   `$USER` ali não são os de quem atualiza, então nada de mexer em home a partir
   delas.
+- **`MK_ROOT`**: todo caminho do sistema (`/etc`, `/usr`, `/var`, `/boot`)
+  passa por uma raiz, `R=${MK_ROOT:-}`, escrita logo depois do
+  `set -euo pipefail`: `"$R/etc/skel"`, não `/etc/skel`. O `mk-update` não
+  passa essa variável (e o `sudo env MK_SHARE=…` não a herda), então `$R` é
+  vazio e os caminhos são os de sempre. Quem a usa são os testes
+  (`tests/migrations/`), que rodam a migração numa raiz falsa. As de usuário
+  não precisam: seguem `$HOME` e os `XDG_*`. Comando que mexe no sistema por
+  conta própria (`systemctl`, `mkinitcpio`, `limine-update`) não recebe a
+  raiz: nos testes é um dublê.
+- **Teste**: `tests/migrations/system/<nome>.test.sh` (ou `user/`), escrito
+  antes da migração: monta o "antes", roda e confere o "depois"; roda de novo
+  e nada muda; num sistema sem nada a fazer, não quebra. O
+  `tests/migrations/regras.test.sh` confere as regras desta página em todas.
 - **Idempotência**: confira antes de mudar (`grep -q`, `[[ -e … ]]`,
   `pacman -Q`). A marca só é gravada depois que o script termina; uma rodada
   interrompida no meio repete a migração inteira.

@@ -1,5 +1,5 @@
 -- Hyprland do Mk. Cada arquivo em mare/ cuida de um assunto.
--- Instale em ~/.config/hypr/ (o diretório inteiro); user.lua é seu e carrega por último.
+-- Fica em ~/.config/mk/hypr/ (o diretório inteiro); user.lua é seu e carrega por último.
 
 -- Os módulos ficam ao lado deste arquivo, onde quer que ele esteja.
 local here = debug.getinfo(1, "S").source:match("^@(.*/)") or "./"

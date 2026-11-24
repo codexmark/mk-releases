@@ -29,12 +29,16 @@ fi
 "$repo/bin/check-keybinds"
 # O bash do Mk abre e sai sem cair (já foi lançado um mk.bash que derrubava todo terminal).
 "$repo/bin/check-shell"
+# Os testes passam, ou não lança (tests/README.md).
+"$repo/tests/run"
 
 src=$(git rev-parse --short=12 HEAD)
 date=$(git log -1 --format=%cs)
 
 # O repositório de lançamentos, numa pasta de trabalho só para isso.
-if [[ -d $work/.git ]]; then
+# Uma pasta que sobrou de outro destino (MK_RELEASES trocado) é refeita: o
+# push vai para o "origin" dela, e tem de ser o repositório pedido agora.
+if [[ -d $work/.git && $(git -C "$work" remote get-url origin 2>/dev/null) == "$releases" ]]; then
   git -C "$work" fetch -q origin
   git -C "$work" reset -q --hard origin/main 2>/dev/null || true
 else

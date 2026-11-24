@@ -3,14 +3,18 @@
 # Roda o cava e imprime uma linha por quadro: "12;40;7;...;" (0 a 100, dos
 # graves aos agudos).
 #   mare-cava [faixas]
+# Faixas que não são um número inteiro caem no padrão (28).
 # MARE_CAVA_SOURCE escolhe de onde ouvir (padrão: o que sai nos alto-falantes).
 set -euo pipefail
 
 command -v cava >/dev/null || exit 127
 conf=${XDG_RUNTIME_DIR:-/tmp}/mare-cava.conf
+# O valor entra no arquivo do cava: só número, para não virar outras linhas.
+bars=${1:-28}
+[[ $bars =~ ^[0-9]+$ ]] || bars=28
 cat >"$conf" <<EOF2
 [general]
-bars = ${1:-28}
+bars = $bars
 framerate = 30
 autosens = 1
 lower_cutoff_freq = 50

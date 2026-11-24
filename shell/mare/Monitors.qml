@@ -157,10 +157,11 @@ Singleton {
     // O sinal de uma taxa que o monitor não lista, dentro dos limites que ele
     // declara; null se não cabe. Horizontal como no CVT-RBv2 (80 pontos de
     // intervalo: 8 + 32 + 40). No vertical, o intervalo do CVT com blanking
-    // reduzido (460 µs) se couber; se não, o maior que os limites deixam: a
-    // frequência de linha fica 0,1 kHz abaixo do teto (o EDID o dá em kHz
-    // inteiros) e o pixel clock não passa do máximo. O `WxH@taxa` do Hyprland
-    // usa o CVT de blanking normal, que estoura esses limites.
+    // reduzido (460 µs), nunca menos que minVblank (numa tela de 768 linhas a
+    // 60 Hz os 460 µs são 22), se couber; se não, o maior que os limites
+    // deixam: a frequência de linha fica 0,1 kHz abaixo do teto (o EDID o dá
+    // em kHz inteiros) e o pixel clock não passa do máximo. O `WxH@taxa` do
+    // Hyprland usa o CVT de blanking normal, que estoura esses limites.
     function timing(w, h, r, limits) {
         const l = limits;
         if (!l || !(w > 0 && h > 0 && r > 0) || !(l.vmax > 0 && l.hmax > 0 && l.clock > 0))
@@ -168,7 +169,7 @@ Singleton {
         if (r > l.vmax || r < (l.vmin || 0))
             return null;
         const htotal = w + 80;
-        const vtotal = Math.min(Math.ceil(h / (1 - 460e-6 * r)),
+        const vtotal = Math.min(Math.max(Math.ceil(h / (1 - 460e-6 * r)), h + minVblank),
             Math.floor((l.hmax * 1000 - 100) / r),
             Math.floor(l.clock * 1e6 / (htotal * r)));
         if (!(vtotal - h >= minVblank) || vtotal * r < (l.hmin || 0) * 1000)
@@ -327,7 +328,9 @@ Singleton {
 
     // Muda modo, escala ou rotação de uma tela. Se ela cresce ou encolhe, as
     // que estavam à direita ou abaixo acompanham a borda, sem abrir buraco
-    // nem ficar por cima.
+    // nem ficar por cima. Num desenho em L, puxar quem está além da borda que
+    // recuou poria uma tela por cima de outra: aí a borda só empurra, e quem
+    // ficou longe é o normalize que encosta.
     function resize(list, name, patch) {
         const out = copy(list);
         const m = find(out, name);
@@ -340,16 +343,22 @@ Singleton {
             m.mode = modeFor(m);
         }
         const after = logical(m);
-        if (placed(m))
-            for (const o of out) {
+        if (!placed(m))
+            return normalize(out);
+        const follow = pull => {
+            const next = copy(out);
+            for (const o of next) {
                 if (o.name === name || !placed(o))
                     continue;
-                if (o.x >= m.x + before.w - 1)
+                if (o.x >= m.x + before.w - 1 && (pull || after.w > before.w))
                     o.x += after.w - before.w;
-                if (o.y >= m.y + before.h - 1)
+                if (o.y >= m.y + before.h - 1 && (pull || after.h > before.h))
                     o.y += after.h - before.h;
             }
-        return normalize(out);
+            return next;
+        };
+        const pulled = follow(true);
+        return normalize(overlaps(pulled) ? follow(false) : pulled);
     }
 
     function pickMode(list, name, w, h, r) {
@@ -463,7 +472,8 @@ Singleton {
     }
 
     // Liga ou desliga. A última tela ligada não desliga; uma tela religada
-    // entra à direita das outras (ou onde o Hyprland quiser, sem modo sabido).
+    // entra à direita das outras, na altura da que vai mais à direita, para
+    // encostar nela (ou onde o Hyprland quiser, sem modo sabido).
     function setEnabled(list, name, on) {
         const out = copy(list);
         const m = find(out, name);
@@ -487,12 +497,14 @@ Singleton {
             return out;
         }
         m.auto = false;
-        let right = 0;
+        let right = 0, top = 0;
         for (const o of out)
-            if (o !== m && placed(o))
-                right = Math.max(right, o.x + logical(o).w);
+            if (o !== m && placed(o) && o.x + logical(o).w > right) {
+                right = o.x + logical(o).w;
+                top = o.y;
+            }
         m.x = right;
-        m.y = 0;
+        m.y = top;
         return normalize(out);
     }
 
@@ -581,9 +593,17 @@ Singleton {
         return true;
     }
 
-    // Texto -> string Lua entre aspas (o escape do JSON é aceito pelo Lua).
+    // Texto -> string Lua entre aspas. O escape do JSON é aceito pelo Lua,
+    // menos o \uXXXX (no Lua é \u{XXXX}, e nem todo Lua tem): um caractere de
+    // controle vai em decimal (\027) e um pedaço de UTF-16 sem par, que não
+    // existe em UTF-8, vira U+FFFD.
     function quote(s) {
-        return JSON.stringify(String(s));
+        return JSON.stringify(String(s)).replace(/\\(?:u([0-9a-fA-F]{4})|.)/g, (all, hex) => {
+            if (hex === undefined)
+                return all;
+            const code = parseInt(hex, 16);
+            return code < 256 ? "\\" + ("00" + code).slice(-3) : "\\239\\191\\189";
+        });
     }
 
     // A regra de uma tela. Vai pelo nome da saída: o Hyprland procura primeiro

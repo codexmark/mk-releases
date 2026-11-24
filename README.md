@@ -43,6 +43,14 @@ Os defeitos que ela mostrou estão nas issues do repositório.
   parear aparelho Bluetooth. As páginas e painéis existem, mas ninguém os viu
   funcionar fora da VM.
 
+A lista completa, com o que falta para cada item sair dela, está em
+[docs/limites.md](docs/limites.md).
+
+**Testes automáticos:** `tests/run` confere a lógica do Mk inteiro (scripts,
+Ajustes, configuração, instalador, migrações, atualização) sem tocar na
+máquina, e roda antes de cada `git push` e de cada lançamento. O projeto segue
+teste primeiro: veja [tests/README.md](tests/README.md).
+
 **Não existe:** instalação em BIOS legado (o instalador para se o live não foi
 iniciado em UEFI), dual boot (o instalador usa o disco inteiro) e discos com
 menos de 24 GiB.
@@ -235,9 +243,10 @@ sistema; no centro, relógio e clima; à direita, a bandeja e os indicadores.
 Clicar num item faz o painel dele descer da ilha, embaixo do clique. `Esc`
 fecha qualquer painel. A borda de baixo ondula com o som que está tocando.
 
-- **Workspaces são projetos.** Ao entrar num workspace novo e vazio, o seletor
-  abre com os repositórios git de `~/Work`. Escolher um liga o workspace ao
-  projeto; terminal, lazygit, lazydocker e yazi passam a abrir na pasta dele.
+- **Workspaces são projetos.** Um workspace novo e vazio mostra a folha que
+  convida a começar; o seletor, com os repositórios git de `~/Work`, abre
+  quando chamado (`qs ipc call mare toggle picker`) e não mais sozinho.
+  Escolher um projeto, por ele ou pela busca, liga o workspace ao projeto; terminal, lazygit, lazydocker e yazi passam a abrir na pasta dele.
 - **Busca** (um toque no `Super`): apps, projetos e comandos numa lista só.
 - **Painéis:** projeto, volume, energia, rede, calendário e clima,
   notificações, sessão, tocando agora, Bluetooth, tela, sistema, área de
@@ -409,6 +418,8 @@ Hyprland do Mk.
 | `config/bash/` | o terminal do Mk: `mk.bash`, o prompt (`starship.toml`), `seu.bash.exemplo` |
 | `config/ghostty/`, `config/fastfetch/` | terminal e a ficha que ele mostra ao abrir |
 | `config/mimeapps.list` | os apps padrão de fábrica |
+| `tests/` | os testes automáticos (`tests/run`) e o gancho de `git push` |
+| `vault/` | o Mk explicado por camadas, do kernel aos aplicativos, com os porquês: uma vault do Obsidian (abra a pasta nele e comece por `00 Início`) |
 | `shell/mare/` | o Maré: QML numa pasta só, mais `scripts/` (o que ele roda por fora) |
 | `apps/` | apps do Mk que vêm prontos, como o player de música `mktunes`; gerados nos repositórios deles (veja `apps/README.md`) |
 | `installer/` | `mk-install` e um arquivo de respostas de exemplo, para testes |
@@ -449,3 +460,5 @@ Regras das listas de pacotes:
 | [shell/mare/README.md](shell/mare/README.md) | o Maré por dentro: arquivos, IPC, scripts |
 | [docs/atualizacoes.md](docs/atualizacoes.md) | do repositório ao Mk instalado: lançar, o canal, e o que fazer se a atualização parar |
 | [docs/desenvolvimento.md](docs/desenvolvimento.md) | trabalhar no Mk: testar, conferir, lançar |
+| [docs/limites.md](docs/limites.md) | o que nunca foi testado em máquina de verdade e o que se sabe que não funciona |
+| [tests/README.md](tests/README.md) | os testes automáticos e a regra de teste primeiro |

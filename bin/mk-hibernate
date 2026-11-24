@@ -202,7 +202,13 @@ remove() {
   fi
 
   step "swapfile e subvolume"
-  if [[ -n $(state_get swapfile) ]]; then rm -f -- "$R$swapfile"; fi
+  if [[ -n $(state_get swapfile) ]]; then
+    rm -f -- "$R$swapfile"
+    # Uma linha do swapfile que não é a do setup (editada à mão) não é
+    # apagada, mas agora aponta para um arquivo que não existe mais.
+    fstab_has 2>/dev/null &&
+      say "aviso: o /etc/fstab ainda tem uma linha do $swapfile que não é a que o mk-hibernate pôs. Tire-a à mão: o arquivo não existe mais."
+  fi
   if [[ -n $(state_get subvol) && -d $R$swapdir ]]; then
     btrfs subvolume delete "$R$swapdir"
   fi

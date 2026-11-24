@@ -10,7 +10,8 @@ if ! pacman -Q cups &>/dev/null; then
   exit 0
 fi
 
-conf=/etc/cups/cups-files.conf
+R=${MK_ROOT:-} # outra raiz no lugar de /: só os testes trocam (migrations/README.md)
+conf=$R/etc/cups/cups-files.conf
 if [[ -f $conf ]] && ! grep -Eq '^SystemGroup .*\bwheel\b' "$conf"; then
   if grep -q '^SystemGroup ' "$conf"; then
     sed -i 's/^SystemGroup .*/& wheel/' "$conf"

@@ -20,9 +20,12 @@ case $mode in
     exit 2 ;;
 esac
 
-dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
+# Sem rota o `ip` sai com 2; o "|| true" deixa o aviso abaixo falar.
+dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }') || true
 [[ -n $dev ]] || { echo "sem conexão ativa" >&2; exit 1; }
-conn=$(nmcli -g GENERAL.CONNECTION dev show "$dev")
+# "-e no": o -g escapa ":" e "\" (uma rede "Casa: 5G" viria "Casa\: 5G"), e
+# o nome vai inteiro para o `con mod`.
+conn=$(nmcli -e no -g GENERAL.CONNECTION dev show "$dev")
 [[ -n $conn ]] || { echo "$dev não está ligado a uma conexão do NetworkManager" >&2; exit 1; }
 
 nmcli con mod "$conn" \

@@ -4,7 +4,8 @@
 # apps que esta máquina já viu, e o mk-update oferece os que entraram depois
 # junto com a atualização do sistema (uma vez, perguntando).
 set -euo pipefail
-visto=/var/lib/mk/apps-oferecidos
+R=${MK_ROOT:-} # outra raiz no lugar de /: só os testes trocam (migrations/README.md)
+visto=$R/var/lib/mk/apps-oferecidos
 [[ -e $visto ]] && exit 0
 lista="${MK_SHARE:-/usr/share/mk}/system/packages/apps.packages"
 mkdir -p "$(dirname "$visto")"

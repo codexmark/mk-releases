@@ -10,7 +10,11 @@ old=$HOME/Pictures
 
 mkdir -p "$pics/Wallpapers"
 find "$old/Wallpapers" -maxdepth 1 -type f -exec mv -n {} "$pics/Wallpapers/" \;
-# O papel de parede escolhido aponta para o caminho antigo.
-find "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell" -name wallpaper.json 2>/dev/null |
-  while IFS= read -r f; do sed -i "s|$old/Wallpapers/|$pics/Wallpapers/|" "$f"; done
+# O papel de parede escolhido aponta para o caminho antigo. (Quem nunca
+# escolheu um não tem a pasta: o find falharia e, com o pipefail, a migração.)
+state=${XDG_STATE_HOME:-$HOME/.local/state}/quickshell
+if [[ -d $state ]]; then
+  find "$state" -name wallpaper.json |
+    while IFS= read -r f; do sed -i "s|$old/Wallpapers/|$pics/Wallpapers/|" "$f"; done
+fi
 rmdir "$old/Wallpapers" "$old" 2>/dev/null || true

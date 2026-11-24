@@ -21,15 +21,21 @@
 #
 # Snapshots: com o snap-pac, cada pacman cria um snapshot antes e depois, e o
 # limine lista os snapshots no boot. Se algo quebrar, dá para voltar.
+#
+# Para testar sem tocar na máquina: MK_ROOT=<pasta> troca a raiz de tudo que é
+# lido e escrito em /usr, /var e /etc (o mesmo MK_ROOT do scripts/mare-updates);
+# MK_SHARE troca só o /usr/share/mk. Os comandos (sudo, pacman, yay, git,
+# pgrep, uname, hyprctl) vêm do PATH.
 set -euo pipefail
 
-share=${MK_SHARE:-/usr/share/mk}
+root=${MK_ROOT:-}
+share=${MK_SHARE:-$root/usr/share/mk}
 cfg=${XDG_CONFIG_HOME:-$HOME/.config}/mk
 marker=.instalado-pelo-mk
 check=$share/shell/mare/scripts/mare-updates
 [[ -x $check ]] || check=$cfg/shell/scripts/mare-updates
 mode=${1:-}
-sys_done=/var/lib/mk/migrations
+sys_done=$root/var/lib/mk/migrations
 state=${XDG_STATE_HOME:-$HOME/.local/state}/mk
 user_done=$state/migrations
 summary=$state/ultima-atualizacao.json
@@ -96,7 +102,7 @@ write_summary() {
   if ((rc == 0)); then
     ok=true applied=$now step=""
   fi
-  [[ -d /usr/lib/modules/$(uname -r) ]] || reboot=true
+  [[ -d $root/usr/lib/modules/$(uname -r) ]] || reboot=true
   mkdir -p "$state"
   jq -nc --argjson when "$now" --argjson started "$MK_UPDATE_START" --argjson ok "$ok" \
     --arg step "$step" --argjson reboot "$reboot" --argjson applied "$applied" \
@@ -197,7 +203,7 @@ for m in "${pend[@]}"; do
 done
 # Os apps que entraram em apps.packages desde a última vez (passo 3). Contam
 # aqui para a oferta voltar mesmo quando não há mais nada a atualizar.
-apps_seen=/var/lib/mk/apps-oferecidos
+apps_seen=$root/var/lib/mk/apps-oferecidos
 apps_list=$share/system/packages/apps.packages
 apps_new=() apps_add=()
 find_new_apps() {
@@ -228,6 +234,22 @@ if [[ $mode != --after-mk ]]; then
 fi
 applying=1
 
+# O que o Mk põe fora de /usr/share/mk: os comandos e o gancho do pacman. Só
+# copia o que mudou. Roda na troca e de novo quando a versão nova assume
+# (--after-mk): quem fez a troca foi o mk-update de antes, que só conhece a
+# lista dele; um comando que a versão nova acrescentou chega na mesma rodada.
+install_bins() {
+  local b src dst
+  for b in mk-session mk-update mk-hibernate; do
+    src=$share/bin/$b dst=$root/usr/bin/$b
+    [[ -f $src ]] || continue
+    cmp -s "$src" "$dst" || sudo install -m755 "$src" "$dst"
+  done
+  src=$share/system/mk/mk-os-release.hook dst=$root/etc/pacman.d/hooks/mk-os-release.hook
+  cmp -s "$src" "$dst" || sudo install -Dm644 "$src" "$dst"
+}
+if [[ $mode == --after-mk ]]; then install_bins; fi
+
 # 1. O próprio Mk: baixa o canal, troca /usr/share/mk e as configs que o Mk
 #    criou em ~/.config/mk (os seus ajustes.json/ajustes.lua ficam).
 if [[ $mk_available == true && $mode != --after-mk ]]; then
@@ -248,10 +270,7 @@ if [[ $mk_available == true && $mode != --after-mk ]]; then
   sudo cp -a "$tmp/mk" "$share.novo"
   sudo rm -rf "${share:?}"
   sudo mv "$share.novo" "$share"
-  sudo install -m755 "$share/bin/mk-session" /usr/bin/mk-session
-  sudo install -m755 "$share/bin/mk-update" /usr/bin/mk-update
-  [[ -f $share/bin/mk-hibernate ]] && sudo install -m755 "$share/bin/mk-hibernate" /usr/bin/mk-hibernate
-  sudo install -Dm644 "$share/system/mk/mk-os-release.hook" /etc/pacman.d/hooks/mk-os-release.hook
+  install_bins
   for pair in hypr:config/hypr shell:shell/mare ghostty:config/ghostty fastfetch:config/fastfetch bash:config/bash; do
     dst=$cfg/${pair%%:*}
     if [[ -e $dst/$marker || ! -e $dst ]]; then
@@ -280,13 +299,13 @@ if [[ $mk_available == true && $mode != --after-mk ]]; then
   note "Mk em $version. O Hyprland pega a config nova no próximo login."
   # O resto (migrações, pacotes) com a versão nova do mk-update. Se a troca
   # falhar, o resumo fica como "parou em: mk".
-  exec /usr/bin/mk-update --after-mk
+  exec "$root/usr/bin/mk-update" --after-mk
 fi
 
 # Um pacman interrompido (terminal fechado, queda de luz) deixa a base de
 # dados travada, e tudo daqui para a frente falharia. Sem nenhum gerenciador
 # de pacotes rodando, a trava é sobra: oferece tirar.
-lock=/var/lib/pacman/db.lck
+lock=$root/var/lib/pacman/db.lck
 if [[ -e $lock ]] && ! pgrep -x 'pacman|yay|makepkg|pamac' >/dev/null; then
   say "o pacman ficou travado por uma atualização interrompida"
   if ask "Destravar (remove $lock)?"; then
@@ -319,7 +338,7 @@ if ((${#apps_add[@]})); then
     if [[ " ${apps_add[*]} " == *" libreoffice-fresh "* ]]; then
       if ! ask "Incluir o LibreOffice (~150 MB de download)?"; then
         mapfile -t apps_add < <(printf '%s\n' "${apps_add[@]}" | grep -vx libreoffice-fresh || true)
-      elif grep -qs '^LANG=pt_BR' /etc/locale.conf; then
+      elif grep -qs '^LANG=pt_BR' "$root/etc/locale.conf"; then
         apps_add+=(libreoffice-fresh-pt-br)
       fi
     fi
@@ -384,7 +403,7 @@ if [[ -s $share/aur-pendentes.txt ]] && command -v yay >/dev/null; then
 fi
 
 # Kernel novo só vale depois de reiniciar.
-if [[ ! -d /usr/lib/modules/$(uname -r) ]]; then
+if [[ ! -d $root/usr/lib/modules/$(uname -r) ]]; then
   say "o kernel foi atualizado: reinicie quando puder"
 else
   say "pronto"

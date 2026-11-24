@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Roda os testes do Mk. Não precisa de root, de rede nem de sessão gráfica, e
+# não toca na máquina (veja tests/lib.sh).
+#
+#   tests/run              tudo
+#   tests/run mare-sleep   só os arquivos com esse trecho no caminho
+#   tests/run -v ...       mostra cada caso, não só os que falharam
+#
+# Um teste é um arquivo em tests/: *.test.sh (bash, com o tests/lib.sh),
+# *.test.mjs (node, para o JavaScript do shell) ou *.test.lua (lua, para a
+# configuração do Hyprland). Cada um imprime "ok - ..." ou "not ok - ..." por
+# caso e sai com 0 só se tudo passou. Sai com 1 se algum arquivo reprovar.
+set -uo pipefail
+
+tests=$(cd "$(dirname "$0")" && pwd)
+verbose=0
+filters=()
+for a in "$@"; do
+  if [[ $a == -v ]]; then verbose=1; else filters+=("$a"); fi
+done
+
+mapfile -t files < <(find "$tests" -type f \( -name '*.test.sh' -o -name '*.test.mjs' -o -name '*.test.lua' \) | sort)
+
+# Cada arquivo roda no seu processo e na sua caixa de areia: vão em paralelo
+# (MK_TEST_JOBS, padrão o número de núcleos) e o resultado sai na ordem.
+jobs=${MK_TEST_JOBS:-$(nproc 2>/dev/null || echo 4)}
+outdir=$(mktemp -d "${TMPDIR:-/tmp}/mk-run.XXXXXX")
+trap 'rm -rf "${outdir:?}"' EXIT
+
+chosen=()
+for f in "${files[@]}"; do
+  rel=${f#"$tests"/}
+  if ((${#filters[@]})); then
+    hit=0
+    for p in "${filters[@]}"; do [[ $rel == *"$p"* ]] && hit=1; done
+    ((hit)) || continue
+  fi
+  chosen+=("$f")
+done
+
+runner_of() {
+  case $1 in
+    *.sh) echo bash ;;
+    *.mjs) echo node ;;
+    *.lua) echo lua ;;
+  esac
+}
+
+i=0
+for f in "${chosen[@]}"; do
+  i=$((i + 1))
+  runner=$(runner_of "$f")
+  if ! command -v "$runner" >/dev/null; then
+    echo 127 >"$outdir/$i.rc"
+    echo "not ok - falta o $runner para rodar este arquivo" >"$outdir/$i.out"
+    continue
+  fi
+  (
+    cd "$(dirname "$f")" || exit 1
+    "$runner" "$f" >"$outdir/$i.out" 2>&1
+    echo $? >"$outdir/$i.rc"
+  ) &
+  while (($(jobs -rp | wc -l) >= jobs)); do wait -n; done
+done
+wait
+
+pass=0 fail=0 cases=0 skipped=0
+failed=()
+i=0
+for f in "${chosen[@]}"; do
+  i=$((i + 1))
+  rel=${f#"$tests"/}
+  out=$(<"$outdir/$i.out")
+  rc=$(<"$outdir/$i.rc")
+  n=$(grep -c '^ok - \|^not ok - ' <<<"$out")
+  cases=$((cases + n))
+  grep -q '^skip - ' <<<"$out" && skipped=$((skipped + 1))
+  if ((rc == 0)) && ! grep -q '^not ok - ' <<<"$out"; then
+    pass=$((pass + 1))
+    printf 'ok     %s (%s)\n' "$rel" "$n"
+    if ((verbose)); then sed 's/^/         /' <<<"$out"; else grep '^skip - ' <<<"$out" | sed 's/^/         /'; fi
+  else
+    fail=$((fail + 1))
+    failed+=("$rel")
+    printf 'FALHOU %s\n' "$rel"
+    if ((verbose)); then sed 's/^/         /' <<<"$out"; else grep -v '^ok - ' <<<"$out" | sed 's/^/         /'; fi
+  fi
+done
+
+echo
+printf '%s arquivos, %s casos: %s passaram, %s falharam' "$((pass + fail))" "$cases" "$pass" "$fail"
+((skipped)) && printf ', %s pulados' "$skipped"
+echo
+if ((fail)); then
+  printf '  %s\n' "${failed[@]}"
+  exit 1
+fi
+((pass > 0)) || { echo "nenhum teste encontrado" >&2; exit 1; }

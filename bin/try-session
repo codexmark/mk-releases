@@ -8,7 +8,13 @@
 #
 # Os passos que precisam de root (pacotes e a entrada na tela de login) não são
 # executados: o script imprime os comandos para você rodar.
+#
+# Para testar sem olhar a máquina: MK_TRY_ROOT=<pasta> troca a raiz onde ele
+# procura o lançador e a entrada da tela de login (/usr/local/bin,
+# /usr/share/wayland-sessions); os comandos impressos continuam os de verdade.
 set -euo pipefail
+
+root=${MK_TRY_ROOT:-}
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 cfg=${XDG_CONFIG_HOME:-$HOME/.config}
@@ -86,15 +92,15 @@ root_steps() {
     echo
     echo "  sudo pacman -S --needed $missing"
   fi
-  if ! cmp -s "$repo/bin/mk-session" "$launcher"; then
+  if ! cmp -s "$repo/bin/mk-session" "$root$launcher"; then
     echo
     echo "  sudo install -Dm755 $repo/bin/mk-session $launcher"
   fi
-  if [[ -f $old_launcher || -f $old_session_file ]]; then
+  if [[ -f $root$old_launcher || -f $root$old_session_file ]]; then
     echo
     echo "  sudo rm -f $old_launcher $old_session_file    # a sessão antiga \"meu-os\""
   fi
-  if [[ ! -f $session_file ]]; then
+  if [[ ! -f $root$session_file ]]; then
     echo
     echo "  printf '[Desktop Entry]\\nName=Mk\\nComment=Hyprland com o Maré\\nExec=$launcher\\nType=Application\\n' | sudo tee $session_file"
   fi
@@ -156,16 +162,21 @@ case ${1:-status} in
       rm -f "$state/.pelo-try-session"
     fi
     rmdir "$state" "$(dirname "$state")" 2>/dev/null || true
+    # O VERSION que o install gravou, quando nada do Mk ficou para ele descrever.
+    [[ -e $hypr_dst || -e $qs_dst ]] || rm -f "$cfg/mk/VERSION"
     rmdir "$cfg/mk" 2>/dev/null || true
-    if [[ -f $session_file || -f $launcher ]]; then
+    if [[ -f $root$session_file || -f $root$launcher ]]; then
       echo
       echo "Para tirar a sessão do sistema (com sudo; vale para todos os usuários):"
       echo "  sudo rm -f $session_file $launcher"
     fi
     ;;
   status)
-    for p in "$hypr_dst" "$qs_dst" "$launcher" "$session_file"; do
+    for p in "$hypr_dst" "$qs_dst"; do
       [[ -e $p ]] && echo "  ok      $p" || echo "  falta   $p"
+    done
+    for p in "$launcher" "$session_file"; do
+      [[ -e $root$p ]] && echo "  ok      $p" || echo "  falta   $p"
     done
     missing=$(missing_packages)
     [[ -n $missing ]] && echo "  pacotes que faltam: $missing" || echo "  pacotes: ok"

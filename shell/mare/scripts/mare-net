@@ -3,7 +3,10 @@
 # Saída: {"iface","type","conn","ip","gateway","dns":[..],"dnsMode"}
 #   type: wifi | ethernet | none
 #   dnsMode: auto (o DNS do roteador) | cloudflare | google | custom
+# Só lê /sys para saber se a interface é Wi-Fi. SYS troca a raiz, para testar.
 set -uo pipefail
+
+sys=${SYS:-/sys}
 
 dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
 if [[ -z $dev ]]; then
@@ -12,9 +15,10 @@ if [[ -z $dev ]]; then
 fi
 
 type=ethernet
-[[ -d /sys/class/net/$dev/wireless ]] && type=wifi
+[[ -d $sys/class/net/$dev/wireless ]] && type=wifi
 
-conn=$(nmcli -g GENERAL.CONNECTION dev show "$dev" 2>/dev/null)
+# "-e no": o -g escapa ":" e "\", e o nome é usado inteiro logo abaixo.
+conn=$(nmcli -e no -g GENERAL.CONNECTION dev show "$dev" 2>/dev/null)
 ip=$(nmcli -g IP4.ADDRESS dev show "$dev" 2>/dev/null | head -1 | cut -d' ' -f1)
 gateway=$(nmcli -g IP4.GATEWAY dev show "$dev" 2>/dev/null | head -1)
 dns=$(nmcli -t -f IP4.DNS dev show "$dev" 2>/dev/null | cut -d: -f2- | jq -Rn '[inputs | select(length > 0)]')
@@ -25,9 +29,10 @@ if [[ -n $conn ]]; then
   ignore=$(nmcli -g ipv4.ignore-auto-dns con show "$conn" 2>/dev/null)
   fixed=$(nmcli -g ipv4.dns con show "$conn" 2>/dev/null)
   if [[ $ignore == yes && -n $fixed ]]; then
-    case $fixed in
-      *1.1.1.1*) mode=cloudflare ;;
-      *8.8.8.8*) mode=google ;;
+    # Endereço inteiro, entre vírgulas: "10.1.1.1" não é o da Cloudflare.
+    case ",${fixed//[ |]/,}," in
+      *,1.1.1.1,*) mode=cloudflare ;;
+      *,8.8.8.8,*) mode=google ;;
       *) mode=custom ;;
     esac
   fi

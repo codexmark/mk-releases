@@ -58,12 +58,17 @@
 # fechada), "sem-avahi" (descoberta desligada), "eu" (o nome do usuário, para
 # os trabalhos da fila). MARE_PRINTERS_FAKE_WAIT=<s> faz a janela de senha de
 # mentira demorar. O `selftest` traz exemplos desses arquivos.
+#
+# Sem os exemplos, o que o script lê do disco (o CUPS está instalado? onde
+# está a página de teste?) sai de /usr. MARE_PRINTERS_ROOT=<pasta> põe outra
+# raiz na frente, para testar com as ferramentas do CUPS trocadas no PATH.
 set -uo pipefail
 
 # O CUPS traduz as mensagens; a leitura abaixo conta com o inglês.
 export LC_ALL=C LANG=C LANGUAGE=C
 
 fx=${MARE_PRINTERS_FIXTURES:-}
+root=${MARE_PRINTERS_ROOT:-}
 # Onde fica o estado da ação em curso e o último resultado.
 if [[ -n ${MARE_PRINTERS_STATE:-} ]]; then
   sd=$MARE_PRINTERS_STATE
@@ -97,7 +102,7 @@ installed() {
   if [[ -n $fx ]]; then
     [[ ! -e $fx/ausente ]]
   else
-    [[ -e /usr/lib/systemd/system/cups.socket || -e /usr/bin/cupsd ]]
+    [[ -e $root/usr/lib/systemd/system/cups.socket || -e $root/usr/bin/cupsd ]]
   fi
 }
 
@@ -337,7 +342,7 @@ add() {
 
 test_page() {
   local page
-  for page in /usr/share/cups/data/default-testpage.pdf /usr/share/cups/data/testprint; do
+  for page in "$root/usr/share/cups/data/default-testpage.pdf" "$root/usr/share/cups/data/testprint"; do
     if [[ -f $page || -n $fx ]]; then
       act lp -d "$1" -t "página de teste" "$page"
       return
@@ -501,7 +506,8 @@ find_printers() {
     legacy=$(awk '
         function flush() { if (uri != "") printf "%s\t%s\n", uri, model }
         /^Device: / { flush(); uri = ""; model = ""; sub(/^Device: uri = /, ""); uri = $0; next }
-        /^[ \t]+make-and-model = / { sub(/^[ \t]+make-and-model = /, ""); model = $0 }
+        # O info vem antes no `lpinfo -l`: um "Unknown" aqui não o apaga.
+        /^[ \t]+make-and-model = / { sub(/^[ \t]+make-and-model = /, ""); if ($0 != "Unknown" || model == "") model = $0 }
         /^[ \t]+info = / { if (model == "" || model == "Unknown") { sub(/^[ \t]+info = /, ""); model = $0 } }
         END { flush() }
       ' <<<"$legacy")

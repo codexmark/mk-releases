@@ -3,9 +3,13 @@
 # {"cycles": n, "health": 0..1, "limit": 0..100 ou null}
 #   health: capacidade cheia de hoje / capacidade de fábrica
 #   limit:  limite de carga, quando o notebook expõe (senão null)
+# Uma leitura que não é número também vira null.
+# Só lê /sys. SYS troca a raiz, para testar.
 set -uo pipefail
 
-bat=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
+sys=${SYS:-/sys}
+
+bat=$(ls -d "$sys"/class/power_supply/BAT* 2>/dev/null | head -1)
 if [[ -z $bat ]]; then
   echo '{"cycles":null,"health":null,"limit":null}'
   exit 0
@@ -21,7 +25,7 @@ fi
 limit=$(read_num "$bat/charge_control_end_threshold")
 
 jq -nc --arg cycles "$cycles" --arg full "$full" --arg design "$design" --arg limit "$limit" '{
-  cycles: (if $cycles == "" or $cycles == "0" then null else ($cycles | tonumber) end),
-  health: (if $full == "" or $design == "" or $design == "0" then null else (($full | tonumber) / ($design | tonumber)) end),
-  limit: (if $limit == "" then null else ($limit | tonumber) end)
+  cycles: (if $cycles == "" or $cycles == "0" then null else (try ($cycles | tonumber) catch null) end),
+  health: (if $full == "" or $design == "" or $design == "0" then null else (try (($full | tonumber) / ($design | tonumber)) catch null) end),
+  limit: (if $limit == "" then null else (try ($limit | tonumber) catch null) end)
 }'

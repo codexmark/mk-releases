@@ -6,7 +6,8 @@
 # pacotes: jre-openjdk-headless mpv ffmpeg
 set -euo pipefail
 share=${MK_SHARE:-/usr/share/mk}
+R=${MK_ROOT:-} # outra raiz no lugar de /: só os testes trocam (migrations/README.md)
 
-bash "$share/system/mk/mktunes-links" /
+bash "$share/system/mk/mktunes-links" "$R/"
 command -v java >/dev/null ||
   echo "aviso: sem Java; o MkTunes abre depois de: sudo pacman -S jre-openjdk-headless" >&2

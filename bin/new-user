@@ -10,9 +10,15 @@
 # Faz: cria o usuário, instala os pacotes que faltam, instala a sessão "Mk"
 # na tela de login, copia a config do Mk para a home dele e pede a senha.
 # Rodar de novo com um usuário que já existe só atualiza a config dele.
+#
+# Para testar sem tocar na máquina: MK_NEW_USER_ROOT=<pasta> troca a raiz do
+# que é escrito no sistema (/usr/local/bin, /usr/share/wayland-sessions) e
+# dispensa o root; os comandos (pacman, id, getent, useradd, passwd, chown,
+# install) vêm do PATH, e a home é a que o getent responder.
 set -euo pipefail
 
-if [[ $EUID -ne 0 ]]; then
+R=${MK_NEW_USER_ROOT:-}
+if [[ -z $R && $EUID -ne 0 ]]; then
   echo "rode com sudo: sudo $0 <nome> [--admin] [--wallpapers]" >&2
   exit 1
 fi
@@ -49,8 +55,8 @@ fi
 
 # 2. Sessão na tela de login (vale para todos os usuários)
 echo "== sessão Mk na tela de login"
-install -Dm755 "$repo/bin/mk-session" /usr/local/bin/mk-session
-cat >/usr/share/wayland-sessions/mk.desktop <<'EOF'
+install -Dm755 "$repo/bin/mk-session" "$R/usr/local/bin/mk-session"
+cat >"$R/usr/share/wayland-sessions/mk.desktop" <<'EOF'
 [Desktop Entry]
 Name=Mk
 Comment=Hyprland com o Maré

@@ -4,15 +4,21 @@
 # Uso: mare-wifi-qr <arquivo.png>
 # O PNG contém a senha: o Maré o grava em $XDG_RUNTIME_DIR (só do usuário,
 # apagado ao desligar) e o remove quando o painel fecha.
+# Só lê /sys para saber se a interface é Wi-Fi. SYS troca a raiz, para testar.
 set -euo pipefail
 
+sys=${SYS:-/sys}
+
 out=${1:?uso: mare-wifi-qr <arquivo.png>}
-dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
-[[ -n $dev && -d /sys/class/net/$dev/wireless ]] || { echo "não está num Wi-Fi" >&2; exit 1; }
-conn=$(nmcli -g GENERAL.CONNECTION dev show "$dev")
-ssid=$(nmcli -g 802-11-wireless.ssid con show "$conn")
-keymgmt=$(nmcli -g 802-11-wireless-security.key-mgmt con show "$conn" 2>/dev/null || true)
-psk=$(nmcli -s -g 802-11-wireless-security.psk con show "$conn" 2>/dev/null || true)
+# Sem rota o `ip` sai com 2; o "|| true" deixa o aviso abaixo falar.
+dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }') || true
+[[ -n $dev && -d $sys/class/net/$dev/wireless ]] || { echo "não está num Wi-Fi" >&2; exit 1; }
+# "-e no": o -g escapa ":" e "\" (uma rede "Casa: 5G" viria "Casa\: 5G"), e
+# aqui o valor é usado inteiro, como nome da conexão, SSID e senha.
+conn=$(nmcli -e no -g GENERAL.CONNECTION dev show "$dev")
+ssid=$(nmcli -e no -g 802-11-wireless.ssid con show "$conn")
+keymgmt=$(nmcli -e no -g 802-11-wireless-security.key-mgmt con show "$conn" 2>/dev/null || true)
+psk=$(nmcli -s -e no -g 802-11-wireless-security.psk con show "$conn" 2>/dev/null || true)
 
 # Caracteres especiais do formato WIFI: precisam de barra antes.
 escape() { sed -e 's/[\\;,:"]/\\&/g' <<<"$1"; }

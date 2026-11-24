@@ -18,7 +18,7 @@ bat
 eza
 dua-cli
 plocate
-jq
+# (o jq já vem em base.packages: os scripts do Maré precisam dele)
 yq
 gum
 btop

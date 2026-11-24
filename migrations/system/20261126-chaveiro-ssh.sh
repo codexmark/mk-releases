@@ -4,7 +4,8 @@
 # para ele quando o soquete está ligado; veja config/hypr/mare/env.lua).
 # pacotes: gcr-4
 set -euo pipefail
-if [[ ! -f /usr/lib/systemd/user/gcr-ssh-agent.socket ]]; then
+R=${MK_ROOT:-} # outra raiz no lugar de /: só os testes trocam (migrations/README.md)
+if [[ ! -f $R/usr/lib/systemd/user/gcr-ssh-agent.socket ]]; then
   echo "aviso: o gcr-4 não foi instalado; o agente SSH do chaveiro fica desligado" >&2
   exit 0
 fi

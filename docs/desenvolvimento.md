@@ -82,6 +82,24 @@ isso, como `20261121-logo-plano.sh` e `20261121-apps-folha.sh`).
 
 Do mais barato ao mais caro. Suba um degrau só quando o anterior passou.
 
+### 0. Teste primeiro
+
+Toda mudança de comportamento começa por um caso em `tests/` que falha, e só
+então o código. As regras e o jeito de escrever estão em
+[tests/README.md](../tests/README.md).
+
+```bash
+tests/run
+```
+
+Leva um ou dois minutos, sem root, sem rede e sem sessão gráfica: os comandos que
+mexem na máquina são dublês. Ligue uma vez por clone o gancho que roda isto
+antes de cada `git push`:
+
+```bash
+git config core.hooksPath tests/hooks
+```
+
 ### 1. Editar e conferir
 
 Sempre que mexer no que cada um cobre:
@@ -451,7 +469,7 @@ compacta, e depois as cópias que o resto do Mk usa:
 | `system/mk/art/mark.png` | o `make-art.py` |
 | `shell/mare/assets/mark.png`, `mark.svg` | o Maré (ilha, bloqueio, Ajustes, boas-vindas) |
 | `config/fastfetch/mark.png` | a ficha do terminal |
-| `system/mk/sddm/mk/mark.png` | a tela de login |
+| `system/mk/sddm/mk/letra-m.png`, `letra-k.png`, `geometria.js` | a tela de login: as letras em camadas e a geometria da marca, para ela ser construída em movimento (`make-logo.py entrada` gera só estes) |
 | `system/mk/plymouth/mk/logo.png` | o boot |
 
 ```bash
@@ -487,8 +505,24 @@ visto funcionando: a instalação com disco criptografado não foi testada.
 **`system/mk/sddm/mk/`** — o tema da tela de login, em QML (`Main.qml`,
 `theme.conf`, `metadata.desktop`). O instalador copia para
 `/usr/share/sddm/themes/mk`, grava o layout do teclado em `theme.conf.user` e
-escolhe o tema em `/etc/sddm.conf.d/20-mk-theme.conf`. O `place` do
-`theme.conf` é o texto do carimbo no canto.
+escolhe o tema em `/etc/sddm.conf.d/20-mk-theme.conf`.
+
+À esquerda fica o relógio de anéis da tela de bloqueio (os minutos e os
+segundos giram em volta de um ponto fora da tela; o número que passa pela
+pílula acende em cobre), com a mesma conta do `shell/mare/LockSurface.qml`:
+um teste reprova se as duas divergirem. À direita, a marca, com quem entra e
+a senha embaixo dela. A entrada constrói a marca em vez de mostrá-la pronta: os eixos, as guias, as
+diagonais, as letras e os nós do logo aparecem nessa ordem, em pouco mais de
+dois segundos. Depois um cursor de cobre anda pela cota com os segundos, um nó
+pisca de cada vez, cada tecla da senha acende o próximo e, enquanto a senha é
+conferida, uma guia varre a marca. Só as cores do Mk. `motion=nao` no
+`theme.conf.user` da máquina desliga tudo e mostra a marca pronta.
+
+Para ver o tema sem sair da sessão:
+
+```bash
+sddm-greeter-qt6 --test-mode --theme system/mk/sddm/mk
+```
 
 **`system/mk/boot/limine-default`** — faz o menu do limine iniciar sozinho
 depois da contagem, mesmo quando os ganchos do limine reescrevem o menu em
@@ -580,9 +614,11 @@ lançamento.
 1. `git status` limpo. Arquivo novo sem `git add` não impede o lançamento, mas
    também não vai nele: confira que nada do que a mudança precisa ficou de
    fora.
-2. `bin/check-keybinds` e `bin/check-shell` passam. (O `mk-release` roda os
-   dois de novo; o primeiro precisa do `node`. O `check-shell` abre um bash
-   interativo de verdade com o `config/bash/mk.bash` e falha se ele cair.)
+2. `tests/run` passa inteiro, e a mudança chegou com o teste dela.
+   `bin/check-keybinds` e `bin/check-shell` passam. (O `mk-release` roda os
+   três de novo. Os testes e o `check-keybinds` precisam do `node`; o
+   `check-shell` abre um bash interativo de verdade com o
+   `config/bash/mk.bash` e falha se ele cair.)
 3. Mexeu em `system/packages/`? `bin/check-packages` passa.
 4. Mexeu no Maré? `bin/dev-shot` com os painéis e páginas tocados dá "log do
    Maré: limpo", e você viu a mudança numa sessão de verdade.

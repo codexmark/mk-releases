@@ -2,9 +2,11 @@
 
 PKG_DIR="${PKG_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../system/packages" && pwd)}"
 
-# Lista os pacotes de um arquivo, sem comentários e linhas em branco.
+# Lista os pacotes de um arquivo, sem comentários, linhas em branco nem
+# espaços em volta do nome. Uma lista sem pacote nenhum é vazia, não um erro
+# (com `set -e`, o erro cortava as listas lidas depois dela).
 read_list() {
-  sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$1" | grep -v '^[[:space:]]*$'
+  sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' "$1"
 }
 
 # Lista os pacotes de uma ou mais seções de hardware.packages.

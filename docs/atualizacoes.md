@@ -46,8 +46,10 @@ O que ele faz, em ordem:
    rastreado não impede, e também não vai no lançamento.
 2. Avisa (sem parar) se há commits que ainda não foram para o repositório
    privado.
-3. Roda `bin/check-keybinds`. Se `config/hypr/mare/binds.lua` e
-   `shell/mare/Keybinds.js` divergirem, ou se faltar o `node`, não lança.
+3. Roda `bin/check-keybinds`, `bin/check-shell` e `tests/run` (todos os
+   testes automáticos). Se `config/hypr/mare/binds.lua` e
+   `shell/mare/Keybinds.js` divergirem, se o bash do Mk não subir, se um teste
+   falhar ou se faltar o `node`, não lança.
 4. Clona ou atualiza o repositório público em
    `~/.cache/mk-release/mk-releases`.
 5. Se o `VERSION` de lá já é o commit atual, diz "já está lançado" e sai.
@@ -110,7 +112,7 @@ sem o `script`, a atualização roda igual, sem registro.
 
 ### 1. Procura
 
-Roda `scripts/mare-updates` (o mesmo dos Ajustes) e mostra: o Mk, o número de
+Roda `shell/mare/scripts/mare-updates` (o mesmo dos Ajustes) e mostra: o Mk, o número de
 pacotes do sistema e do AUR, as migrações pendentes ("ajustes") e os apps
 novos do Mk. Sem nada a fazer, diz "tudo em dia" e sai. Senão pergunta
 "Atualizar agora?".
@@ -122,7 +124,8 @@ Só quando o canal tem versão nova:
 1. Clona o canal (raso), tira o `.git` e preserva o
    `/usr/share/mk/aur-pendentes.txt`, se existir.
 2. Copia para `/usr/share/mk.novo`, apaga `/usr/share/mk` e renomeia.
-3. Reinstala `/usr/bin/mk-session`, `/usr/bin/mk-update` e o gancho
+3. Reinstala `/usr/bin/mk-session`, `/usr/bin/mk-update`,
+   `/usr/bin/mk-hibernate` (só serve para desfazer um preparo antigo) e o gancho
    `/etc/pacman.d/hooks/mk-os-release.hook`.
 4. Troca as pastas `hypr`, `shell`, `ghostty`, `fastfetch` e `bash` de
    `~/.config/mk`, cada uma de uma vez (copia ao lado e renomeia). Só troca a

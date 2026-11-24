@@ -5,13 +5,18 @@
 # legível por quem chamou o sudo.
 #
 #   sudo bin/diagnose-user <nome>
+#
+# Para testar sem tocar na máquina: MK_DIAG_ROOT=<pasta> põe a saída em
+# <pasta>/tmp/mk-diagnostico e dispensa o root; os comandos (id, getent, ps,
+# chown) vêm do PATH, e a home é a que o getent responder.
 set -uo pipefail
 
-[[ $EUID -eq 0 ]] || { echo "rode com sudo: sudo $0 <nome>" >&2; exit 1; }
+R=${MK_DIAG_ROOT:-}
+[[ -n $R || $EUID -eq 0 ]] || { echo "rode com sudo: sudo $0 <nome>" >&2; exit 1; }
 name=${1:-}
 id "$name" >/dev/null 2>&1 || { echo "usuário não existe: $name" >&2; exit 2; }
 home=$(getent passwd "$name" | cut -d: -f6)
-out=/tmp/mk-diagnostico
+out=$R/tmp/mk-diagnostico
 rm -rf "$out"
 mkdir -p "$out"
 

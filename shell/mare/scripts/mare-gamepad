@@ -11,24 +11,31 @@
 #   mare-gamepad status      JSON com o estado (não muda nada)
 #   mare-gamepad install     instala (interativo: rode num terminal)
 #   mare-gamepad remove      remove (interativo, pede a senha do sudo)
+#
+# O status só lê /sys (os USB ligados e os módulos carregados). SYS troca a
+# raiz, para testar.
 set -uo pipefail
+
+sys=${SYS:-/sys}
 
 # Um controle da Microsoft (045e) ligado por USB, pelo nome do produto.
 controllers() {
   local d vendor product
-  for d in /sys/bus/usb/devices/*; do
+  for d in "$sys"/bus/usb/devices/*; do
     [[ -r $d/idVendor && -r $d/product ]] || continue
     read -r vendor <"$d/idVendor"
     [[ $vendor == 045e ]] || continue
     read -r product <"$d/product"
     [[ ${product,,} == *controller* || ${product,,} == *xbox* ]] && printf '%s\n' "$product"
   done
+  # O último teste do laço pode ter dado falso: isso não é erro do status.
+  return 0
 }
 
 status() {
   local installed=false loaded=false yay=false
   pacman -Qq xone-dkms >/dev/null 2>&1 && installed=true
-  [[ -d /sys/module/xone_gip || -d /sys/module/xone_wired || -d /sys/module/xone_dongle ]] && loaded=true
+  [[ -d $sys/module/xone_gip || -d $sys/module/xone_wired || -d $sys/module/xone_dongle ]] && loaded=true
   command -v yay >/dev/null 2>&1 && yay=true
   controllers | jq -R . | jq -sc --argjson installed "$installed" --argjson loaded "$loaded" \
     --argjson yay "$yay" '{ installed: $installed, loaded: $loaded, yay: $yay, controllers: . }'

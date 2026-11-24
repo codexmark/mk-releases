@@ -1,8 +1,9 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Abre sozinho num workspace novo e vazio: escolha um projeto de ~/Work
-// (os que já estão em outro workspace não aparecem) ou deixe livre.
+// Escolha um projeto de ~/Work para este workspace (os que já estão em outro
+// não aparecem) ou deixe livre. Só abre quando chamado (toggle picker): num
+// workspace vazio quem convida a começar é a folha do Backdrop.
 Item {
     id: panel
 

@@ -11,7 +11,11 @@
 #   applied: quando o sistema foi atualizado pela última vez (0 = não se sabe)
 #   reboot:  o kernel em uso já saiu do disco: falta reiniciar
 #   news:    o que chega com a versão nova do Mk (NOVIDADES do lançamento)
+# MK_ROOT troca a raiz de /usr, /var (VERSION, canal, migrações, pacman.log,
+# módulos do kernel), para testar.
 set -uo pipefail
+
+root=${MK_ROOT:-}
 
 err=""
 to_json() { # linhas "nome velha -> nova" em [{name, from, to}]
@@ -33,11 +37,11 @@ command -v yay >/dev/null && aur=$(timeout 30 yay -Qua 2>/dev/null)
 
 # Versão do Mk: "commit data" escrito pela instalação.
 version="" date=""
-for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/VERSION" /usr/share/mk/VERSION; do
+for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/VERSION" "$root/usr/share/mk/VERSION"; do
   if [[ -r $f ]]; then read -r version date <"$f"; break; fi
 done
 channel=""
-for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/channel" /usr/share/mk/system/mk/channel; do
+for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/channel" "$root/usr/share/mk/system/mk/channel"; do
   if [[ -r $f ]]; then channel=$(grep -v '^#' "$f" | head -1); [[ -n $channel ]] && break; fi
 done
 # A versão no canal: o arquivo VERSION do último lançamento ("commit data"),
@@ -77,19 +81,19 @@ else
   last=null
 fi
 [[ $applied =~ ^[1-9][0-9]*$ ]] || applied=0
-stamp=$(grep -a 'starting full system upgrade' /var/log/pacman.log 2>/dev/null | tail -1 |
+stamp=$(grep -a 'starting full system upgrade' "$root/var/log/pacman.log" 2>/dev/null | tail -1 |
   sed -n 's/^\[\([^]]*\)\].*/\1/p')
 [[ -n $stamp ]] && stamp=$(date -d "$stamp" +%s 2>/dev/null)
 [[ $stamp =~ ^[0-9]+$ ]] && ((stamp > applied)) && applied=$stamp
 reboot=false
-[[ -d /usr/lib/modules/$(uname -r) ]] || reboot=true
+[[ -d $root/usr/lib/modules/$(uname -r) ]] || reboot=true
 
 # Migrações pendentes (o mk-update roda cada uma uma vez).
 migrations=0
 for kind in system user; do
-  for f in /usr/share/mk/migrations/"$kind"/*.sh; do
+  for f in "$root"/usr/share/mk/migrations/"$kind"/*.sh; do
     [[ -f $f ]] || continue
-    if [[ $kind == system ]]; then done_dir=/var/lib/mk/migrations
+    if [[ $kind == system ]]; then done_dir=$root/var/lib/mk/migrations
     else done_dir=${XDG_STATE_HOME:-$HOME/.local/state}/mk/migrations; fi
     [[ -e $done_dir/$(basename "$f") ]] || migrations=$((migrations + 1))
   done

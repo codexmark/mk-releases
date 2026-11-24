@@ -290,14 +290,14 @@ mk-install --answers respostas.conf
 | `HOSTNAME`, `USERNAME`, `PASSWORD` | como nas perguntas |
 | `TIMEZONE`, `KEYMAP`, `LOCALE` | ex. `America/Porto_Velho`, `br-abnt2`, `pt_BR.UTF-8` |
 | `HARDWARE` | `amd intel nvidia vm`, separados por espaço; vazio para nenhum |
-| `APPS`, `ENCRYPT` | `sim` ou `nao` |
+| `APPS`, `ENCRYPT` | `sim` ou `nao`, exatamente assim (`yes`, `true` e outros são recusados) |
 | `POWEROFF` | `sim` desliga a máquina no fim |
 
 O arquivo é lido como `CHAVE=valor`, uma por linha, sem executar nada; uma
 chave desconhecida ou uma linha fora desse formato para o instalador. Preencha
 todas as chaves do exemplo: neste modo não há valores padrão de região. Com
-`LOCALE` ou `KEYMAP` vazios o instalador para; com `TIMEZONE` vazio ele **não
-para** e instala com o fuso quebrado.
+`LOCALE`, `KEYMAP` ou `TIMEZONE` vazios, ou com um valor que não existe no
+live, o instalador para antes de tocar no disco.
 
 Neste modo não há tela de Wi-Fi: a rede já precisa estar no ar. As respostas
 passam pelas mesmas validações, e a revisão é mostrada antes de formatar.

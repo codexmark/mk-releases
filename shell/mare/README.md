@@ -85,6 +85,40 @@ esteja marcado como livre (`Projects.free`). Fora disso o `Mare.mode` até vira
 `"project"` (é o que o `state` devolve), mas o `Tide` o trata como `"rest"`
 e nada aparece.
 
+### Os painéis
+
+Cada nome de `Mare.panels` é um arquivo, carregado pelo `Tide` quando o
+`Mare.mode` vira esse nome (`settings` é a exceção: abre a `SettingsWindow`).
+
+| Painel | Arquivo | O que mostra |
+|---|---|---|
+| `project` | `ProjectPanel.qml` | O projeto em foco: branch, mudanças, containers, portas e atalhos. |
+| `volume` | `VolumePanel.qml` | Volume da saída padrão: arrastar na barra, clicar no ícone silencia. |
+| `power` | `PowerPanel.qml` | Bateria e perfil de energia (power-profiles-daemon). |
+| `network` | `NetworkPanel.qml` | Rede: o que está conectado, as redes Wi-Fi, detalhes da conexão. |
+| `calendar` | `CalendarPanel.qml` | O mês, com a semana começando no domingo. |
+| `picker` | `PickerPanel.qml` | Escolher um projeto de `~/Work` para o workspace. Só abre quando chamado (`toggle picker`); fecha sozinho se o workspace ganhar janela. |
+| `launcher` | `LauncherPanel.qml` | A busca: comandos do projeto, projetos, aplicativos, ajustes e a calculadora (`Calc.js`). |
+| `switcher` | `SwitcherPanel.qml` | Alt+Tab: cartões com miniatura ao vivo, na ordem de uso. |
+| `notifications` | `NotificationsPanel.qml` | Histórico de notificações e o não perturbe. |
+| `session` | `SessionPanel.qml` | Bloquear, suspender (se Ajustes › Energia deixar), sair, reiniciar, desligar. |
+| `media` | `MediaPanel.qml` | Tocando agora: capa, faixa, progresso e controles. |
+| `bluetooth` | `BluetoothPanel.qml` | Liga o adaptador, lista e pareia aparelhos (com o `BluetoothPair.qml`). |
+| `display` | `DisplayPanel.qml` | Brilho e luz noturna. |
+| `system` | `SystemPanel.qml` | CPU, memória, disco e temperatura, com o último minuto em gráfico. |
+| `clipboard` | `ClipboardPanel.qml` | Histórico da área de transferência (cliphist). |
+| `wallpaper` | `WallpaperPanel.qml` | Os papéis de parede, 12 por página. |
+| `capture` | `CapturePanel.qml` | Capturar uma área, a janela, a tela, ou gravar um vídeo. |
+| `emoji` | `EmojiPanel.qml` | Procurar um emoji (português ou inglês) e digitá-lo na janela em foco. |
+
+Dois modos passageiros não são painéis e não aceitam `toggle`: `toast`
+(`ToastView.qml`, a pílula cresce com uma notificação) e `osd` (`OsdView.qml`,
+a pílula vira barra de nível quando o volume ou o brilho mudam).
+
+Pedaços de páginas dos Ajustes com arquivo próprio: `SettingsMonitorsPage.qml`
+(a página Monitores), `SettingsSleepBlock.qml` (os avisos no fim de Energia) e
+`SettingsUpdatesLast.qml` (como foi a última atualização).
+
 ### Registrar um painel novo
 
 São três lugares, mais o arquivo do painel:

@@ -21,7 +21,8 @@ set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 dir=${XDG_CACHE_HOME:-$HOME/.cache}/mk-vm
-ovmf=/usr/share/edk2/x64
+# OVMF troca a pasta do firmware UEFI da VM (os testes usam).
+ovmf=${OVMF:-/usr/share/edk2/x64}
 
 command -v qemu-system-x86_64 >/dev/null || { echo "falta o qemu: sudo pacman -S --needed qemu-desktop edk2-ovmf" >&2; exit 1; }
 [[ -f $ovmf/OVMF_CODE.4m.fd ]] || { echo "falta o UEFI da VM: sudo pacman -S --needed edk2-ovmf" >&2; exit 1; }

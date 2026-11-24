@@ -23,6 +23,9 @@ aur_repo=${MK_AUR_REPO:-$src/aur-repo}
 [[ -d $aur_repo ]] || aur_repo=$src/iso/work/aur/repo
 target=/mnt
 log=/var/log/mk-install.log
+# A raiz do live. Vazia no uso normal; os testes (tests/installer) carregam
+# este arquivo com `source` e apontam esta, $target e $log para uma pasta.
+live_root=''
 marker=.instalado-pelo-mk
 mapper=mkroot
 
@@ -92,7 +95,9 @@ ask() {
   if ((use_gum)); then
     gum input --header "$1" --value "$2" --width 60
   else
-    read -rp "$1 [$2]: " reply
+    # Sem mais entrada (um pipe que acabou), para: os laços da entrevista
+    # repetiriam a pergunta para sempre.
+    read -rp "$1 [$2]: " reply || die "a entrada acabou no meio das perguntas"
     printf '%s\n' "${reply:-$2}"
   fi
 }
@@ -102,7 +107,7 @@ ask_secret() {
   if ((use_gum)); then
     gum input --password --header "$1" --width 60
   else
-    read -rsp "$1: " reply
+    read -rsp "$1: " reply || die "a entrada acabou no meio das perguntas"
     echo >&2
     printf '%s\n' "$reply"
   fi
@@ -158,7 +163,10 @@ answers=''
 
 while (($#)); do
   case $1 in
-    --answers) answers=${2:-}; shift 2 ;;
+    --answers)
+      [[ -n ${2:-} ]] || die "--answers pede o arquivo de respostas"
+      answers=$2
+      shift 2 ;;
     -h | --help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "opção desconhecida: $1" ;;
   esac
@@ -182,6 +190,10 @@ load_answers() {
     esac
   done <"$1"
 }
+
+# Separados para os testes trocarem: lá não há root nem disco de verdade.
+is_root() { [[ $EUID -eq 0 ]]; }
+is_block() { [[ -b $1 ]]; }
 
 part_name() {
   if [[ $1 =~ [0-9]$ ]]; then echo "${1}p$2"; else echo "$1$2"; fi
@@ -207,7 +219,7 @@ list_disks() {
 
 detect_hardware() {
   local hw=() gpu
-  case $(grep -m1 vendor_id /proc/cpuinfo | awk '{print $3}') in
+  case $(grep -m1 vendor_id "$live_root/proc/cpuinfo" | awk '{print $3}') in
     AuthenticAMD) hw+=(amd) ;;
     GenuineIntel) hw+=(intel) ;;
   esac
@@ -322,18 +334,27 @@ interview() {
 }
 
 validate() {
-  [[ -b $DISK ]] || die "disco inválido: $DISK"
+  is_block "$DISK" || die "disco inválido: $DISK"
   [[ $(lsblk -dno TYPE "$DISK") == disk ]] || die "$DISK não é um disco inteiro"
   [[ $DISK != "$(live_disk)" ]] || die "$DISK é o pendrive do live"
   valid_host "$HOSTNAME_" || die "hostname inválido: $HOSTNAME_"
   valid_user "$USERNAME" || die "usuário inválido: $USERNAME"
   [[ -n $PASSWORD ]] || die "senha vazia"
-  [[ -e /usr/share/zoneinfo/$TIMEZONE ]] || die "fuso inválido: $TIMEZONE"
-  grep -q "^$LOCALE " /usr/share/i18n/SUPPORTED || die "idioma inválido: $LOCALE"
-  [[ -n $(find /usr/share/kbd/keymaps -name "$KEYMAP.map.gz" -print -quit) ]] || die "teclado inválido: $KEYMAP"
+  # Nome de arquivo, não de pasta ("America") nem vazio; e o idioma e o teclado
+  # ao pé da letra: "." e "*" num arquivo de respostas não casam com tudo.
+  [[ -n $TIMEZONE && $TIMEZONE != *..* && -f $live_root/usr/share/zoneinfo/$TIMEZONE ]] || die "fuso inválido: $TIMEZONE"
+  awk -v l="$LOCALE" '$1 == l { ok = 1 } END { exit !ok }' "$live_root/usr/share/i18n/SUPPORTED" ||
+    die "idioma inválido: $LOCALE"
+  [[ $KEYMAP =~ ^[A-Za-z0-9._-]+$ &&
+    -n $(find "$live_root/usr/share/kbd/keymaps" -name "$KEYMAP.map.gz" -print -quit) ]] || die "teclado inválido: $KEYMAP"
   local h
   for h in $HARDWARE; do
     [[ $h =~ ^(amd|intel|nvidia|vm)$ ]] || die "perfil de hardware desconhecido: $h"
+  done
+  # Um "yes" aqui valeria "nao" em silêncio: o disco ficaria sem LUKS.
+  local k
+  for k in APPS ENCRYPT POWEROFF; do
+    [[ ${!k} == sim || ${!k} == nao ]] || die "$k deve ser sim ou nao: ${!k}"
   done
   local size
   size=$(lsblk -dbno SIZE "$DISK")
@@ -387,8 +408,8 @@ cleanup() {
 }
 
 preflight() {
-  [[ $EUID -eq 0 ]] || die "rode como root (no live você já é root)"
-  [[ -d /sys/firmware/efi ]] || die "o live não foi iniciado em modo UEFI; reinicie escolhendo a entrada UEFI do pendrive"
+  is_root || die "rode como root (no live você já é root)"
+  [[ -d $live_root/sys/firmware/efi ]] || die "o live não foi iniciado em modo UEFI; reinicie escolhendo a entrada UEFI do pendrive"
   local cmd
   for cmd in pacstrap arch-chroot genfstab sgdisk mkfs.fat mkfs.btrfs cryptsetup; do
     command -v "$cmd" >/dev/null || die "falta $cmd no live"
@@ -420,7 +441,7 @@ partition() {
   udevadm settle
   esp=$(part_name "$DISK" 1)
   rootpart=$(part_name "$DISK" 2)
-  [[ -b $esp && -b $rootpart ]] || die "as partições $esp e $rootpart não apareceram"
+  is_block "$esp" && is_block "$rootpart" || die "as partições $esp e $rootpart não apareceram"
 
   mkfs.fat -F 32 -n MK_EFI "$esp" >/dev/null
   if [[ $ENCRYPT == sim ]]; then
@@ -448,8 +469,8 @@ partition() {
 
 # pacman.conf do live + o repositório local do AUR.
 make_pacman_conf() {
-  pacman_conf=$(mktemp /tmp/mk-pacman.XXXXXX.conf)
-  cp /etc/pacman.conf "$pacman_conf"
+  pacman_conf=$(mktemp --tmpdir mk-pacman.XXXXXX.conf)
+  cp "$live_root/etc/pacman.conf" "$pacman_conf"
   if [[ -f $aur_repo/mk-aur.db.tar.gz ]]; then
     printf '\n[mk-aur]\nSigLevel = Optional TrustAll\nServer = file://%s\n' "$aur_repo" >>"$pacman_conf"
   fi
@@ -546,12 +567,22 @@ place() {
   touch "$2/$marker"
 }
 
+# Devolve o bit de execução aos scripts de uma pasta (os que começam com #!).
+# O mkarchiso grava o /usr/share/mk do live inteiro como 644: copiado assim, o
+# Mk instalado ficava sem nenhum script executável (o comando mktunes, que é
+# um link para lá, não rodava).
+fix_exec() {
+  find "$1" -type f ! -perm -u+x -exec env LC_ALL=C awk \
+    'FNR == 1 { if (/^#!/) printf "%s\0", FILENAME; nextfile }' {} + | xargs -0r chmod 755
+}
+
 install_desktop() {
   step "o desktop Mk"
   # O repositório inteiro fica em /usr/share/mk (scripts, listas, configs).
   mkdir -p "$target/usr/share/mk"
   tar -C "$src" --exclude=./aur-repo --exclude=./iso/work --exclude=./iso/out --exclude=.git -cf - . |
     tar -C "$target/usr/share/mk" -xf -
+  fix_exec "$target/usr/share/mk"
 
   # O nome do sistema: Mk no boot e no login, e continua Mk depois das
   # atualizações do pacote filesystem (o gancho reaplica).
@@ -579,6 +610,7 @@ EOF
   place "$src/shell/mare" "$skel/.config/mk/shell"
   place "$src/config/fastfetch" "$skel/.config/mk/fastfetch"
   place "$src/config/bash" "$skel/.config/mk/bash"
+  fix_exec "$skel/.config/mk"
   install -Dm644 "$src/config/bash/seu.bash.exemplo" "$skel/.config/mk/seu.bash"
   # Placa de vídeo que não volta do suspender (AMD Navi 10): o usuário novo
   # nasce com "não dormir". Só em instalação nova; quem já usa o Mk vê o aviso
@@ -731,10 +763,12 @@ active_limine_conf() {
   fi
 }
 
-# Toda entrada aponta para arquivos que existem na ESP?
+# Há uma entrada que inicia o Linux, e toda entrada aponta para arquivos que
+# existem na ESP? (Só a "EFI fallback", que carrega o limine de novo, não serve.)
 limine_conf_ok() {
   local conf=$1 file n=0
   [[ -f $conf ]] || return 1
+  grep -Eq '^[[:space:]]*protocol:[[:space:]]*linux[[:space:]]*$' "$conf" || return 1
   while read -r file; do
     # Com a verificação ligada, o limine-entry-tool põe "#<resumo>" no fim.
     file=${file%%#*}
@@ -775,7 +809,7 @@ finish_boot() {
   # versão): a entrada "Limine" que ele registrou sai e a Mk aponta para o
   # mesmo arquivo (ele não recria enquanto houver entrada para esse caminho).
   # Sem os ganchos, vale a cópia que o instalador fez.
-  [[ -d /sys/firmware/efi/efivars ]] || return 0
+  [[ -d $live_root/sys/firmware/efi/efivars ]] || return 0
   local loader='\EFI\limine\BOOTX64.EFI' num
   if [[ -f $target/boot/EFI/limine/limine_x64.efi ]]; then
     loader='\EFI\limine\limine_x64.efi'
@@ -928,4 +962,7 @@ main() {
   fi
 }
 
-main
+# Só instala quando executado. Com `source` (os testes) ficam só as funções.
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main
+fi

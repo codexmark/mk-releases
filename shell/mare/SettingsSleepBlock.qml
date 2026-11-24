@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import "SettingsSchema.js" as Schema
 
 // O fim da página Energia dos Ajustes, abaixo de "Ao dormir": os avisos de
 // quando suspender não serve nesta máquina. O que ela tem vem do
@@ -29,6 +30,14 @@ ColumnLayout {
         visible: block.risky.length > 0 && block.choice === "suspender"
         color: Theme.copper
         text: "Esta placa de vídeo (" + block.risky.join(", ") + ") é conhecida por não voltar do suspender: a tela fica preta e só reiniciando.  Escolha não dormir."
+    }
+
+    // Uma escolha antiga que o Mk não tem mais (hibernar): nada fica marcado
+    // acima, e o computador não dorme até a pessoa escolher.
+    Line {
+        visible: Schema.orphan(Settings.values, "power.sleep")
+        color: Theme.copper
+        text: "A escolha que estava salva aqui (" + block.choice + ") não existe mais no Mk. Enquanto você não escolher, o computador não dorme."
     }
 
     // Suspender proibido no sistema (sleep.conf): o Mk não suspende.

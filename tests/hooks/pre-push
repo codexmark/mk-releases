@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Gancho do git: roda os testes antes de cada push e recusa se algo falhar.
+# Liga uma vez por clone: git config core.hooksPath tests/hooks
+# Para um push de emergência sem os testes: git push --no-verify
+repo=$(git rev-parse --show-toplevel) || exit 1
+exec "$repo/tests/run"

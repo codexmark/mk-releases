@@ -172,9 +172,12 @@ function normalizeKey(text) {
     var t = String(text === undefined || text === null ? "" : text).trim().toLowerCase();
     if (t === "")
         return "";
-    if (aliases[t] !== undefined)
+    // Só o que está escrito nas tabelas: "constructor" e "__proto__" existem em
+    // todo objeto e não são teclas.
+    var own = Object.prototype.hasOwnProperty;
+    if (own.call(aliases, t))
         return aliases[t];
-    if (keyIndex[t] !== undefined)
+    if (own.call(keyIndex, t))
         return keyIndex[t];
     if (/^code:[0-9]{1,3}$/.test(t)) {
         var n = parseInt(t.slice(5), 10);

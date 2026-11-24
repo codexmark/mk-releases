@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Inicia a sessão do Mk: Hyprland com a config de ~/.config/mk/hypr,
-# gerenciado pelo uwsm. Instalado em /usr/local/bin e chamado pela entrada
-# "Mk" da tela de login; vale para qualquer usuário que tenha a config.
+# gerenciado pelo uwsm. Chamado pela entrada "Mk" da tela de login; vale para
+# qualquer usuário que tenha a config. O instalador e o mk-update o põem em
+# /usr/bin; o bin/new-user (num Arch que já existe), em /usr/local/bin.
 config="${XDG_CONFIG_HOME:-$HOME/.config}/mk/hypr/hyprland.lua"
 if [[ ! -f $config ]]; then
   echo "Mk: $config não existe; rode bin/try-session install" >&2

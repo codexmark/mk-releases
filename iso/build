@@ -118,7 +118,8 @@ while ((i < ${#queue[@]})); do
     continue
   fi
 
-  # Dependências do AUR primeiro na fila (o repositório local precisa delas).
+  # As dependências que são do AUR entram na fila também (o repositório local
+  # precisa delas; a ordem quem resolve é o pacstrap).
   for dep in $(srcinfo_field "$dir/.SRCINFO" depends); do
     in_repos "$dep" || enqueue "$dep"
   done
@@ -129,7 +130,9 @@ while ((i < ${#queue[@]})); do
   ver=$(sed -n 's/^[[:space:]]*pkgver = //p' "$dir/.SRCINFO" | head -1)-$(sed -n 's/^[[:space:]]*pkgrel = //p' "$dir/.SRCINFO" | head -1)
   epoch=$(sed -n 's/^[[:space:]]*epoch = //p' "$dir/.SRCINFO" | head -1)
   [[ -n $epoch ]] && ver=$epoch:$ver
-  cached=$(find "$aur_pkg/$base" -name "$name-$ver-*.pkg.tar.*" ! -name '*.sig' 2>/dev/null | sort | tail -1)
+  # (|| true: na primeira vez a pasta do pacote ainda não existe, o find falha
+  # e, com pipefail, o build inteiro parava aqui sem dizer nada.)
+  cached=$(find "$aur_pkg/$base" -name "$name-$ver-*.pkg.tar.*" ! -name '*.sig' 2>/dev/null | sort | tail -1 || true)
   if [[ -n $cached && $name != *-git ]]; then
     cp "$cached" "$aur_repo/"
     built+=("$name")
@@ -179,7 +182,10 @@ else
   repo-add -q "$aur_repo/$repo_name.db.tar.gz"
 fi
 # O instalador instala exatamente esta lista (o pacman resolve as dependências).
-printf '%s\n' "${built[@]}" >"$aur_repo/packages.txt"
+# Sem nenhum compilado o arquivo fica vazio (um printf sem argumentos gravaria
+# uma linha em branco, e o instalador a tomaria por um pacote).
+: >"$aur_repo/packages.txt"
+if ((${#built[@]})); then printf '%s\n' "${built[@]}" >"$aur_repo/packages.txt"; fi
 
 say "AUR: ${#built[@]} compilados, ${#failed[@]} com falha (relatório: $report)"
 

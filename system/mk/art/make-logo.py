@@ -14,8 +14,11 @@
 #   python3 system/mk/art/make-logo.py      gera logo/*.svg e *.png, a marca e
 #                                           as cópias que o boot, o login e o
 #                                           bloqueio usam
+#   python3 system/mk/art/make-logo.py entrada   só as peças da tela de entrada
+#                                           (as letras em camadas e a geometria)
 import os
 import shutil
+import sys
 import subprocess
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
@@ -127,6 +130,51 @@ def mark_svg():
     ]) + "\n"
 
 
+def letter_svg(ch, ox, color):
+    """Uma letra só, no quadro do logo inteiro: a entrada (sddm) anima o M e o
+    k em camadas separadas, por cima da construção que ela mesma desenha."""
+    path, _ = glyph_path(ch, ox)
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{VB[0]} {VB[1]} {VB[2]} {VB[3]}">'
+            f'<path d="{path}" fill="{color}"/></svg>\n')
+
+
+def login_assets(root):
+    """O que a tela de entrada precisa para construir a marca em movimento: as
+    duas letras em PNG e a geometria (em unidades da fonte) num .js do tema."""
+    theme = os.path.join(root, "system/mk/sddm/mk")
+    for name, ch, ox, color in (("letra-m", "M", 0, BONE), ("letra-k", "k", KX, COPPER)):
+        tmp = os.path.join(out, name + ".svg")
+        with open(tmp, "w") as f:
+            f.write(letter_svg(ch, ox, color))
+        render(tmp, os.path.join(theme, name + ".png"), width=1600)
+        os.remove(tmp)
+    nodes = ", ".join(f"[{x}, {y}, {0 if c == BONE else 1}]" for x, y, c in NODES)
+    diags = ", ".join(f"[{x1}, {y1}, {x2}, {y2}]" for (x1, y1), (x2, y2) in DIAGS)
+    with open(os.path.join(theme, "geometria.js"), "w") as f:
+        f.write(f""".pragma library
+
+// A geometria da marca "Mk", para a tela de entrada desenhar a construção
+// dela (eixos, guias, diagonais e nós) em movimento. GERADO: não edite à mão,
+// rode system/mk/art/make-logo.py (lá diz de onde cada número vem).
+// Unidades da fonte, y para cima (na tela, y = -altura). vb é o quadro das
+// imagens letra-m.png e letra-k.png: [x, y, largura, altura], y para baixo.
+var vb = [{VB[0]}, {VB[1]}, {VB[2]}, {VB[3]}];
+var ax = {AX};          // o eixo vertical
+var ay = {AY};          // a linha de cota, abaixo da base (para baixo)
+var top = {TOP};        // o alto do eixo (para baixo: negativo é acima)
+var right = {RIGHT};    // o fim da cota
+var kx = {KX};          // onde o k começa: daqui em diante a cota é de cobre
+// Alturas: base, vértice do M, altura-x, maiúsculas, ascendente do k.
+var heights = {HEIGHTS};
+// Hastes do M, o vértice dele, a haste do k e o fim do braço.
+var verts = {VERTS};
+// Diagonais de construção [x1, y1, x2, y2]: duas do M, o braço e a perna do k.
+var diags = [{diags}];
+// Nós nas quinas [x, y, cor]: 0 = osso (do M), 1 = cobre (do k).
+var nodes = [{nodes}];
+""")
+
+
 def render(svg_path, png_path, width=None, height=None):
     size = ["-w", str(width)] if width else ["-h", str(height)]
     subprocess.run(["rsvg-convert", *size, "-o", png_path, svg_path], check=True)
@@ -134,6 +182,11 @@ def render(svg_path, png_path, width=None, height=None):
 
 if __name__ == "__main__":
     os.makedirs(out, exist_ok=True)
+    if sys.argv[1:] == ["entrada"]:
+        # Só as peças da tela de entrada, sem regravar o resto.
+        login_assets(os.path.normpath(os.path.join(here, "..", "..", "..")))
+        print("ok: letra-m.png, letra-k.png, geometria.js")
+        sys.exit(0)
     for name, bg in (("mk-logo", True), ("mk-logo-transparente", False)):
         path = os.path.join(out, name + ".svg")
         with open(path, "w") as f:
@@ -152,6 +205,6 @@ if __name__ == "__main__":
     render(mark, os.path.join(root, "shell/mare/assets/mark.png"), height=120)
     shutil.copy(mark, os.path.join(root, "shell/mare/assets/mark.svg"))
     render(mark, os.path.join(root, "config/fastfetch/mark.png"), height=240)
-    render(mark, os.path.join(root, "system/mk/sddm/mk/mark.png"), height=120)
     render(os.path.join(out, "mk-logo-transparente.svg"), os.path.join(root, "system/mk/plymouth/mk/logo.png"), width=1200)
+    login_assets(root)
     print("ok:", ", ".join(sorted(os.listdir(out))))

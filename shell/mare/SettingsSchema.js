@@ -318,9 +318,11 @@ function kbOptions(values) {
     var parts = [];
     if (String(valueOf(values, "hypr.kbLayout")).indexOf(",") >= 0)
         parts.push("grp:alt_shift_toggle");
-    var caps = capsOptions[valueOf(values, "input.caps")];
-    if (caps)
-        parts.push(caps);
+    // Só o que está na tabela: um valor torto no ajustes.json ("constructor")
+    // não vira opção do xkb.
+    var caps = valueOf(values, "input.caps");
+    if (Object.prototype.hasOwnProperty.call(capsOptions, caps))
+        parts.push(capsOptions[caps]);
     return parts.join(",");
 }
 
@@ -370,7 +372,9 @@ function luaValue(v) {
         return v ? "true" : "false";
     if (typeof v === "number")
         return String(Math.round(v * 1000) / 1000);
-    return "\"" + String(v).replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\"";
+    // Uma quebra de linha crua dentro das aspas é erro de sintaxe no Lua.
+    var text = String(v).replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+    return "\"" + text.replace(/\n/g, "\\n").replace(/\r/g, "\\r") + "\"";
 }
 
 function hyprTable(values, changed) {
@@ -432,6 +436,20 @@ function sleepMode(values, caps) {
     if (mode === "suspender")
         return caps && caps.sono && caps.sono.canSuspend === false ? "nada" : "suspender";
     return "nada";
+}
+
+// O valor salvo de uma linha de escolha não é nenhuma das opções dela: sobrou
+// de uma opção que o Mk tirou ("hibernar") ou veio torto do ajustes.json. O
+// painel avisa em vez de mostrar a linha sem nada marcado.
+function orphan(values, key) {
+    var r = rowOf(key);
+    if (!r || r.ctl !== "choice" || !r.options)
+        return false;
+    var v = valueOf(values, key);
+    for (var i = 0; i < r.options.length; i++)
+        if (r.options[i].v === v)
+            return false;
+    return true;
 }
 
 // O comando de cada jeito de dormir; "" = não dorme.

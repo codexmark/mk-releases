@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
 # Leituras cruas do sistema para o painel do Maré, uma por linha (chave valor).
 # Os contadores (cpu, rede) são acumulados; o shell calcula as diferenças.
+# PROC e SYS trocam a raiz de /proc e /sys, para testar.
 set -uo pipefail
 
+proc=${PROC:-/proc}
+sys=${SYS:-/sys}
+
 # cpu: total e ocioso (idle + iowait) desde o boot
-awk '/^cpu /{t=0; for(i=2;i<=NF;i++) t+=$i; print "cpu_total", t; print "cpu_idle", $5+$6}' /proc/stat
+awk '/^cpu /{t=0; for(i=2;i<=NF;i++) t+=$i; print "cpu_total", t; print "cpu_idle", $5+$6}' "$proc/stat"
 
 # memória em kB
-awk '/^MemTotal:/{print "mem_total", $2} /^MemAvailable:/{print "mem_avail", $2}' /proc/meminfo
+awk '/^MemTotal:/{print "mem_total", $2} /^MemAvailable:/{print "mem_avail", $2}' "$proc/meminfo"
 
-# rede: bytes recebidos e enviados, somando todas as interfaces menos a lo
-awk -F'[: ]+' 'NR>2 && $2!="lo" {rx+=$3; tx+=$11} END{print "net_rx", rx+0; print "net_tx", tx+0}' /proc/net/dev
+# rede: bytes recebidos e enviados, somando todas as interfaces menos a lo.
+# O nome vem alinhado à direita em 6 colunas: um curto (lo, eth0) tem espaço
+# antes e um comprido (enp3s0, wlp0s20f3) não, por isso o espaço sai primeiro.
+awk -F'[: ]+' 'NR>2 { sub(/^ +/, "") } NR>2 && $1!="lo" {rx+=$2; tx+=$10} END{print "net_rx", rx+0; print "net_tx", tx+0}' "$proc/net/dev"
 
 # temperatura da CPU em milésimos de grau, do primeiro sensor conhecido
-for d in /sys/class/hwmon/hwmon*; do
+for d in "$sys"/class/hwmon/hwmon*; do
   case $(cat "$d/name" 2>/dev/null) in
     coretemp|k10temp|zenpower|cpu_thermal)
       echo "temp $(cat "$d/temp1_input" 2>/dev/null || echo 0)"

@@ -2,6 +2,7 @@
 # Estado de um projeto para o painel do Maré, em JSON.
 # Uso: mare-project <diretório>
 # Saída: {"branch","dirty","runtime","containers":[{name,status,running}],"ports":[..]}
+# PROC troca a raiz de /proc (de onde sai a pasta de cada processo), para testar.
 set -uo pipefail
 
 dir=${1:-}
@@ -38,7 +39,7 @@ while read -r line; do
   port=$(awk '{print $4}' <<<"$line" | grep -oE '[0-9]+$')
   pid=$(grep -oE 'pid=[0-9]+' <<<"$line" | head -1 | cut -d= -f2)
   [[ -z $port || -z $pid ]] && continue
-  cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+  cwd=$(readlink "${PROC:-/proc}/$pid/cwd" 2>/dev/null || true)
   [[ $cwd == "$dir" || $cwd == "$dir"/* ]] && proc_ports+=":$port"$'\n'
 done < <(ss -ltnpH 2>/dev/null)
 

@@ -8,8 +8,9 @@
 # gerava um aviso a cada sincronização).
 set -euo pipefail
 share=${MK_SHARE:-/usr/share/mk}
-boot=${MK_BOOT:-/boot}
-defaults=${MK_LIMINE_DEFAULTS:-/etc/default/limine}
+R=${MK_ROOT:-} # outra raiz no lugar de /: só os testes trocam (migrations/README.md)
+boot=${MK_BOOT:-$R/boot}
+defaults=${MK_LIMINE_DEFAULTS:-$R/etc/default/limine}
 
 if [[ -f $defaults ]] && grep -q '^MAX_SNAPSHOT_ENTRIES=5$' "$defaults"; then
   sed -i 's/^MAX_SNAPSHOT_ENTRIES=5$/MAX_SNAPSHOT_ENTRIES=auto/' "$defaults"

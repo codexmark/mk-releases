@@ -1,0 +1,8 @@
+# O que só existe na máquina de quem trabalha no Mk.
+__pycache__/
+/iso/work/
+/iso/out/
+# As preferências do Obsidian de quem abriu a vault: ele as regrava a cada
+# abertura, e um arquivo rastreado ali deixava a árvore suja e travava o
+# lançamento. A vault abre sem elas.
+/vault/.obsidian/

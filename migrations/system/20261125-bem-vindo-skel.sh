@@ -5,7 +5,8 @@
 # primeiro mk-update do usuário novo a daria por vista. Só esta marca: as
 # outras migrações de usuário ainda têm o que fazer numa home saída deste skel.
 set -euo pipefail
-state=/etc/skel/.local/state/mk/migrations
+R=${MK_ROOT:-} # outra raiz no lugar de /: só os testes trocam (migrations/README.md)
+state=$R/etc/skel/.local/state/mk/migrations
 
 mkdir -p "$state"
 touch "$state/20261123-bem-vindo.sh"

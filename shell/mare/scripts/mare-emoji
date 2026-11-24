@@ -294,7 +294,7 @@ function fold(s) {
 // O emoji pronto para copiar: sem tom (0) ou com um dos cinco (1 a 5). Com
 // tom, o U+FE0F que vinha depois da base sai, como manda o Unicode.
 function withTone(c, tone) {
-    var t = tones[tone] || "";
+    var t = tone >= 1 && tone <= 5 && tone === Math.floor(tone) ? tones[tone] : "";
     return t === "" ? c.replace(/~/g, "") : c.replace(/~️?/g, t);
 }
 
@@ -304,8 +304,9 @@ function withTone(c, tone) {
 //   g  a categoria                           fn, fk, fe  textos da busca
 //   fx  as palavras postas à mão, entre espaços (para achar uma inteira)
 var all = null;
-var byGroup = {};
-var byChar = {};
+// Sem protótipo: "constructor" não é um grupo nem um emoji.
+var byGroup = Object.create(null);
+var byChar = Object.create(null);
 
 function load() {
     if (all !== null)

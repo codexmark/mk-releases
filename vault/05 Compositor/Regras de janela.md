@@ -1,0 +1,44 @@
+---
+camada: "05 Compositor"
+tags:
+  - mk
+  - compositor
+  - janelas
+fontes:
+  - "config/hypr/mare/rules.lua"
+---
+
+# Regras de janela
+
+O Mk tem três regras de janela, todas em `rules.lua`: utilitários flutuam, diálogos de arquivo flutuam, e nenhum app se maximiza por conta própria.
+
+## Para quê
+
+Num gerenciador em mosaico, um diálogo pequeno que entra no mosaico empurra todas as outras janelas. As regras tiram do mosaico o que é passageiro.
+
+## Como funciona
+
+| Regra | Casa com | Efeito |
+|---|---|---|
+| `float-utilities` | classe `pavucontrol`, `nm-connection-editor`, `blueman-manager`, `xdg-desktop-portal-gtk`, `org.gnome.Calculator` | flutua e centraliza |
+| `float-file-dialogs` | título "Open File", "Save File", "Save As", "Choose Files", "Open Folder", "Abrir arquivo", "Salvar arquivo" | flutua e centraliza |
+| `no-maximize-requests` | qualquer classe | `suppress_event = "maximize"` |
+
+São chamadas a `hl.window_rule({ name, match, … })`.
+
+## Por quê assim
+
+- O arquivo traz um comentário só: "diálogos e utilitários flutuam e centralizam". O resto do comportamento das janelas vem do layout e dos [[Atalhos]].
+- Diálogos de arquivo são reconhecidos **pelo título**, em inglês e em português; os utilitários, pela classe.
+- `suppress_event = "maximize"` para todas as janelas: o efeito é ignorar o pedido de um app para se maximizar. O arquivo não comenta além do nome da regra (`no-maximize-requests`); **motivo não registrado**.
+
+> [!note] O que não está aqui
+> As camadas do Maré (ilha, painéis, bloqueio) não são janelas: são *layer surfaces* e não passam por estas regras. Veja [[Maré]].
+
+## Onde está no código
+
+`config/hypr/mare/rules.lua` (20 linhas).
+
+## Ligações
+
+Depende de: [[Hyprland em Lua]]. Carregado em: [[Ordem de carga]].

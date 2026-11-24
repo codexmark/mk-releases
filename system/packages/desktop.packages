@@ -1,7 +1,6 @@
 # Sessão gráfica: Hyprland e as peças em volta dele.
-# É aqui que mora "a sua cara". A barra, o launcher e as notificações abaixo
-# são um ponto de partida simples (waybar + fuzzel + mako); troque à vontade
-# por quickshell, swaync, etc.
+# A barra, o launcher e as notificações são do Maré (quickshell): não há
+# waybar, fuzzel nem mako aqui.
 
 # Compositor e sessão
 hyprland

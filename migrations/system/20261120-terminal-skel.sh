@@ -2,7 +2,8 @@
 # Usuários novos nascem com o terminal do Mk (ficha do fastfetch e prompt).
 set -euo pipefail
 share=${MK_SHARE:-/usr/share/mk}
-skel=/etc/skel
+R=${MK_ROOT:-} # outra raiz no lugar de /: só os testes trocam (migrations/README.md)
+skel=$R/etc/skel
 
 for d in fastfetch bash; do
   rm -rf "${skel:?}/.config/mk/$d"

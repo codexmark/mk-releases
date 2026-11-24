@@ -28,7 +28,7 @@ function evaluate(text) {
             i++;
         } else if (s.slice(i, i + 4) === "raiz" || s.slice(i, i + 4) === "sqrt") {
             i += 4;
-            v = Math.sqrt(atom());
+            v = Math.sqrt(plain(atom()));
         } else if (s.slice(i, i + 2) === "pi") {
             i += 2;
             v = Math.PI;
@@ -83,7 +83,10 @@ function evaluate(text) {
 
 // 1234567.5 -> "1.234.567,5"
 function format(v) {
-    var r = Math.round(v * 1e8) / 1e8;
+    // Oito casas tiram o lixo do ponto flutuante (0,1 + 0,2). Acima de 1e7 a
+    // conta v * 1e8 já não cabe exata e estragava o número (10^15 saía
+    // 999.999.999.999.999,9): ali valem os 15 dígitos que um double guarda.
+    var r = Math.abs(v) < 1e7 ? Math.round(v * 1e8) / 1e8 : Number(v.toPrecision(15));
     var parts = String(Math.abs(r)).split(".");
     if (parts[0].indexOf("e") >= 0 || (parts[1] && parts[1].indexOf("e") >= 0))
         return String(r).replace(".", ",");

@@ -1,5 +1,6 @@
-# Pacotes do AUR. NÃO entram no pacstrap: são compilados depois da instalação,
-# com internet, e a falha de um não deve travar a instalação.
+# Pacotes do AUR. NÃO entram no pacstrap dos repositórios: o iso/build os
+# compila num repositório local (mk-aur) que vai no ISO, e a falha de um não
+# trava nem o build nem a instalação (o que faltar fica para o yay depois).
 # Regra: só vem para cá o que não existe em core/extra.
 # Use o nome do PackageBase do AUR.
 
