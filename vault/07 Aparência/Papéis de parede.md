@@ -24,7 +24,7 @@ Personalizar a área de trabalho sem um programa de papel de parede à parte, e 
 ## Como funciona
 
 - **O fundo** (`Backdrop.qml`, camada *Background*): uma folha de desenho (moldura com marcas de corte e régua, grade de pontos, um arco com colunas e linhas de construção, o sol de cobre, a letra grega do workspace em serifa, o carimbo no canto). Num workspace vazio, a folha convida a começar. Com papel de parede escolhido, a imagem entra por cima, escurecida.
-- **Onde ficam**: os do usuário em `<pasta de imagens>/Wallpapers` (achada com `xdg-user-dir PICTURES`; `~/Imagens` em português); os do Mk em `shell/mare/wallpapers/` (`01-arcos` … `12-catedral`).
+- **Onde ficam**: os do usuário em `<pasta de imagens>/Wallpapers` (achada com `xdg-user-dir PICTURES`; `~/Imagens` em português); os do Mk em `shell/mare/wallpapers/`: seis autorais (Entropia, Núcleo, Origem, Monólito, Singularidade e Maré, em `00-1-entropia` … `00-6-mare`, criados por quem mantém o Mk e assinados "Mk_ by codexmark", mostrados primeiro) e doze desenhados por código (`01-arcos` … `12-catedral`).
 - **O painel** (`Super + W`): 12 por página, os do usuário primeiro. Clique aplica.
 - **A cor**: `mare-palette` roda `matugen image … --dry-run -m dark --prefer saturation` e devolve a cor principal; o `Wallpaper.qml` guarda `primary` e o matiz (`hue`), e a interface toma o matiz da imagem.
 - **Persistência**: `wallpaper.json` no estado do Quickshell (caminho e cor).

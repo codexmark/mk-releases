@@ -41,7 +41,7 @@ apps padrão de fábrica) completam a pasta.
 
 **`shell/mare/`** — todo o QML numa pasta só, sem subpastas de código. Ao lado:
 `scripts/` (os `mare-*` que o shell roda por fora), `assets/` (a marca e o
-grão) e `wallpapers/` (os doze papéis de parede do Mk).
+grão) e `wallpapers/` (os papéis de parede do Mk: seis autorais e doze desenhados por código).
 
 **`system/mk/`** — a cara do Mk: `art/`, `plymouth/`, `sddm/`, `look/`,
 `fonts/`, `boot/limine-default`, `os-release`, `issue`, `mk-os-release.hook` e
@@ -485,9 +485,18 @@ antes. O `grain.png` também existe em `shell/mare/assets/` e em
 python3 system/mk/art/make-wallpapers.py
 ```
 
-Os doze papéis de parede: cada um é um SVG montado no script, renderizado em
-2560x1440 e finalizado com grão. Saem em `shell/mare/wallpapers/*.jpg`, que o
-painel de papel de parede lista depois dos seus. Com argumentos, refaz só os
+Os doze papéis de parede desenhados por código (`01-arcos` a `12-catedral`):
+cada um é um SVG montado no script, renderizado em 2560x1440 e finalizado com
+grão. Saem em `shell/mare/wallpapers/*.jpg`, que o painel de papel de parede
+lista depois dos seus.
+
+Na mesma pasta ficam os seis **autorais**, criados por quem mantém o Mk e
+assinados "Mk_ by codexmark": Entropia (`00-1-entropia`), Núcleo
+(`00-2-nucleo`), Origem (`00-3-origem`), Monólito (`00-4-monolito`),
+Singularidade (`00-5-singularidade`) e Maré (`00-6-mare`). Não saem de script:
+o arquivo no repositório é o original, em JPEG, sem metadados. O `00-` no nome
+faz o painel mostrá-los antes dos desenhados por código, e o gerador não toca
+neles. Estão em 1672x941; uma exportação maior entra no lugar com o mesmo nome. Com argumentos, refaz só os
 que tiverem o texto no nome:
 
 ```bash

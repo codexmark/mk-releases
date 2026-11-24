@@ -27,7 +27,7 @@ Uma origem só para todas as cópias do logo espalhadas pelo sistema, e papéis 
 |---|---|
 | `make-logo.py` | o logo em vetor (o "Mk" em serifa reta sobre um plano cartesiano), com as letras tiradas do contorno da própria fonte; SVG e PNG em `art/logo/`, e as cópias que o resto usa |
 | `make-art.py` | `emblem.png` (arco, colunas, sol de cobre) e `grain.png`; usa a marca do `make-logo.py` |
-| `make-wallpapers.py` | os doze papéis de parede em `shell/mare/wallpapers/*.jpg` |
+| `make-wallpapers.py` | os doze papéis de parede desenhados por código em `shell/mare/wallpapers/*.jpg` (os seis autorais, `00-*`, não saem de script) |
 
 As cópias que o `make-logo.py` grava:
 
