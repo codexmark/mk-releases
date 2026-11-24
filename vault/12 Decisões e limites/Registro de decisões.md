@@ -39,6 +39,7 @@ As notas das camadas dizem como cada peça funciona. Estas dizem por que o siste
 | D14 | [[D14 Tema por variável de sessão]] | aparência |
 | D15 | [[D15 Teste primeiro e CI local]] | desenvolvimento |
 | D16 | [[D16 Descanso de tela no lugar do suspender]] | sessão, energia |
+| D17 | [[D17 Apps próprios em Go e QML]] | aplicativos |
 
 O que **não** virou nota de decisão, porque o repositório não registra o motivo, está em [[Motivos não registrados]]. O que se sabe que não funciona ou não foi testado está em [[Limitações conhecidas]].
 

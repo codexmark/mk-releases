@@ -34,7 +34,7 @@ São travas baratas, com um alvo cada. Duas delas, mais o `tests/run`, barram o 
 
 - **`check-keybinds`**: o comando de verificação mora **no cabeçalho do `Keybinds.js`** (uma linha de `node -e`); o script só o extrai e roda. Sai com 1 se divergirem e com 2 se faltar o `node`.
 - **`check-packages`**: usa `pacman -Si` (vale a base sincronizada da máquina) e a API do AUR. Não instala nada. Sem rede, diz que não alcançou o AUR, em vez de acusar cada pacote como inexistente.
-- **`check-shell`**: usa `script(1)` para dar um pseudo-terminal ao bash; `bash -i -c` não pegaria o erro, porque sem terminal o ble.sh não carrega.
+- **`check-shell`**: usa `script(1)` para dar um pseudo-terminal ao bash; `bash -i -c` não pegaria o erro, porque sem terminal o ble.sh não carrega. Tenta três vezes por terminal: falhou uma vez num lançamento com a máquina ocupada (o bash subiu, saiu com 0 e a resposta não veio); um `mk.bash` quebrado de verdade cai nas três.
 
 O lint (`tests/lint.test.sh`) cobre o que antes era só convenção: sintaxe de bash, QML, JavaScript, Lua, JSON e Python; shellcheck sem avisos; bit de execução; e `rm -rf` com variável sempre protegido por `${VAR:?}`.
 

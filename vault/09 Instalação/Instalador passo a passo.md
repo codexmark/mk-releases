@@ -58,7 +58,7 @@ flowchart TD
 
 Cada etapa tem a sua nota: [[Particionamento]], [[Btrfs e subvolumes]], [[LUKS]], [[Listas de pacotes]], [[Locale, fuso e teclado]], [[Usuários e sudo]], [[Initramfs]], [[Limine]], [[AUR na instalação]], [[Snapper e snap-pac]], [[Serviços systemd]], [[Firewall]], [[SDDM]], [[limine-default]], [[Entrada UEFI única]].
 
-**Na etapa 7**, além de copiar, o instalador marca todas as [[Migrações]] como feitas (as de sistema em `/var/lib/mk/migrations`, as de usuário no skel) e grava `/var/lib/mk/apps-oferecidos`.
+**Na etapa 7**, além de copiar, o instalador liga os apps (`mktunes-links`, `mkpulso-links`, `apps-links`), o instalador marca todas as [[Migrações]] como feitas (as de sistema em `/var/lib/mk/migrations`, as de usuário no skel) e grava `/var/lib/mk/apps-oferecidos`.
 
 **Registro**: `/var/log/mk-install.log`, no live e (copiado antes de desmontar) no sistema instalado. Começa **depois** da revisão. A senha não é escrita nele.
 
@@ -71,7 +71,8 @@ Cada etapa tem a sua nota: [[Particionamento]], [[Btrfs e subvolumes]], [[LUKS]]
 - **`set -euo pipefail` e `trap cleanup EXIT`**: se parar depois do `formatar`, a última linha mostra o código de saída, o log e como tentar de novo (`umount -R /mnt`, `cryptsetup close mkroot`). Recomeçar formata de novo.
 - **`sim` ou `nao`, e nada mais**: "um 'yes' aqui valeria 'nao' em silêncio: o disco ficaria sem LUKS".
 - **`live_root`**: os caminhos do live que o instalador lê (`/proc/cpuinfo`, `zoneinfo`, `SUPPORTED`, `/sys/firmware/efi`, `pacman.conf`) passam por essa variável, vazia em uso normal; os testes a apontam para uma pasta falsa e carregam o instalador como biblioteca, sem chamar o `main` ([[Testes e TDD]]).
-- **`fix_exec`**: depois de copiar o repositório para `/usr/share/mk`, o instalador devolve o bit de execução aos arquivos que começam com `#!`. O `mkarchiso` grava o `/usr/share/mk` do live inteiro como 644; copiado assim, o Mk instalado ficava sem nenhum script executável (o comando `mktunes`, que é um link para lá, não rodava).
+- **`fix_exec`**: depois de copiar o repositório para `/usr/share/mk`, o instalador devolve o bit de execução aos arquivos que começam com `#!` (scripts) ou com a marca ELF (binários compilados, como os motores dos [[Apps do Mk (motor em Go, janela em QML)|apps do Mk]]). O `mkarchiso` grava o `/usr/share/mk` do live inteiro como 644; copiado assim, o Mk instalado ficava sem nenhum script executável (o comando `mktunes`, que é um link para lá, não rodava).
+- **`SNAP_PAC_SKIP=y` durante a instalação**: o pacman roda no disco novo sem configuração do snapper (ela só vem no fim), e o gancho do snap-pac escrevia "fatal library error, lookup self" no meio do log. A mensagem era inofensiva e assustadora.
 - **O `pacman.conf` do live é copiado para um temporário** e ganha o repositório `mk-aur`; o do live não é alterado.
 - **O live roda da memória**: o log do live some ao desligar.
 

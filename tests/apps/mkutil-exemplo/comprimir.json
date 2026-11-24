@@ -1,0 +1,6 @@
+[
+  { "fase": "plano", "saida": "/exemplo/férias na praia-8mb.mp4", "passadas": 2, "video_bps": 898871, "audio_bps": 96000, "largura": 854, "altura": 480 },
+  { "fase": "codificando", "passada": 1, "passadas": 2, "pct": 18.4, "velocidade": 3.1, "resta_s": 41, "tamanho_bytes": 0 },
+  { "fase": "codificando", "passada": 2, "passadas": 2, "pct": 73.0, "velocidade": 2.8, "resta_s": 12, "tamanho_bytes": 3500000 },
+  { "fase": "fim", "ok": true, "saida": "/exemplo/férias na praia-8mb.mp4", "antes_bytes": 48000000, "depois_bytes": 7600000, "economia_pct": 84.2, "maior": false }
+]

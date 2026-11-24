@@ -52,7 +52,7 @@ Deixar o conjunto de apps crescer sem reinstalar ninguém e sem trazer de volta 
 - **Só anota depois do pacman dar certo**: se ele falha, a oferta volta na próxima rodada.
 - **O arquivo vazio desliga a oferta**: a condição é `-s` (existe e não é vazio). Numa máquina antiga, a migração `20261125-apps-oferecidos.sh` cria o arquivo: com o Nautilus instalado, anota o conjunto antigo (e os apps novos são oferecidos); sem os apps gráficos, anota a lista inteira (nada a oferecer).
 - **GTK4/libadwaita de preferência**: é o que veste melhor o tema GTK do Mk ([[Tema GTK, ícones e Qt]]).
-- **O que ficou de fora de propósito** (comentário da lista): monitor de sistema (a ilha e o btop já cobrem), app de notas, anotador de capturas (entra quando o painel de captura tiver a ação "anotar"), gimp, kdenlive, obs-studio.
+- **O que ficou de fora de propósito** (comentário da lista): monitor de sistema ("a ilha e o btop já cobrem", diz o comentário; hoje há também o [[MkPulso]]), app de notas, anotador de capturas (entra quando o painel de captura tiver a ação "anotar"), gimp, kdenlive, obs-studio.
 - **`mpv-mpris`**: é o que faz o mpv aparecer na ilha e obedecer às teclas de mídia.
 
 ## Onde está no código

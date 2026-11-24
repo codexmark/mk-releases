@@ -1,0 +1,19 @@
+{
+  "arquivo": "/exemplo/firefox-128.0.tar.xz",
+  "tipo": "compactado",
+  "id": "firefox",
+  "nome": "firefox",
+  "versao": "128.0",
+  "descricao": null,
+  "tamanho_bytes": 80000000,
+  "destino": "/exemplo/Aplicativos/firefox",
+  "atalho": "/exemplo/.local/share/applications/mkinstalar-firefox.desktop",
+  "ja_instalado": true,
+  "precisa_senha": false,
+  "plano": ["tirar a versão que o MkInstalar instalou antes", "extrair 812 itens para ~/Aplicativos/firefox", "criar o atalho no menu para firefox"],
+  "avisos": [],
+  "appimage": null,
+  "pacote": null,
+  "compactado": { "formato": "tar.xz", "entradas": 812, "tamanho_total_bytes": 250000000, "pasta_unica": "firefox",
+                  "executaveis": ["firefox", "firefox-bin", "updater"], "atalhos": [], "executavel_sugerido": "firefox" }
+}

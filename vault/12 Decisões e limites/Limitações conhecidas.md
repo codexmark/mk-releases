@@ -75,6 +75,10 @@ A lista de `docs/limites.md`, onde cada item "tem dono certo: virar um caso que 
 - **Calculadora da busca**: `1.000 + 500` dá 501 ([[Busca e calculadora]]).
 - **Atalhos**: um combo com duas teclas (`SUPER + Q + W`) fica só com a última ([[Atalhos do usuário]]).
 - **`mk atualizar`**: parando entre baixar a lista e atualizar, o sistema fica com a lista nova e os pacotes antigos; "Replace X with Y?" é respondido "sim" sozinho, a escolha entre provedores não; a trava contra duas rodadas é por usuário ([[mk-update]]).
+- **Apps novos (MkPulso, MkPacotes, MkInstalar, MkComprimir)**: os motores foram exercitados de verdade na VM (encerrar um processo, instalar e remover um pacote com a senha pedida pelo Maré, comprimir um vídeo, e as recusas: processo 1, SDDM, glibc). As janelas foram vistas abrindo, com dados reais, mas **os botões nunca foram clicados**: a folha de confirmação do MkPacotes, o seletor de arquivo e o arrastar do MkInstalar e do MkComprimir, e as ações de serviço do MkPulso só rodaram contra dublês ou pela linha de comando ([[Apps do Mk (motor em Go, janela em QML)]]).
+- **MkPacotes chama `pkexec pacman` pelo nome**: o certo é o motor passar o caminho fixo, como o MkInstalar já faz. E não remove pacote do AUR com letra maiúscula no nome ([[MkPacotes]]).
+- **MkComprimir**: fechar a janela no meio de uma codificação pode deixar um arquivo `.mkcomprimir-*.parcial.*` escondido ao lado do vídeo ([[MkInstalar e MkComprimir]]).
+- **MkTunes continua em Java**: o porte para Go espera o repositório dele ([[MkTunes]]).
 - **`mare-wifi-qr`**: duas conexões salvas com o mesmo nome se confundem, e uma rede WEP por frase-senha gera um QR que o celular pode não aceitar.
 - **`mare-shot`**: duas capturas no mesmo segundo usam o mesmo nome de arquivo.
 - **Descanso de tela**: desliga quando a tela é bloqueada (aos 5 min, de fábrica); com "Bloquear" em 0 fica até a tela apagar ([[Descanso de tela]]).

@@ -1,0 +1,3 @@
+{ "arquivo": "/exemplo/férias na praia.mp4", "tipo": "video", "tamanho_bytes": 48000000, "duracao_s": 62.4,
+  "largura": 1920, "altura": 1080, "fps": 30.0, "codec": "h264", "taxa_bps": 6025846,
+  "audio": { "codec": "aac", "taxa_bps": 128000, "canais": 2 } }

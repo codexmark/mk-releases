@@ -75,7 +75,7 @@ As camadas 01 a 08 são o sistema em execução, de baixo para cima. As camadas 
 [[Direção Folha]] · [[Fontes]] · [[Papéis de parede]] · [[Tema GTK, ícones e Qt]] · [[Ghostty]] · [[Fastfetch]] · [[Arte e geradores]]
 
 ### 08 Aplicativos
-[[Apps padrão]] · [[Apps oferecidos]] · [[MkTunes]] · [[Ferramentas de desenvolvimento]] · [[Terminal e bash do Mk]] · [[Comando mk]]
+[[Apps padrão]] · [[Apps oferecidos]] · [[Apps do Mk (motor em Go, janela em QML)]] · [[MkPulso]] · [[MkPacotes]] · [[MkInstalar e MkComprimir]] · [[MkTunes]] · [[Ferramentas de desenvolvimento]] · [[Terminal e bash do Mk]] · [[Comando mk]]
 
 ### 09 Instalação
 [[ISO]] · [[Instalador passo a passo]] · [[AUR na instalação]] · [[Modo desassistido]] · [[O que foi testado]] · [[Experimentar sem instalar]]

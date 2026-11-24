@@ -40,7 +40,7 @@ Cada painel é uma função do sistema ao alcance de um clique na ilha, de um at
 | `notifications` | `NotificationsPanel.qml` | histórico e não perturbe ([[Notificações e OSD]]) |
 | `session` | `SessionPanel.qml` | bloquear, suspender, sair, reiniciar, desligar |
 | `display` | `DisplayPanel.qml` | brilho e luz noturna |
-| `system` | `SystemPanel.qml` | CPU, memória, temperatura, rede, disco, com o último minuto em gráfico; atalho para o btop |
+| `system` | `SystemPanel.qml` | CPU, memória, temperatura, rede, disco, com o último minuto em gráfico; atalho para o [[MkPulso]], o monitor do Mk (antes era o btop) |
 | `clipboard` | `ClipboardPanel.qml` | histórico da área de transferência (`cliphist`) |
 | `wallpaper` | `WallpaperPanel.qml` | [[Papéis de parede]], 12 por página |
 | `capture` | `CapturePanel.qml` | capturar área, janela, tela, ou gravar um vídeo |

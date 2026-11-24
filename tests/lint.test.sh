@@ -43,7 +43,8 @@ else
 fi
 
 t "todo executável de bin/ e scripts do shell tem o bit de execução"
-for f in bin/* shell/mare/scripts/* tests/run tests/hooks/* apps/mkpulso/bin/mkpulso apps/mkpulso/pack apps/mkpulso/assinatura; do
+for f in bin/* shell/mare/scripts/* tests/run tests/hooks/* apps/mkpulso/bin/mkpulso apps/mkpacotes/bin/mkpacotes apps/mkutil/bin/mkinstalar \
+  apps/mkutil/bin/mkcomprimir apps/mk*/pack apps/mk*/assinatura; do
   [[ -f $f && $f != bin/lib-packages.sh ]] || continue
   [[ -x $f ]] || _fail "sem +x: $f"
 done
@@ -60,7 +61,7 @@ fi
 
 t "JavaScript do shell: sintaxe válida"
 if command -v node >/dev/null; then
-  for f in shell/mare/*.js apps/mkpulso/qml/*.js; do
+  for f in shell/mare/*.js apps/mk*/qml/*.js; do
     out=$(grep -vE '^\.(pragma|import) ' "$f" | node --check - 2>&1) || _fail "$f" "$out"
   done
 else

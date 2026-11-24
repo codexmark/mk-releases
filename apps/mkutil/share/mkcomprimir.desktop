@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=MkComprimir
+GenericName=Compressor de vídeos e imagens
+Comment=Encolhe vídeos e imagens, com o tamanho estimado antes de começar
+Exec=mkcomprimir %F
+Icon=mkcomprimir
+Terminal=false
+Categories=AudioVideo;Graphics;Utility;
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;image/gif;image/jpeg;image/png;image/webp;image/avif;
+Keywords=comprimir;encolher;vídeo;video;imagem;foto;ffmpeg;gif;webp;tamanho;

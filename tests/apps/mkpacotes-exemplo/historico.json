@@ -1,0 +1,11 @@
+{
+ "eventos": [
+  {"t_s": 1795480000, "acao": "atualizado", "nome": "htop", "de": "3.5.1-1", "para": "3.5.2-1"},
+  {"t_s": 1795470000, "acao": "instalado", "nome": "fd", "de": null, "para": "10.2.0-1"},
+  {"t_s": 1795460000, "acao": "removido", "nome": "fuse2", "de": "2.9.9-6", "para": null},
+  {"t_s": 1795450000, "acao": "reinstalado", "nome": "bash", "de": "5.3.20-1", "para": "5.3.20-1"},
+  {"t_s": 1795440000, "acao": "rebaixado", "nome": "glibc", "de": "2.43-1", "para": "2.42-1"},
+  {"t_s": null, "acao": "instalado", "nome": "relogio-torto", "de": null, "para": "1-1"}
+ ],
+ "total": 4312
+}

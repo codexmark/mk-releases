@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>MkComprimir</title>
+  <rect width="64" height="64" rx="12" fill="#0b0b0b"/>
+  <path d="M12 14h40v36H12z" fill="none" stroke="#cdc4ba" stroke-opacity=".6" stroke-width="2" stroke-linejoin="miter"/>
+  <path d="M20 22l9 9M29 23v8h-8M44 42l-9-9M35 41v-8h8" fill="none" stroke="#ce5e32" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

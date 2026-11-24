@@ -1,0 +1,17 @@
+{
+ "pacotes": [
+  {"nome": "bash", "versao": "5.3.20-1", "descricao": "The GNU Bourne Again shell", "tamanho_bytes": 10055840, "instalado_em_s": 1792797774, "motivo": "pedido", "origem": "core", "orfao": false, "atualizacao": "5.3.21-1", "protegido": false},
+  {"nome": "fd", "versao": "10.2.0-1", "descricao": "Simple, fast and user-friendly alternative to find", "tamanho_bytes": 4194304, "instalado_em_s": 1795300000, "motivo": "pedido", "origem": "extra", "orfao": false, "atualizacao": null, "protegido": false},
+  {"nome": "ghostty", "versao": "1.3.1-2", "descricao": "Fast, native, feature-rich terminal emulator pushing modern features", "tamanho_bytes": 96468992, "instalado_em_s": 1793000000, "motivo": "pedido", "origem": "extra", "orfao": false, "atualizacao": null, "protegido": false},
+  {"nome": "glibc", "versao": "2.42-1", "descricao": "GNU C Library", "tamanho_bytes": 50331648, "instalado_em_s": 1792000000, "motivo": "dependencia", "origem": "core", "orfao": false, "atualizacao": null, "protegido": true},
+  {"nome": "google-chrome", "versao": "156.0.8078.47-1", "descricao": "The popular web browser by Google (Stable Channel)", "tamanho_bytes": 398458880, "instalado_em_s": 1794800000, "motivo": "pedido", "origem": "aur", "orfao": false, "atualizacao": null, "protegido": false},
+  {"nome": "htop", "versao": "3.5.2-1", "descricao": "Interactive process viewer", "tamanho_bytes": 409600, "instalado_em_s": 1795400000, "motivo": "pedido", "origem": "extra", "orfao": false, "atualizacao": "3.5.3-1", "protegido": false},
+  {"nome": "hyprland", "versao": "0.57.2-1", "descricao": "A highly customizable dynamic tiling Wayland compositor", "tamanho_bytes": 31457280, "instalado_em_s": 1792100000, "motivo": "pedido", "origem": "extra", "orfao": false, "atualizacao": null, "protegido": true},
+  {"nome": "libnl", "versao": "3.11.0-1", "descricao": "Library for applications dealing with netlink sockets", "tamanho_bytes": 1572864, "instalado_em_s": 1792000200, "motivo": "dependencia", "origem": "core", "orfao": false, "atualizacao": null, "protegido": false},
+  {"nome": "simde", "versao": "0.8.2-1", "descricao": "Header-only library providing implementations of SIMD instruction sets", "tamanho_bytes": 7340032, "instalado_em_s": 1793500000, "motivo": "dependencia", "origem": "extra", "orfao": true, "atualizacao": null, "protegido": false},
+  {"nome": "uthash", "versao": "2.3.0-2", "descricao": "C preprocessor implementations of a hash table and a linked list", "tamanho_bytes": 430080, "instalado_em_s": 1793500100, "motivo": "dependencia", "origem": "extra", "orfao": true, "atualizacao": null, "protegido": false},
+  {"nome": "yay", "versao": "13.0.1-1", "descricao": "Yet another yogurt. Pacman wrapper and AUR helper written in go.", "tamanho_bytes": 9437184, "instalado_em_s": 1792200000, "motivo": "pedido", "origem": "aur", "orfao": false, "atualizacao": null, "protegido": false}
+ ],
+ "totais": {"pacotes": 11, "pedidos": 7, "aur": 2, "orfaos": 2, "atualizacoes": 2, "tamanho_bytes": 610156704},
+ "aviso": null
+}

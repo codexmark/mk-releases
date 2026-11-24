@@ -95,6 +95,24 @@ correção.
 - **`shellcheck` puxa uns 55 pacotes do Haskell** (as bibliotecas dele no
   Arch). Entra pela lista de desenvolvimento, para o lint do `tests/run` não
   ser pulado num Mk instalado.
+- **Apps novos (MkPulso, MkPacotes, MkInstalar, MkComprimir), o que foi
+  visto e o que não foi.** Os motores foram exercitados de verdade na VM:
+  encerrar um processo, instalar e remover um pacote com a senha pedida pelo
+  Maré, comprimir um vídeo, e as recusas (processo 1, SDDM, glibc). As janelas
+  foram vistas abrindo, com dados reais, mas **os botões nunca foram
+  clicados**: a folha de confirmação do MkPacotes, o seletor de arquivo e o
+  arrastar do MkInstalar e do MkComprimir, e as ações de serviço do MkPulso só
+  rodaram contra dublês ou pela linha de comando.
+- **MkPacotes chama `pkexec pacman` pelo nome.** O pkexec acha o programa no
+  `PATH` de quem chamou; o pedido de senha mostra o caminho inteiro
+  (`/usr/bin/pacman`), mas o certo é o motor passar o caminho fixo, como o
+  MkInstalar já faz.
+- **MkPacotes não remove pacote do AUR com letra maiúscula no nome** (a
+  validação só aceita minúsculas).
+- **MkComprimir:** fechar a janela no meio de uma codificação pode deixar um
+  arquivo `.mkcomprimir-*.parcial.*` escondido ao lado do vídeo.
+- **MkTunes continua em Java.** O porte para Go espera o repositório dele, que
+  não está na máquina onde os outros apps foram feitos.
 - **`mare-wifi-qr`:** duas conexões salvas com o mesmo nome se confundem, e
   uma rede WEP por frase-senha gera um QR que o celular pode não aceitar.
 - **`mare-shot`:** duas capturas no mesmo segundo usam o mesmo nome de arquivo.

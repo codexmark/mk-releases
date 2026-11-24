@@ -6,6 +6,8 @@ tags:
   - migrações
   - catálogo
 fontes:
+  - "migrations/system/20261130-mkpacotes-mkutil.sh"
+  - "migrations/system/20261129-mkpulso.sh"
   - "migrations/user/20261128-papel-de-fabrica.sh"
   - "migrations/system/20261128-entrada-marca.sh"
   - "migrations/system/20261120-boot-mk.sh"
@@ -53,6 +55,8 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261127-mktunes.sh` | os links do MkTunes | `jre-openjdk-headless mpv ffmpeg` |
 | `20261128-entrada-marca.sh` | o tema novo do sddm (a marca construída), mantendo o `theme.conf.user` | |
 | `20261128-shellcheck.sh` | só avisa se o `shellcheck` não veio | `shellcheck` |
+| `20261129-mkpulso.sh` | os links do MkPulso (comando, atalho, ícone); avisa se o coletor não veio | |
+| `20261130-mkpacotes-mkutil.sh` | os links do MkPacotes, do MkInstalar e do MkComprimir (`apps-links`) | |
 
 ### De usuário (`migrations/user/`)
 
@@ -82,7 +86,7 @@ Essa migração existe porque o instalador, até certa versão, **descartava** o
 
 ## Onde está no código
 
-`migrations/system/` (21 arquivos) e `migrations/user/` (8 arquivos).
+`migrations/system/` (23 arquivos) e `migrations/user/` (8 arquivos).
 
 ## Ligações
 

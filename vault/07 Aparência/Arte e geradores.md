@@ -34,7 +34,6 @@ As cópias que o `make-logo.py` grava:
 | Arquivo | Quem usa |
 |---|---|
 | `shell/mare/assets/mark.png`, `mark.svg` | o Maré (ilha, bloqueio, Ajustes, boas-vindas) |
-| `config/fastfetch/mark.png` | a ficha do terminal |
 | `system/mk/sddm/mk/letra-m.png`, `letra-k.png`, `geometria.js` | a tela de login (as letras em camadas e a geometria da marca) |
 | `system/mk/plymouth/mk/logo.png` | o boot |
 | `system/mk/art/mark.png` | o `make-art.py` |

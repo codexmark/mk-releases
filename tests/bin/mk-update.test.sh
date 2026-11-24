@@ -1261,3 +1261,15 @@ info true 0 0
 out=$(run <<<"s")
 eq aaaaaaaaaaaa "$(campo from)"
 eq "$nova" "$(cat "$cfg/VERSION")"
+
+t "rodado de dentro de /usr/share/mk (que a rodada troca): sai de lá antes, sem erros de getcwd"
+# Visto na VM: de dentro de uma pasta de /usr/share/mk, depois da troca cada
+# comando do script reclamava "job-working-directory: getcwd" dezenas de vezes.
+zera
+info true 0 0
+mkdir -p "$share/apps/x"
+out=$(cd "$share/apps/x" && MK_ROOT=$R bash "$REPO/bin/mk-update" 2>&1 <<<"s")
+eq 0 $?
+hasnt "$out" "getcwd"
+hasnt "$out" "job-working-directory"
+eq "$nova" "$(cat "$cfg/VERSION")"

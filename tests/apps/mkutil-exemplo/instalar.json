@@ -1,0 +1,9 @@
+[
+  { "fase": "copiando", "pct": 12.5 },
+  { "fase": "copiando", "pct": 61.0 },
+  { "fase": "copiando", "pct": 100.0 },
+  { "fase": "atalho" },
+  { "fase": "fim", "ok": true, "id": "krita", "tipo": "appimage", "nome": "Krita",
+    "destino": "/exemplo/Aplicativos/krita.AppImage", "atalho": "/exemplo/.local/share/applications/mkinstalar-krita.desktop",
+    "avisos": ["este AppImage precisa do FUSE 2 (libfuse.so.2), que não está instalado: sem ele o app não abre. Instale o pacote fuse2"] }
+]

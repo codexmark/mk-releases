@@ -1,0 +1,19 @@
+{
+  "arquivo": "/exemplo/htop-3.3.0-3-x86_64.pkg.tar.zst",
+  "tipo": "pacote",
+  "id": "htop",
+  "nome": "htop",
+  "versao": "3.3.0-3",
+  "descricao": "Interactive process viewer",
+  "tamanho_bytes": 150000,
+  "destino": null,
+  "atalho": null,
+  "ja_instalado": false,
+  "precisa_senha": true,
+  "plano": ["trocar htop 3.2.2-1 por 3.3.0-3 com o pacman (pede a senha de administrador)", "o pacman baixa o que faltar das 3 dependências"],
+  "avisos": ["um pacote roda scripts como administrador ao instalar: só instale de onde você confia"],
+  "appimage": null,
+  "pacote": { "nome": "htop", "versao": "3.3.0-3", "descricao": "Interactive process viewer", "arquitetura": "x86_64",
+              "tamanho_instalado_bytes": 412345, "dependencias": ["libcap", "ncurses", "libnl>=3"], "instalado": "3.2.2-1" },
+  "compactado": null
+}

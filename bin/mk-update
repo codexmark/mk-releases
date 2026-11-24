@@ -38,6 +38,9 @@
 # pgrep, uname, hyprctl, flock) vêm do PATH. MK_UPDATE_SUDO_CADA troca o
 # intervalo (segundos) em que a senha do sudo é renovada.
 set -euo pipefail
+# A rodada troca /usr/share/mk inteiro: quem a chama de dentro de uma pasta de
+# lá ficaria numa pasta que não existe mais, e cada comando reclamaria.
+cd / 2>/dev/null || true
 
 root=${MK_ROOT:-}
 share=${MK_SHARE:-$root/usr/share/mk}

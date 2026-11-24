@@ -34,7 +34,7 @@ Coerência: quem instalou o Mk vê o nome Mk em todo lugar. Para ferramentas, `I
 
 O pacote `filesystem` é dono do `/etc/os-release` e o reescreve a cada atualização. Sem o gancho, o nome voltaria a "Arch Linux" na primeira atualização do `filesystem`. O código não discute alternativas; o Mk não tem pacotes próprios nem repositório de pacotes ([[Pacman e AUR]]), então um gancho é o que cabe.
 
-Deduzido do código, não ensaiado: o gancho lê de `/usr/share/mk` e o `Exec` faz `rm -f` antes de copiar, então, se essa pasta sumir, o `/etc/os-release` fica ausente até ela voltar. Veja [[Quando a atualização para]].
+O gancho confere antes se o arquivo do Mk existe (`[ -f /usr/share/mk/system/mk/os-release ] || exit 0`): sem ele, não faz nada. Uma versão anterior apagava o `/etc/os-release` e só então tentava copiar; na instalação, o gancho rodava antes de o instalador pôr os arquivos, o `cp` falhava e ficava um "command failed" no log. Veja [[Quando a atualização para]].
 
 ## Onde está no código
 

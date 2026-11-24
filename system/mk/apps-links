@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Liga ao sistema os apps do Mk que moram em apps/ (MkPacotes, MkInstalar e
+# MkComprimir): o comando, o atalho no menu e o ícone de cada um. São links
+# para /usr/share/mk, então a versão que o mk-update traz vale sozinha. (O
+# MkTunes e o MkPulso têm os seus: mktunes-links e mkpulso-links.)
+#   apps-links [raiz]   o instalador passa a raiz do sistema novo
+set -euo pipefail
+root=${1:-/}
+root=${root%/}
+
+link() {
+  mkdir -p "$root$(dirname "$2")"
+  ln -sfn "/usr/share/mk/apps/$1" "$root$2"
+}
+# pasta do app : nome do comando
+for par in mkpacotes:mkpacotes mkutil:mkinstalar mkutil:mkcomprimir; do
+  pasta=${par%%:*} nome=${par#*:}
+  link "$pasta/bin/$nome" "/usr/bin/$nome"
+  link "$pasta/share/$nome.desktop" "/usr/share/applications/$nome.desktop"
+  link "$pasta/share/$nome.svg" "/usr/share/icons/hicolor/scalable/apps/$nome.svg"
+done
+
+# No sistema em uso, o menu e os ícones percebem já.
+if [[ -z $root ]]; then
+  update-desktop-database -q /usr/share/applications 2>/dev/null || true
+  gtk-update-icon-cache -qtf /usr/share/icons/hicolor 2>/dev/null || true
+fi

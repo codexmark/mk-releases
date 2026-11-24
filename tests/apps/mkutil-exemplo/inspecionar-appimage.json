@@ -1,0 +1,18 @@
+{
+  "arquivo": "/exemplo/Krita-5.2.2-x86_64.AppImage",
+  "tipo": "appimage",
+  "id": "krita",
+  "nome": "Krita",
+  "versao": "5.2.2",
+  "descricao": "Pintura digital, para ilustração e quadrinhos",
+  "tamanho_bytes": 412000000,
+  "destino": "/exemplo/Aplicativos/krita.AppImage",
+  "atalho": "/exemplo/.local/share/applications/mkinstalar-krita.desktop",
+  "ja_instalado": false,
+  "precisa_senha": false,
+  "plano": ["copiar para ~/Aplicativos/krita.AppImage", "marcar como executável", "criar o atalho no menu"],
+  "avisos": ["este AppImage precisa do FUSE 2 (libfuse.so.2), que não está instalado: sem ele o app não abre. Instale o pacote fuse2"],
+  "appimage": { "tipo": 2, "tem_desktop": true, "tem_icone": true, "fuse": false },
+  "pacote": null,
+  "compactado": null
+}

@@ -1,0 +1,11 @@
+{
+ "acao": "remover", "pedidos": ["htop"],
+ "entra": [],
+ "sai": [
+  {"nome": "htop", "versao": "3.5.2-1", "tamanho_bytes": 409600, "pedido": true},
+  {"nome": "libnl", "versao": "3.11.0-1", "tamanho_bytes": 1572864, "pedido": false}
+ ],
+ "baixar_bytes": null, "liberar_bytes": 1982464,
+ "comandos": [["pkexec", "pacman", "-Rns", "--noconfirm", "--", "htop"]],
+ "avisos": [], "travado": false, "nada_a_fazer": false, "cache": null
+}

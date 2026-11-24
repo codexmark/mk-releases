@@ -602,6 +602,8 @@ install_desktop() {
   bash "$src/system/mk/mktunes-links" "$target"
   # O MkPulso (apps/mkpulso), o monitor de sistema: idem.
   bash "$src/system/mk/mkpulso-links" "$target"
+  # O MkPacotes, o MkInstalar e o MkComprimir (apps/mkpacotes, apps/mkutil).
+  bash "$src/system/mk/apps-links" "$target"
   install -Dm644 /dev/stdin "$target/usr/share/wayland-sessions/mk.desktop" <<'EOF'
 [Desktop Entry]
 Name=Mk

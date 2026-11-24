@@ -13,12 +13,12 @@ hl.window_rule({
     center = true,
 })
 
--- O MkPulso (apps/mkpulso), o monitor do sistema: um utilitário que se abre
--- por cima do trabalho, no tamanho dele. Lado a lado com outras janelas ele
--- vira uma coluna estreita e a tabela não cabe.
+-- Os apps do Mk (apps/): utilitários que se abrem por cima do trabalho, no
+-- tamanho deles. Lado a lado com outras janelas viram uma coluna estreita e
+-- as tabelas não cabem.
 hl.window_rule({
     name = "float-mkpulso",
-    match = { title = "^MkPulso$" },
+    match = { title = "^(MkPulso|MkPacotes|MkInstalar|MkComprimir)$" },
     float = true,
     center = true,
 })

@@ -6,6 +6,7 @@ tags:
   - testes
   - tdd
 fontes:
+  - "tests/apps/mkpulso-go.test.sh"
   - "migrations/system/20261128-shellcheck.sh"
   - "tests/README.md"
   - "tests/run"
@@ -25,7 +26,7 @@ fontes:
 
 # Testes e TDD
 
-O Mk tem uma suíte de testes automáticos em `tests/` (119 arquivos e 2576 casos na última contagem registrada) que não precisa de root, de rede nem de sessão gráfica, e uma regra: **teste primeiro**.
+O Mk tem uma suíte de testes automáticos em `tests/` (132 arquivos e cerca de 2800 casos na última contagem) que não precisa de root, de rede nem de sessão gráfica, e uma regra: **teste primeiro**.
 
 ## Para quê
 
@@ -61,6 +62,7 @@ Um defeito achado em uso vira primeiro um caso que o reproduz, e só então a co
 | `tests/migrations/` | cada migração, em `system/` e `user/`, e as regras comuns a todas | `mig.sh`, `regras.test.sh` |
 | `tests/config/` | o Lua do Hyprland, `mk.bash`, hypridle, hyprlock, ghostty, fastfetch, mimeapps | `hl.lua`, `harness.lua` |
 | `tests/qml/` | a estrutura do shell que nenhum compilador confere | |
+| `tests/apps/` | os apps de `apps/` (MkPulso, MkPacotes, MkUtil): os testes em Go de cada motor (`go test`, `gofmt`, `go vet` e a conferência de que o binário é o do código do repositório), a lógica e a estrutura das janelas, os lançadores | `*-exemplo/` (respostas gravadas) |
 | `tests/docs/` | a documentação contra o código | |
 
 Um arquivo de teste por arquivo testado, com o mesmo nome: `shell/mare/scripts/mare-sleep` → `tests/scripts/mare-sleep.test.sh`.

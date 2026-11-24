@@ -30,7 +30,7 @@ Para achar o arquivo certo a partir de um assunto, e o assunto a partir de um ar
 | `config/bash/`, `config/ghostty/`, `config/fastfetch/` | o terminal do Mk | [[Terminal e bash do Mk]], [[Ghostty]], [[Fastfetch]] |
 | `config/mimeapps.list` | os apps padrão de fábrica | [[Apps padrão]] |
 | `shell/mare/` | o Maré: QML numa pasta só, `scripts/`, `assets/`, `wallpapers/` | [[Maré]] |
-| `apps/` | apps do Mk que vêm prontos (o MkTunes) | [[MkTunes]] |
+| `apps/` | os apps do Mk que vêm prontos: MkPulso, MkPacotes e MkUtil (código aqui, motor em Go) e o MkTunes (gerado no repositório dele) | [[Apps do Mk (motor em Go, janela em QML)]], [[MkTunes]] |
 | `installer/` | `mk-install` e o arquivo de respostas de exemplo | [[Instalador passo a passo]] |
 | `iso/` | `build`, `vm`, `profile/` | [[ISO]], [[VM de teste]] |
 | `migrations/` | `system/` e `user/` | [[Migrações]] |

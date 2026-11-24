@@ -1,0 +1,5 @@
+{
+ "travado": false, "sincronizado_em_s": 1795400000,
+ "cache": {"arquivos": 4227, "bytes": 12000000000},
+ "comandos": {"pacman": true, "pkexec": true, "yay": true, "mk_update": true}
+}

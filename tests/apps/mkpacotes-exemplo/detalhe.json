@@ -1,0 +1,13 @@
+{
+ "nome": "yay", "versao": "13.0.1-1", "descricao": "Yet another yogurt. Pacman wrapper and AUR helper written in go.", "origem": "aur",
+ "instalado": true, "motivo": "pedido", "orfao": false, "protegido": false, "atualizacao": null,
+ "url": "https://github.com/Jguer/yay", "licencas": ["GPL-3.0-or-later"], "mantenedor": "Fulano de Tal <fulano@exemplo.org>",
+ "tamanho_bytes": 9437184, "baixar_bytes": null, "instalado_em_s": 1792200000, "construido_em_s": 1792199000,
+ "depende": [{"nome": "pacman", "pede": "pacman>6.1", "instalado": true}, {"nome": "git", "pede": "git", "instalado": true}],
+ "opcionais": [{"nome": "sudo", "para": "privilege elevation", "instalado": true}, {"nome": "doas", "para": "privilege elevation", "instalado": false}],
+ "fornece": [], "conflita": ["yay-bin"],
+ "requerido_por": [], "opcional_para": [],
+ "arquivos": {"total": 12, "executaveis": ["/usr/bin/yay"]},
+ "aur": {"versao": "13.1.0-1", "votos": 2650, "popularidade": 10.07, "desatualizado_desde_s": null, "mantenedor": "jguer", "modificado_em_s": 1793196922},
+ "erro_aur": null
+}

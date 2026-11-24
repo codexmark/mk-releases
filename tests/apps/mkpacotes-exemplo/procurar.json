@@ -1,0 +1,10 @@
+{
+ "resultados": [
+  {"nome": "htop", "versao": "3.5.3-1", "descricao": "Interactive process viewer", "origem": "extra", "instalado": true, "versao_instalada": "3.5.2-1", "votos": null, "desatualizado": null},
+  {"nome": "htop-git", "versao": "3.5.0.r12.g1a2b3c4-1", "descricao": "Interactive process viewer (git version)", "origem": "aur", "instalado": false, "versao_instalada": null, "votos": 38, "desatualizado": false},
+  {"nome": "htop-vim", "versao": "3.4.1-1", "descricao": "Interactive process viewer with vim keybindings", "origem": "aur", "instalado": false, "versao_instalada": null, "votos": 24, "desatualizado": true},
+  {"nome": "bashtop", "versao": "0.9.25-3", "descricao": "Linux resource monitor", "origem": "extra", "instalado": false, "versao_instalada": null, "votos": null, "desatualizado": null},
+  {"nome": "btop", "versao": "1.4.5-1", "descricao": "A monitor of system resources, bpytop ported to C++", "origem": "extra", "instalado": false, "versao_instalada": null, "votos": null, "desatualizado": null}
+ ],
+ "cortado": false, "erro_oficial": null, "erro_aur": null
+}

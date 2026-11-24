@@ -65,6 +65,7 @@ Detalhes de cada passo:
 - **Migrações em dois tempos** (passos 4 e 6): veja [[D03 Migração não instala pacote]].
 - **Uma transação só no pacman**: nunca se instala pacote novo sobre um sistema desatualizado.
 - **Lê tudo de `/usr/share/mk`** (ou de `MK_SHARE`), não de um clone. `MK_ROOT` troca a raiz de tudo o que é lido e escrito em `/usr`, `/var` e `/etc`, e os comandos vêm do `PATH`: servem aos testes (`tests/bin/mk-update.test.sh`).
+- **Sai da pasta que vai trocar** (`cd /` logo no começo): rodado de dentro de `/usr/share/mk`, depois da troca cada comando reclamava de `getcwd` dezenas de vezes (visto na VM).
 - **Fechar a janela no meio** também grava o resumo: o `HUP` é repassado à rodada e tratado.
 - **A troca de `<raiz>` vale para quem rodou**: outro usuário da mesma máquina continua com a versão antiga na pasta dele até rodar o `mk-update` também.
 

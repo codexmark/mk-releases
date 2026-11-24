@@ -6,6 +6,7 @@ tags:
   - música
   - mktunes
 fontes:
+  - "docs/limites.md"
   - "apps/README.md"
   - "apps/mktunes/VERSION"
   - "apps/mktunes/bin/mktunes"
@@ -16,7 +17,7 @@ fontes:
 
 # MkTunes
 
-O MkTunes é o player de música do Mk: músicas, álbuns, rádios e letras, sem conta. É o primeiro app "do Mk" que vem pronto dentro do repositório, em `apps/mktunes`.
+O MkTunes é o player de música do Mk: músicas, álbuns, rádios e letras, sem conta. Foi o primeiro app "do Mk" a vir pronto dentro do repositório, em `apps/mktunes`, e é o único cujo código mora fora dele e cujo núcleo é em Java.
 
 ## Para quê
 
@@ -36,6 +37,7 @@ Tocar música com uma janela na mesma linguagem do Maré e aparecendo na ilha.
 - **Vem compilado dentro do Mk**: o `mk-update` troca `/usr/share/mk` inteiro, então "uma versão nova de um app chega como qualquer outra mudança do Mk", sem pacote, sem AUR, sem repositório de binários.
 - **Links em vez de cópias**: "a versão que o mk-update traz vale sozinha, sem rodar isto de novo".
 - **Em `desktop.packages`, não em `apps.packages`**: `mpv` e `ffmpeg` também estão na lista de apps; estão aqui "porque o MkTunes não é opcional".
+- **Continua em Java**: os apps que vieram depois têm o motor em Go ([[Apps do Mk (motor em Go, janela em QML)]]). O porte do MkTunes para Go espera o repositório dele, que não estava na máquina onde os outros apps foram feitos (`docs/limites.md`). Até lá, ele é o único app do Mk que pede uma JVM (`jre-openjdk-headless`).
 - **Java só de linha de comando** (`headless`): o núcleo não tem parte gráfica.
 - **Daemon velho depois de um `mk-update`**: o lançador detecta um daemon que segura os jars que a atualização apagou (arquivos `(deleted)` em `/proc/<pid>/fd`), para-o e sobe o novo.
 - **Num Mk já instalado**: a migração `20261127-mktunes.sh` cria os links e pede os três pacotes.

@@ -1,0 +1,233 @@
+{
+ "caber": [
+  {
+   "alvo_mb": 8,
+   "duracao_s": 62.4,
+   "audio": true,
+   "largura": 1920,
+   "altura": 1080,
+   "fps": 30,
+   "cabe": true,
+   "video_bps": 898871,
+   "audio_bps": 96000,
+   "saida_largura": 854,
+   "saida_altura": 480
+  },
+  {
+   "alvo_mb": 25,
+   "duracao_s": 62.4,
+   "audio": true,
+   "largura": 1920,
+   "altura": 1080,
+   "fps": 30,
+   "cabe": true,
+   "video_bps": 3012974,
+   "audio_bps": 96000,
+   "saida_largura": 1920,
+   "saida_altura": 1080
+  },
+  {
+   "alvo_mb": 100,
+   "duracao_s": 62.4,
+   "audio": true,
+   "largura": 1920,
+   "altura": 1080,
+   "fps": 30,
+   "cabe": true,
+   "video_bps": 12339897,
+   "audio_bps": 96000,
+   "saida_largura": 1920,
+   "saida_altura": 1080
+  },
+  {
+   "alvo_mb": 8,
+   "duracao_s": 600,
+   "audio": true,
+   "largura": 1920,
+   "altura": 1080,
+   "fps": 30,
+   "cabe": true,
+   "video_bps": 71466,
+   "audio_bps": 32000,
+   "saida_largura": 426,
+   "saida_altura": 240
+  },
+  {
+   "alvo_mb": 8,
+   "duracao_s": 3600,
+   "audio": true,
+   "largura": 1920,
+   "altura": 1080,
+   "fps": 30,
+   "cabe": false
+  },
+  {
+   "alvo_mb": 16,
+   "duracao_s": 180,
+   "audio": true,
+   "largura": 1080,
+   "altura": 1920,
+   "fps": 60,
+   "cabe": true,
+   "video_bps": 593777,
+   "audio_bps": 96000,
+   "saida_largura": 240,
+   "saida_altura": 426
+  },
+  {
+   "alvo_mb": 10,
+   "duracao_s": 30,
+   "audio": false,
+   "largura": 3840,
+   "altura": 2160,
+   "fps": 60,
+   "cabe": true,
+   "video_bps": 2586666,
+   "audio_bps": 0,
+   "saida_largura": 1280,
+   "saida_altura": 720
+  },
+  {
+   "alvo_mb": 8,
+   "duracao_s": 12.5,
+   "audio": true,
+   "largura": 1280,
+   "altura": 720,
+   "fps": 24,
+   "cabe": true,
+   "video_bps": 4870400,
+   "audio_bps": 96000,
+   "saida_largura": 1280,
+   "saida_altura": 720
+  },
+  {
+   "alvo_mb": 2,
+   "duracao_s": 300,
+   "audio": true,
+   "largura": 640,
+   "altura": 360,
+   "fps": 25,
+   "cabe": false
+  },
+  {
+   "alvo_mb": 1,
+   "duracao_s": 2000,
+   "audio": true,
+   "largura": 1920,
+   "altura": 1080,
+   "fps": 30,
+   "cabe": false
+  },
+  {
+   "alvo_mb": 50,
+   "duracao_s": 10,
+   "audio": true,
+   "largura": 320,
+   "altura": 240,
+   "fps": 15,
+   "cabe": true,
+   "video_bps": 38704000,
+   "audio_bps": 96000,
+   "saida_largura": 320,
+   "saida_altura": 240
+  },
+  {
+   "alvo_mb": 8,
+   "duracao_s": 95,
+   "audio": true,
+   "largura": 1921,
+   "altura": 1081,
+   "fps": null,
+   "cabe": true,
+   "video_bps": 557473,
+   "audio_bps": 96000,
+   "saida_largura": 852,
+   "saida_altura": 480
+  },
+  {
+   "alvo_mb": 0.5,
+   "duracao_s": 20,
+   "audio": true,
+   "largura": 854,
+   "altura": 480,
+   "fps": 30,
+   "cabe": true,
+   "video_bps": 162000,
+   "audio_bps": 32000,
+   "saida_largura": 428,
+   "saida_altura": 240
+  }
+ ],
+ "dimensoes": [
+  {
+   "largura": 1920,
+   "altura": 1080,
+   "lado": 720,
+   "saida_largura": 1280,
+   "saida_altura": 720
+  },
+  {
+   "largura": 1080,
+   "altura": 1920,
+   "lado": 720,
+   "saida_largura": 720,
+   "saida_altura": 1280
+  },
+  {
+   "largura": 1920,
+   "altura": 1080,
+   "lado": 1080,
+   "saida_largura": 1920,
+   "saida_altura": 1080
+  },
+  {
+   "largura": 1280,
+   "altura": 720,
+   "lado": 1080,
+   "saida_largura": 1280,
+   "saida_altura": 720
+  },
+  {
+   "largura": 1921,
+   "altura": 1081,
+   "lado": 0,
+   "saida_largura": 1920,
+   "saida_altura": 1080
+  },
+  {
+   "largura": 3840,
+   "altura": 1600,
+   "lado": 1080,
+   "saida_largura": 2592,
+   "saida_altura": 1080
+  },
+  {
+   "largura": 853,
+   "altura": 480,
+   "lado": 480,
+   "saida_largura": 852,
+   "saida_altura": 480
+  },
+  {
+   "largura": 720,
+   "altura": 576,
+   "lado": 480,
+   "saida_largura": 600,
+   "saida_altura": 480
+  },
+  {
+   "largura": 100,
+   "altura": 50,
+   "lado": 240,
+   "saida_largura": 100,
+   "saida_altura": 50
+  },
+  {
+   "largura": 4096,
+   "altura": 2160,
+   "lado": 721,
+   "saida_largura": 1366,
+   "saida_altura": 720
+  }
+ ]
+}

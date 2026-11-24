@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>MkPacotes</title>
+  <rect width="64" height="64" rx="12" fill="#0b0b0b"/>
+  <path d="M32 12 50 21v22L32 52 14 43V21z" fill="none" stroke="#cdc4ba" stroke-opacity=".6" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M14 21l18 9 18-9M32 30v22" fill="none" stroke="#cdc4ba" stroke-opacity=".6" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M23 16.5 41 25.5v7" fill="none" stroke="#ce5e32" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

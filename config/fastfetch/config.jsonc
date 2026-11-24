@@ -1,15 +1,9 @@
-// A ficha do Mk no terminal, compacta: a marca pequena à esquerda e, ao lado,
-// o carimbo da folha (quem, onde, a data) e três seções curtas. No fim, a
-// paleta Folha: a escala de osso e o cobre.
+// A ficha do Mk no terminal: só texto, encostada à esquerda. Quem e onde, a
+// linha do Mk com duas setas de cobre, e três seções (cada uma com dois traços,
+// o título e a régua). No fim, a paleta Folha: a escala de osso e o cobre.
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
-  "logo": {
-    "type": "kitty-direct",
-    "source": "~/.config/mk/fastfetch/mark.png",
-    "width": 15,
-    "height": 5,
-    "padding": { "top": 2, "left": 2, "right": 4 }
-  },
+  "logo": { "type": "none" },
   "display": {
     "separator": "  ",
     "color": { "keys": "38;2;206;94;50", "title": "1;38;2;205;196;186", "output": "38;2;205;196;186" },
@@ -18,8 +12,8 @@
   },
   "modules": [
     "break",
-    // Quem e onde. Linha própria em vez do módulo "title", que some quando
-    // a imagem (kitty) está ligada em algumas versões do fastfetch.
+    // Quem e onde, numa linha própria (o módulo "title" não deixa escolher o
+    // peso das duas partes).
     {
       "type": "command",
       "key": " ",
@@ -32,22 +26,22 @@
       "key": " ",
       "keyWidth": 1,
       "text": "date +%d.%m.%Y",
-      "format": "\u001b[38;2;206;94;50m■\u001b[0m \u001b[38;2;149;143;135mMK · folha {} · um desktop Arch, pronto para trabalhar\u001b[0m"
+      "format": "\u001b[38;2;206;94;50m❯❯\u001b[0m \u001b[38;2;149;143;135mMK · folha {} · um desktop Arch, pronto para trabalhar\u001b[0m"
     },
     "break",
-    { "type": "custom", "format": "\u001b[38;2;206;94;50m──\u001b[0m \u001b[1;38;2;205;196;186mMÁQUINA\u001b[0m \u001b[38;2;58;54;50m──────────────────────────\u001b[0m" },
-    { "type": "cpu", "key": "CPU", "format": "{name} ({cores-logical})" },
-    { "type": "gpu", "key": "VÍDEO", "format": "{name}", "detectionMethod": "pci" },
+    { "type": "custom", "format": "\u001b[38;2;206;94;50m── ──\u001b[0m \u001b[1;38;2;205;196;186mMÁQUINA\u001b[0m \u001b[38;2;58;54;50m───────────────────────────\u001b[0m" },
+    { "type": "cpu", "key": "CPU", "format": "{name} ({cores-logical}) @ {freq-max}" },
+    { "type": "gpu", "key": "VÍDEO", "format": "{vendor} {name} [{type}]", "detectionMethod": "pci" },
     { "type": "memory", "key": "MEMÓRIA", "format": "{used} / {total} ({percentage})" },
-    { "type": "disk", "key": "DISCO", "folders": "/", "format": "{size-used} / {size-total} ({size-percentage})" },
+    { "type": "disk", "key": "DISCO", "folders": "/", "format": "{size-used} / {size-total} ({size-percentage}) - {filesystem}" },
     "break",
-    { "type": "custom", "format": "\u001b[38;2;206;94;50m──\u001b[0m \u001b[1;38;2;205;196;186mSISTEMA\u001b[0m \u001b[38;2;58;54;50m──────────────────────────\u001b[0m" },
+    { "type": "custom", "format": "\u001b[38;2;206;94;50m── ──\u001b[0m \u001b[1;38;2;205;196;186mSISTEMA\u001b[0m \u001b[38;2;58;54;50m───────────────────────────\u001b[0m" },
     { "type": "os", "key": "SISTEMA", "format": "{pretty-name} {arch}" },
     { "type": "kernel", "key": "KERNEL" },
     { "type": "wm", "key": "JANELAS", "format": "{pretty-name} {version}" },
-    { "type": "packages", "key": "PACOTES", "format": "{all}" },
+    { "type": "packages", "key": "PACOTES" },
     "break",
-    { "type": "custom", "format": "\u001b[38;2;206;94;50m──\u001b[0m \u001b[1;38;2;205;196;186mSESSÃO\u001b[0m \u001b[38;2;58;54;50m───────────────────────────\u001b[0m" },
+    { "type": "custom", "format": "\u001b[38;2;206;94;50m── ──\u001b[0m \u001b[1;38;2;205;196;186mSESSÃO\u001b[0m \u001b[38;2;58;54;50m────────────────────────────\u001b[0m" },
     { "type": "uptime", "key": "LIGADO", "format": "{?days}{days} d {?}{hours} h {minutes} min" },
     { "type": "terminal", "key": "TERMINAL", "format": "{pretty-name}" },
     "break",

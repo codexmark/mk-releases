@@ -1,0 +1,11 @@
+[
+ {"linha": "$ pkexec pacman -Rns --noconfirm -- htop"},
+ {"linha": "checking dependencies..."},
+ {"linha": "Packages (2) libnl-3.11.0-1  htop-3.5.2-1"},
+ {"linha": "Total Removed Size:  1.89 MiB"},
+ {"linha": ":: Processing package changes..."},
+ {"linha": "removing htop..."},
+ {"linha": "removing libnl..."},
+ {"linha": ":: Running post-transaction hooks..."},
+ {"ok": true, "acao": "remover", "pacotes": ["htop"]}
+]

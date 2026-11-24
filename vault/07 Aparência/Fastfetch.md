@@ -13,7 +13,7 @@ fontes:
 
 # Fastfetch
 
-A "ficha" é o que o terminal mostra ao abrir: a marca do Mk pequena à esquerda e, ao lado, quem e onde, três seções curtas (máquina, sistema, sessão) e a paleta Folha.
+A "ficha" é o que o terminal mostra ao abrir: só texto, encostado à esquerda: quem e onde, a linha do Mk aberta por duas setas de cobre (`❯❯`), três seções (máquina, sistema, sessão), cada uma com dois traços, o título e a régua, e a paleta Folha.
 
 ## Para quê
 
@@ -22,7 +22,7 @@ Identidade e um resumo útil da máquina na primeira linha de cada janela de ter
 ## Como funciona
 
 - **Config**: `config/fastfetch/config.jsonc`, com o `mark.png` ao lado (instalados em `<raiz>/fastfetch/`).
-- **Logo**: a imagem `mark.png` pelo protocolo gráfico do kitty (`kitty-direct`).
+- **Sem imagem** (`"logo": { "type": "none" }`): a marca à esquerda saiu; a ficha é só texto. A máquina diz a frequência do processador, o tipo da placa, o sistema de arquivos, e os pacotes vêm por gerenciador.
 - **Módulos**: uma linha `usuário @ máquina`; a linha do carimbo com a data; `MÁQUINA` (CPU, vídeo, memória, disco); `SISTEMA` (sistema, kernel, janelas, pacotes); `SESSÃO` (ligado há quanto tempo, terminal); os pontos da paleta.
 - **Quando aparece** (`mk.bash`): só se o `fastfetch` existe, o terminal é `xterm-ghostty` ou `xterm-kitty`, `SHLVL <= 1`, e não se está dentro do tmux nem do neovim.
 - **Desligar**: `MK_NO_FETCH=1` (por exemplo no `seu.bash`).
@@ -30,7 +30,7 @@ Identidade e um resumo útil da máquina na primeira linha de cada janela de ter
 
 ## Por quê assim
 
-- **Só em ghostty e kitty**: a imagem usa o protocolo do kitty, que esses dois entendem.
+- **Só em ghostty e kitty**: a condição vem de quando a ficha tinha imagem pelo protocolo do kitty; hoje, só com texto, ela poderia valer em qualquer terminal.
 - **Uma vez por janela, nunca dentro do tmux ou do neovim**: um shell aninhado não repete a ficha.
 - **Linha própria em vez do módulo `title`**: o `title` do fastfetch sumia quando a imagem estava ligada, em algumas versões (visto na VM).
 - **Formato compacto**: a primeira versão tinha um desenho grande; a ficha "compacta, com a marca nova" veio depois, e uma migração de usuário cobriu quem tinha ficado com a pasta antiga.

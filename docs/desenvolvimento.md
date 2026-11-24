@@ -36,7 +36,7 @@ do `hyprland.lua`.
 
 **`config/bash/`** — `mk.bash` (o terminal do Mk e o comando `mk`),
 `starship.toml` e `seu.bash.exemplo`. `config/ghostty/config`,
-`config/fastfetch/` (a ficha e o `mark.png` dela) e `config/mimeapps.list` (os
+`config/fastfetch/` (a ficha do terminal, só texto) e `config/mimeapps.list` (os
 apps padrão de fábrica) completam a pasta.
 
 **`shell/mare/`** — todo o QML numa pasta só, sem subpastas de código. Ao lado:
@@ -470,7 +470,6 @@ compacta, e depois as cópias que o resto do Mk usa:
 |---|---|
 | `system/mk/art/mark.png` | o `make-art.py` |
 | `shell/mare/assets/mark.png`, `mark.svg` | o Maré (ilha, bloqueio, Ajustes, boas-vindas) |
-| `config/fastfetch/mark.png` | a ficha do terminal |
 | `system/mk/sddm/mk/letra-m.png`, `letra-k.png`, `geometria.js` | a tela de login: as letras em camadas e a geometria da marca, para ela ser construída em movimento (`make-logo.py entrada` gera só estes) |
 | `system/mk/plymouth/mk/logo.png` | o boot |
 

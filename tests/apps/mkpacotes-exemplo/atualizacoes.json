@@ -1,0 +1,9 @@
+{
+ "atualizacoes": [
+  {"nome": "bash", "de": "5.3.20-1", "para": "5.3.21-1", "origem": "core"},
+  {"nome": "htop", "de": "3.5.2-1", "para": "3.5.3-1", "origem": "extra"},
+  {"nome": "yay", "de": "13.0.1-1", "para": "13.1.0-1", "origem": "aur"}
+ ],
+ "totais": {"oficiais": 2, "aur": 1},
+ "fonte": "checkupdates", "erro_oficial": null, "erro_aur": null
+}

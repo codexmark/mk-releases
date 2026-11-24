@@ -208,7 +208,6 @@ if __name__ == "__main__":
     render(mark, os.path.join(here, "mark.png"), height=160)
     render(mark, os.path.join(root, "shell/mare/assets/mark.png"), height=120)
     shutil.copy(mark, os.path.join(root, "shell/mare/assets/mark.svg"))
-    render(mark, os.path.join(root, "config/fastfetch/mark.png"), height=240)
     render(os.path.join(out, "mk-logo-transparente.svg"), os.path.join(root, "system/mk/plymouth/mk/logo.png"), width=1200)
     login_assets(root)
     print("ok:", ", ".join(sorted(os.listdir(out))))

@@ -1,0 +1,11 @@
+{ "itens": [
+  { "id": "firefox", "tipo": "compactado", "nome": "Firefox", "versao": "127.0", "origem": "firefox-127.0.tar.xz",
+    "destino": "/exemplo/Aplicativos/firefox", "atalho": "/exemplo/.local/share/applications/mkinstalar-firefox.desktop",
+    "icone": null, "instalado_em_s": 1795470000, "tamanho_bytes": 248000000, "existe": true },
+  { "id": "obsidian", "tipo": "appimage", "nome": "Obsidian", "versao": "1.5.3", "origem": "Obsidian-1.5.3.AppImage",
+    "destino": "/exemplo/Aplicativos/obsidian.AppImage", "atalho": "/exemplo/.local/share/applications/mkinstalar-obsidian.desktop",
+    "icone": "/exemplo/Aplicativos/.icones/obsidian.png", "instalado_em_s": 1795300000, "tamanho_bytes": 101000000, "existe": true },
+  { "id": "balenaetcher", "tipo": "appimage", "nome": "balenaEtcher", "versao": null, "origem": "balenaEtcher-x64.AppImage",
+    "destino": "/exemplo/Aplicativos/balenaetcher.AppImage", "atalho": null,
+    "icone": null, "instalado_em_s": 1795100000, "tamanho_bytes": 139000000, "existe": false }
+] }

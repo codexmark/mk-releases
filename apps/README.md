@@ -57,3 +57,31 @@ MKPULSO_EXEMPLO=tests/apps/mkpulso-exemplo qs -p apps/mkpulso/qml
 
 O sistema liga o app por `system/mk/mkpulso-links` (comando `mkpulso`, atalho
 no menu e ícone). Não pede pacote além do que o Mk já tem.
+
+## mkpacotes
+
+O gerenciador de pacotes do Mk, no mesmo molde do MkPulso (coletor em Go em
+`mkpacotes/src/`, janela em `mkpacotes/qml/`, contrato em
+`mkpacotes/CONTRATO.md`, `mkpacotes/pack` para compilar): o que está
+instalado, com filtros (pedidos por você, do AUR, órfãos, com atualização),
+busca nos repositórios e no AUR, a ficha de cada pacote e o histórico do
+`pacman.log`. Toda ação mostra antes o plano (o que entra, o que sai, os
+comandos) e só roda depois da confirmação, com a senha pedida pelo polkit (o
+Maré). Recusa remover o que derruba o sistema. "Atualizar tudo" é do
+`mk atualizar`: o app só o abre num terminal.
+
+## mkutil
+
+Dois utilitários com um motor em Go (`mkutil/src/`, `mkutil/bin/mkutil-motor`):
+
+- **MkInstalar** (`mkinstalar [arquivos]`): instala um AppImage (copia para
+  `~/Aplicativos`, cria o atalho de menu; o arquivo nunca é executado para ser
+  inspecionado), um pacote do Arch (`pacman -U` pelo polkit) ou um arquivo
+  compactado (recusa caminhos que saem da pasta e bombas), e desinstala o que
+  instalou.
+- **MkComprimir** (`mkcomprimir [arquivos]`): encolhe vídeos e imagens com o
+  ffmpeg, com predefinições (inclusive "caber em N MB"), a estimativa antes de
+  começar, progresso, cancelar e fila. Nunca sobrescreve o original.
+
+O sistema liga os três por `system/mk/apps-links`.
+

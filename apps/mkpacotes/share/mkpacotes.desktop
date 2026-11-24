@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MkPacotes
+GenericName=Gerenciador de pacotes
+Comment=Instalar, remover e procurar programas no Arch e no AUR
+Exec=mkpacotes
+Icon=mkpacotes
+Terminal=false
+Categories=System;PackageManager;
+Keywords=pacotes;programas;instalar;remover;desinstalar;pacman;aur;yay;atualizar;atualizações;órfãos;orfaos;cache;
