@@ -38,7 +38,12 @@ command -v yay >/dev/null && aur=$(timeout 30 yay -Qua 2>/dev/null)
 # Versão do Mk: "commit data" escrito pela instalação.
 version="" date=""
 for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/VERSION" "$root/usr/share/mk/VERSION"; do
-  if [[ -r $f ]]; then read -r version date <"$f"; break; fi
+  # Um arquivo vazio (a máquina desligada à força logo depois de atualizar)
+  # não é uma versão: vale o seguinte.
+  if [[ -r $f ]]; then
+    read -r version date <"$f" || true
+    [[ -n $version ]] && break
+  fi
 done
 channel=""
 for f in "${XDG_CONFIG_HOME:-$HOME/.config}/mk/channel" "$root/usr/share/mk/system/mk/channel"; do

@@ -20,22 +20,26 @@ eq "$(grep -c '^[a-z-]*[[:space:]]*{[[:space:]]*$' "$conf")" "$(grep -c '^[[:spa
 eq $'general\nlistener' "$(sed -n 's/^\([a-z-]*\)[[:space:]]*{.*/\1/p' "$conf" | sort -u)"
 eq 1 "$(grep -c '^general' "$conf")"
 
-t "quatro passos, cada um com tempo e ação, em ordem crescente"
-eq 4 "$(wc -l <<<"$passos")"
+t "cinco passos, cada um com tempo e ação, em ordem crescente"
+eq 5 "$(wc -l <<<"$passos")"
 while IFS='|' read -r tempo acao _; do
   like "$tempo" '^[0-9]+$' "tempo"
   [[ -n $acao ]] || _fail "passo de $tempo s sem on-timeout"
 done <<<"$passos"
 tempos=$(cut -d'|' -f1 <<<"$passos")
-eq "$(sort -n -u <<<"$tempos")" "$tempos"
+eq "$(sort -n <<<"$tempos")" "$tempos"
 
-t "os tempos são os do cabeçalho: escurece aos 4 min, bloqueia aos 5, apaga aos 6, dorme aos 30"
-has "$(head -3 "$conf")" "escurece aos 4 min, bloqueia aos 5, desliga a tela aos 6"
-has "$(head -3 "$conf")" "dorme aos 30"
+t "os tempos são os do cabeçalho: descanso de tela aos 3 min, escurece aos 4, bloqueia aos 5, apaga aos 30"
+has "$(head -4 "$conf")" "descanso de tela aos 3 min, escurece aos 4, bloqueia aos 5"
+has "$(head -4 "$conf")" "desliga a tela aos 30"
+eq "180" "$(passo 'ipc call mare saver on' | cut -d'|' -f1)"
 eq "240" "$(passo 'brightnessctl -s set' | cut -d'|' -f1)"
 eq "300" "$(passo 'loginctl lock-session' | cut -d'|' -f1)"
-eq "360" "$(passo 'action = "off"' | cut -d'|' -f1)"
+eq "1800" "$(passo 'action = "off"' | cut -d'|' -f1)"
 eq "1800" "$(passo 'mare-sleep' | cut -d'|' -f1)"
+
+t "o descanso de tela liga pelo Maré e desliga quando alguém volta"
+eq "180|qs -p ~/.config/mk/shell ipc call mare saver on|qs -p ~/.config/mk/shell ipc call mare saver off" "$(passo 'saver on')"
 
 t "o passo de dormir é o último e chama o scripts/mare-sleep now da instalação"
 eq "1800|~/.config/mk/shell/scripts/mare-sleep now|" "$(tail -1 <<<"$passos")"
@@ -51,20 +55,20 @@ exists "$script"
 [[ -x $script ]] || _fail "sem o bit de execução: $script"
 has "$(grep -v '^#' "$script")" '$action == now'
 
-t "o passo de dormir, rodado como o hypridle roda (sh -c), suspende quando os Ajustes não dizem outra coisa"
+t "o passo de dormir, rodado como o hypridle roda (sh -c), não dorme quando os Ajustes não dizem outra coisa"
 mkdir -p "$HOME/.config/mk/shell/scripts" "$SBX/sys/power" "$SBX/sys/bus/pci/devices" "$SBX/proc"
 cp "$script" "$HOME/.config/mk/shell/scripts/mare-sleep"
 echo "freeze mem disk" >"$SBX/sys/power/state"
 stub systemctl
 dormir=$(tail -1 <<<"$passos" | cut -d'|' -f2)
 ok env SYS="$SBX/sys" PROC="$SBX/proc" sh -c "$dormir"
-called "systemctl suspend"
-
-t "o passo de dormir respeita o 'Ao dormir: nada' dos Ajustes"
-calls_reset
-echo '{"power.sleep":"nada"}' >"$HOME/.config/mk/ajustes.json"
-ok env SYS="$SBX/sys" PROC="$SBX/proc" sh -c "$dormir"
 not_called "systemctl"
+
+t "o passo de dormir suspende para quem escolheu 'Ao dormir: suspender' nos Ajustes"
+calls_reset
+echo '{"power.sleep":"suspender"}' >"$HOME/.config/mk/ajustes.json"
+ok env SYS="$SBX/sys" PROC="$SBX/proc" sh -c "$dormir"
+called "systemctl suspend"
 
 t "bloqueio: a tela do Maré primeiro; sem o Maré, o hyprlock com a config do Mk"
 lock=$(campo lock_cmd)

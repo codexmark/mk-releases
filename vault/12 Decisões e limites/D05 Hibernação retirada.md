@@ -41,7 +41,7 @@ O que está registrado é a retirada e o sintoma; o repositório não descreve u
 
 ## Consequência
 
-- Dois modos de dormir: suspender ou não dormir ([[Energia e suspensão]]).
+- Dois modos de dormir: suspender ou não dormir ([[Energia e suspensão]]). Mais tarde "não dormir" virou o de fábrica ([[D16 Descanso de tela no lugar do suspender]]).
 - O Mk instalado não tem swap ([[Swap e hibernação]]).
 - Numa máquina cuja placa não volta da suspensão (a Navi 10), a única opção segura é "não dormir".
 - `bin/mk-hibernate` tem 242 linhas para um recurso que não existe: é o preço de não deixar ninguém com um swapfile e um `resume=` órfãos.

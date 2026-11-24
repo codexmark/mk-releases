@@ -17,8 +17,8 @@ Item {
         .slice()
         .sort((a, b) => focusOrder(a) - focusOrder(b))
     readonly property int count: windows.length
-    readonly property int sel: count > 0 ? ((Mare.switchIndex % count) + count) % count : 0
-    readonly property int start: Math.max(0, Math.min(sel - 3, count - maxCards))
+    readonly property int sel: wrapped(Mare.switchIndex, count)
+    readonly property int start: firstCard(sel, count, maxCards)
     readonly property var shown: windows.slice(start, start + maxCards)
 
     implicitWidth: Math.max(320, 44 + shown.length * (cardWidth + 12) - 12)
@@ -30,10 +30,28 @@ Item {
         forceActiveFocus();
     }
 
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no Maré nem no Hyprland: são as contas
+    // da fila de cartões, testadas fora do shell com node
+    // (tests/js/SwitcherPanel.test.mjs).
+    // A posição da janela na ordem de uso (0 = a de agora); sem o dado do
+    // Hyprland, vai para o fim.
     function focusOrder(t) {
         const id = t.lastIpcObject ? t.lastIpcObject.focusHistoryID : undefined;
         return id === undefined ? 999 : id;
     }
+
+    // O índice dentro de `n` janelas, dando a volta nos dois sentidos.
+    function wrapped(index, n) {
+        return n > 0 ? ((index % n) + n) % n : 0;
+    }
+
+    // O primeiro cartão à mostra: o escolhido fica no quarto lugar enquanto
+    // houver janelas dos dois lados.
+    function firstCard(chosen, n, max) {
+        return Math.max(0, Math.min(chosen - 3, n - max));
+    }
+    // --- puro: fim ---
 
     function confirm(index) {
         const t = windows[index === undefined ? sel : index];

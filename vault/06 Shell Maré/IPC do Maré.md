@@ -32,7 +32,7 @@ qs -p ~/.config/mk/shell ipc call mare <função> [argumentos]
 | `toggle` | `panel` | abre o painel; se já é ele, fecha |
 | `toggleAt` | `panel`, `x` | o mesmo, descendo embaixo da posição `x`, como um clique na ilha |
 | `close` | | volta para `rest` |
-| `state` | | devolve o modo atual |
+| `state` | | devolve o modo atual (`saver` enquanto o descanso de tela está na frente) |
 | `settings` | `page` | abre os Ajustes na página; `""` abre na última |
 | `set` | `key`, `value` | muda um ajuste, como o painel faria |
 | `switcher` | `direction` | Alt+Tab: `prev` volta; outro valor avança |
@@ -44,6 +44,7 @@ qs -p ~/.config/mk/shell ipc call mare <função> [argumentos]
 | `volume` | `change` | `+5`, `-5` (em %) ou `mute` |
 | `brightness` | `change` | `+5` ou `-5` (em %) |
 | `dnd` | | liga ou desliga o não perturbe; devolve o novo valor |
+| `saver` | `state` | o [[Descanso de tela]]: `on`, `off` ou `toggle`; devolve `ligado` ou `desligado` |
 
 Há um segundo alvo, `wallpaper` (em `Wallpaper.qml`): `set <caminho>`, `random` e `get`.
 

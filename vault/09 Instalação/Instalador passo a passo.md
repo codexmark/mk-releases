@@ -71,6 +71,7 @@ Cada etapa tem a sua nota: [[Particionamento]], [[Btrfs e subvolumes]], [[LUKS]]
 - **`set -euo pipefail` e `trap cleanup EXIT`**: se parar depois do `formatar`, a última linha mostra o código de saída, o log e como tentar de novo (`umount -R /mnt`, `cryptsetup close mkroot`). Recomeçar formata de novo.
 - **`sim` ou `nao`, e nada mais**: "um 'yes' aqui valeria 'nao' em silêncio: o disco ficaria sem LUKS".
 - **`live_root`**: os caminhos do live que o instalador lê (`/proc/cpuinfo`, `zoneinfo`, `SUPPORTED`, `/sys/firmware/efi`, `pacman.conf`) passam por essa variável, vazia em uso normal; os testes a apontam para uma pasta falsa e carregam o instalador como biblioteca, sem chamar o `main` ([[Testes e TDD]]).
+- **`fix_exec`**: depois de copiar o repositório para `/usr/share/mk`, o instalador devolve o bit de execução aos arquivos que começam com `#!`. O `mkarchiso` grava o `/usr/share/mk` do live inteiro como 644; copiado assim, o Mk instalado ficava sem nenhum script executável (o comando `mktunes`, que é um link para lá, não rodava).
 - **O `pacman.conf` do live é copiado para um temporário** e ganha o repositório `mk-aur`; o do live não é alterado.
 - **O live roda da memória**: o log do live some ao desligar.
 

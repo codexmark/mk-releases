@@ -87,10 +87,7 @@ ColumnLayout {
     // refaz todas as linhas e os botões, e isso a cada leitura perderia o
     // clique que estivesse no meio.
     function apply(data) {
-        const state = {
-            installed: data.installed === true, running: data.running === true, enabled: data.enabled === true,
-            "default": data["default"] || "", pending: data.pending || "", printers: data.printers || []
-        };
+        const state = stateOf(data);
         const text = JSON.stringify(state);
         if (text !== seen) {
             seen = text;
@@ -103,25 +100,56 @@ ColumnLayout {
         if (!result || !result.key || (result.at > 0 && result.at === noteAt))
             return;
         noteAt = result.at;
-        const what = result.key.split(":")[0];
-        const target = result.key.slice(what.length + 1);
-        noteError = result.ok !== true;
-        note = result.message || (noteError ? "não deu certo" : "");
-        // Quem sumiu (removida) ou acabou de entrar (adicionada) não tem linha.
-        noteFor = (what === "remove" || what === "add") && !noteError ? "" : target;
+        const told = noteOf(result);
+        noteError = told.error;
+        note = told.text;
+        noteFor = told.target;
         noteTimer.restart();
     }
 
-    // A impressora achada já tem fila? A mesma costuma se anunciar em ipp e
-    // em ipps: valem os dois endereços.
     function isAdded(uri) {
+        return addedIn(uri, printers);
+    }
+
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca na página nem no CUPS: são funções de
+    // dado para dado e de dado para texto sobre o que o mare-printers
+    // respondeu, testadas fora do shell com node
+    // (tests/js/SettingsPrintersPage.test.mjs).
+    // O estado que o script contou, com cada campo no seu tipo (o que faltar
+    // vira falso, vazio ou lista vazia).
+    function stateOf(data) {
+        return {
+            installed: data.installed === true, running: data.running === true, enabled: data.enabled === true,
+            "default": data["default"] || "", pending: data.pending || "", printers: data.printers || []
+        };
+    }
+
+    // O recado de uma ação ({ key: "<verbo>:<alvo>", ok, message }): é erro?,
+    // o texto e a linha a que se refere ({ error, text, target }).
+    function noteOf(result) {
+        const what = result.key.split(":")[0];
+        const target = result.key.slice(what.length + 1);
+        const failed = result.ok !== true;
+        return {
+            error: failed,
+            text: result.message || (failed ? "não deu certo" : ""),
+            // Quem sumiu (removida) ou acabou de entrar (adicionada) não tem linha.
+            target: (what === "remove" || what === "add") && !failed ? "" : target
+        };
+    }
+
+    // A impressora achada já tem fila? A mesma costuma se anunciar em ipp e
+    // em ipps: valem os dois endereços. `queues`: as filas ([{ uri, ... }]).
+    function addedIn(uri, queues) {
         const bare = uri.replace(/^ipps?:/, "");
-        return printers.some(p => p.uri.replace(/^ipps?:/, "") === bare);
+        return queues.some(p => p.uri.replace(/^ipps?:/, "") === bare);
     }
 
     function queueText(count) {
         return count === 0 ? "fila vazia" : count === 1 ? "1 na fila" : count + " na fila";
     }
+    // --- puro: fim ---
 
     Component.onCompleted: refresh()
 

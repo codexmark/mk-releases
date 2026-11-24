@@ -11,7 +11,7 @@ Item {
     id: panel
 
     readonly property var dev: UPower.displayDevice
-    readonly property int pct: dev ? Math.round(dev.percentage > 1 ? dev.percentage : dev.percentage * 100) : 0
+    readonly property int pct: dev ? percent(dev.percentage) : 0
     readonly property bool charging: dev && dev.state === UPowerDeviceState.Charging
     readonly property bool full: dev && dev.state === UPowerDeviceState.FullyCharged
 
@@ -28,17 +28,34 @@ Item {
     implicitWidth: 420
     implicitHeight: column.implicitHeight + 44
 
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no UPower nem no painel: são contas e
+    // textos, testados fora do shell com node (tests/js/PowerPanel.test.mjs).
+    // O UPower dá a carga de 0 a 100; se um dia vier de 0 a 1, não zera.
+    function percent(p) {
+        return Math.round(p > 1 ? p : p * 100);
+    }
+
     function duration(seconds) {
         if (!seconds || seconds <= 0)
             return "";
-        const h = Math.floor(seconds / 3600);
-        const m = Math.round((seconds % 3600) / 60);
+        // Arredonda o total em minutos antes de separar as horas: 3599 s é
+        // "1 h 0 min", não "60 min".
+        const total = Math.round(seconds / 60);
+        const h = Math.floor(total / 60);
+        const m = total % 60;
         return h > 0 ? `${h} h ${m} min` : `${m} min`;
     }
 
     function wh(value) {
         return value > 0 ? value.toFixed(1).replace(".", ",") + " Wh" : "";
     }
+
+    // A potência de agora: "+18,4 W" carregando, "−7,2 W" gastando.
+    function watts(rate, charging) {
+        return (charging ? "+" : "−") + rate.toFixed(1).replace(".", ",") + " W";
+    }
+    // --- puro: fim ---
 
     Component.onCompleted: batteryProc.running = true
 
@@ -143,7 +160,7 @@ Item {
 
             Text {
                 visible: panel.dev && panel.dev.changeRate > 0
-                text: panel.dev ? (panel.charging ? "+" : "−") + panel.dev.changeRate.toFixed(1).replace(".", ",") + " W" : ""
+                text: panel.dev ? panel.watts(panel.dev.changeRate, panel.charging) : ""
                 color: panel.charging ? Theme.copper : Theme.textDim
                 font.family: Theme.mono
                 font.pixelSize: 12

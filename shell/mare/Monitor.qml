@@ -38,6 +38,11 @@ Scope {
         active: scope.focused
     }
 
+    // O descanso de tela: toma a tela inteira de cada monitor.
+    ScreenSaver {
+        screen: scope.modelData
+    }
+
     // Boas-vindas (primeiro login; Welcome.qml decide quando).
     WelcomeWindow {
         screen: scope.modelData

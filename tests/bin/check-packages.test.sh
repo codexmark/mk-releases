@@ -111,12 +111,52 @@ eq 1 $?
 has "$out" "AVISO   yay-bin (aur): também existe nos oficiais, mova para outra lista"
 listas
 
-t "sem acesso ao AUR (o curl falha): não diz 'Tudo certo', sai com 1"
-stub curl 'exit 6'
+t "sem rede (o curl falha): diz que não alcançou o AUR e sai com 1, sem acusar pacote nenhum"
+# Antes, sem rede, todo pacote de aur.packages saía como "não encontrado no AUR".
+stub curl 'echo "curl: (6) Could not resolve host: aur.archlinux.org" >&2; exit 6'
 out=$(confere)
 eq 1 $?
+has "$out" "não alcancei o AUR"
+has "$out" "Não deu para conferir o AUR"
+hasnt "$out" "não encontrado no AUR"
+hasnt "$out" "FALTA"
 hasnt "$out" "Tudo certo"
+hasnt "$out" "Há problemas nas listas."
+
+t "sem rede: as outras listas são conferidas do mesmo jeito, e o problema delas aparece"
+printf 'hyprland\nnao-existe-mais\n' >"$PKG_DIR/desktop.packages"
+out=$(confere)
+eq 1 $?
+has "$out" "FALTA   nao-existe-mais (desktop)"
+has "$out" "Há problemas nas listas."
+has "$out" "não alcancei o AUR"
+hasnt "$out" "(aur): não encontrado"
+listas
+
+t "o AUR responde com erro (limite de consultas): diz o erro, não que os pacotes faltam"
+stub curl 'echo "{\"type\":\"error\",\"error\":\"Rate limit reached\",\"results\":[]}"'
+out=$(confere)
+eq 1 $?
+has "$out" "o AUR não devolveu a lista de pacotes (Rate limit reached)"
+hasnt "$out" "não encontrado no AUR"
+hasnt "$out" "Tudo certo"
+
+t "a resposta não é do AUR (página de portal cativo): também não acusa os pacotes"
+stub curl 'echo "<html>entre com a sua senha</html>"'
+out=$(confere)
+eq 1 $?
+has "$out" "o AUR não devolveu a lista de pacotes"
+hasnt "$out" "não encontrado no AUR"
 stub curl 'cat "$SBX/aur.json"'
+
+t "o AUR alcançado e sem nenhum dos pacotes: aí sim é FALTA, um por um"
+echo '{"type":"multiinfo","resultcount":0,"results":[]}' >"$SBX/aur.json"
+out=$(confere)
+eq 1 $?
+has "$out" "FALTA   yay-bin (aur): não encontrado no AUR"
+has "$out" "FALTA   limine-snapper-sync (aur): não encontrado no AUR"
+hasnt "$out" "não alcancei"
+listas
 
 t "vários problemas: lista todos antes de sair"
 printf 'neovim\nsumiu-a\nsumiu-b\n' >"$PKG_DIR/dev.packages"

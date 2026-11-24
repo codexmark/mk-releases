@@ -6,6 +6,7 @@ tags:
   - busca
   - launcher
 fontes:
+  - "tests/js/Calc.test.mjs"
   - "shell/mare/LauncherPanel.qml"
   - "shell/mare/Calc.js"
   - "shell/mare/Tide.qml"
@@ -32,6 +33,8 @@ Fontes da lista, concatenadas nesta ordem:
 - 7 linhas visíveis; `↑/↓` escolhe, `Enter` abre, `Esc` fecha.
 - A pontuação favorece, nesta ordem: prefixo, início de palavra, trecho, letras na ordem. O detalhe (`detail`) vale metade do título.
 - **Calculadora** (`Calc.js`): se o texto é uma conta, a primeira linha vira `= resultado` e Enter copia (`wl-copy`). Aceita números com vírgula ou ponto, `+ - * x / ^ %`, parênteses, `raiz`/`sqrt` e `pi`. Exemplos do próprio arquivo: `12,5 * 3`, `2^10`, `(1200 - 15%) / 4`, `raiz(81)`.
+  - **Só responde quando o texto é claramente uma conta**; na dúvida, `null`. As regras estão no cabeçalho do `Calc.js`: a potência prende mais que o sinal e associa à direita (`-2^2` = −4, `2^3^2` = 2^9); espaços valem só entre um termo e outro e nunca juntam nada (`1 2 + 3` não é conta); zero à esquerda (`007`) não é número de conta; o texto precisa fazer alguma operação (`42`, `-5` e `pi` não são conta; `15%` é); uma data inteira (`2024-11-15`, `15/11/2024`) e um hexadecimal (`0x10`) não são conta; resultado que não é número finito (`1/0`) é `null`.
+  - Limite conhecido: `1.000 + 500` dá 501, porque o ponto é lido como decimal.
 - Abre por `Super` (um toque) ou `Super + Espaço`, e pela marca "Mk" na ilha.
 
 ## Por quê assim

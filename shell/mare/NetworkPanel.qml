@@ -12,11 +12,7 @@ Item {
     id: panel
 
     readonly property var wifi: Networking.devices.values.find(d => d.type === DeviceType.Wifi) ?? null
-    readonly property var networks: wifi
-        ? wifi.networks.values.slice()
-            .sort((a, b) => (b.connected - a.connected) || (b.signalStrength - a.signalStrength))
-            .slice(0, 6)
-        : []
+    readonly property var networks: wifi ? nearest(wifi.networks.values, 6) : []
 
     // Entrar numa rede: a que está pedindo senha, e o que deu errado.
     property var asking: null
@@ -177,8 +173,7 @@ Item {
     property var internetPings: []
     readonly property real routerMs: last(routerPings)
     readonly property real internetMs: last(internetPings)
-    readonly property int loss: internetPings.length === 0 ? 0
-        : Math.round(100 * internetPings.filter(p => p < 0).length / internetPings.length)
+    readonly property int loss: lossOf(internetPings)
 
     property string dnsBusy: ""
     property bool showQr: false
@@ -194,6 +189,17 @@ Item {
     implicitWidth: 460
     implicitHeight: column.implicitHeight + 44
 
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no Maré nem no NetworkManager: são
+    // funções de lista para lista e de texto para número, testadas fora do
+    // shell com node (tests/js/NetworkPanel.test.mjs).
+    // As redes ao redor: a conectada primeiro, depois as de sinal mais forte.
+    function nearest(list, max) {
+        return list.slice()
+            .sort((a, b) => (b.connected - a.connected) || (b.signalStrength - a.signalStrength))
+            .slice(0, max);
+    }
+
     function last(list) {
         return list.length > 0 ? list[list.length - 1] : -1;
     }
@@ -203,9 +209,40 @@ Item {
         return next.length > 24 ? next.slice(next.length - 24) : next;
     }
 
+    // Abaixo de 10 ms, uma casa (até 9,9: 9,96 já é "10 ms", não "10,0 ms").
     function ms(value) {
-        return value < 0 ? "—" : value < 10 ? value.toFixed(1).replace(".", ",") + " ms" : Math.round(value) + " ms";
+        return value < 0 ? "—" : value < 9.95 ? value.toFixed(1).replace(".", ",") + " ms" : Math.round(value) + " ms";
     }
+
+    // Quantos por cento das medidas ficaram sem resposta (-1).
+    function lossOf(pings) {
+        return pings.length === 0 ? 0
+            : Math.round(100 * pings.filter(p => p < 0).length / pings.length);
+    }
+
+    // A saída do `ping -c 1` -> o tempo em ms; -1 = sem resposta.
+    function pingMs(text) {
+        const m = text.match(/time=([0-9.]+)/);
+        return m ? Number(m[1]) : -1;
+    }
+
+    // As redes guardadas que o mare-wifi listou ([{ ssid, autoconnect }]) ->
+    // nome → reconecta sozinho? Dois perfis com o mesmo nome: vale o que
+    // reconecta.
+    function savedMap(list) {
+        const next = {};
+        for (const s of list)
+            next[s.ssid] = next[s.ssid] === true || s.autoconnect;
+        return next;
+    }
+
+    // A linha da VPN: o túnel aberto, quantos mais, a interface e o IP.
+    function vpnLine(status) {
+        return status.name + (status.count > 1 ? " +" + (status.count - 1) : "")
+            + (status.iface !== "" ? "  ·  " + status.iface : "")
+            + (status.ip !== "" ? "  ·  " + status.ip : "");
+    }
+    // --- puro: fim ---
 
     function setDns(mode) {
         if (dnsBusy !== "" || mode === net.dnsMode)
@@ -283,8 +320,7 @@ Item {
         command: ["env", "LC_ALL=C", "ping", "-n", "-c", "1", "-W", "1", panel.net.gateway]
         stdout: StdioCollector {
             onStreamFinished: {
-                const m = text.match(/time=([0-9.]+)/);
-                panel.routerPings = panel.push(panel.routerPings, m ? Number(m[1]) : -1);
+                panel.routerPings = panel.push(panel.routerPings, panel.pingMs(text));
             }
         }
     }
@@ -294,8 +330,7 @@ Item {
         command: ["env", "LC_ALL=C", "ping", "-n", "-c", "1", "-W", "1", "1.1.1.1"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const m = text.match(/time=([0-9.]+)/);
-                panel.internetPings = panel.push(panel.internetPings, m ? Number(m[1]) : -1);
+                panel.internetPings = panel.push(panel.internetPings, panel.pingMs(text));
             }
         }
     }
@@ -316,10 +351,7 @@ Item {
                 try {
                     const reply = JSON.parse(text);
                     if (reply.saved) {
-                        const next = {};
-                        for (const s of reply.saved)
-                            next[s.ssid] = next[s.ssid] === true || s.autoconnect;
-                        panel.saved = next;
+                        panel.saved = panel.savedMap(reply.saved);
                         panel.savedLoaded = reply.ok === true;
                     } else if (!reply.ok && reply.error && !wifiProc.quiet) {
                         panel.wifiError = reply.error;
@@ -537,10 +569,7 @@ Item {
 
             Text {
                 Layout.fillWidth: true
-                text: !Vpn.up ? "desligada"
-                    : Vpn.status.name + (Vpn.status.count > 1 ? " +" + (Vpn.status.count - 1) : "")
-                        + (Vpn.status.iface !== "" ? "  ·  " + Vpn.status.iface : "")
-                        + (Vpn.status.ip !== "" ? "  ·  " + Vpn.status.ip : "")
+                text: !Vpn.up ? "desligada" : panel.vpnLine(Vpn.status)
                 color: Vpn.up ? Theme.text : Theme.textDim
                 font.family: Theme.mono
                 font.pixelSize: 12

@@ -62,3 +62,22 @@ for f in "$mare"/*.qml; do
   mapfile -t others < <(find "$mare" -maxdepth 1 -name '*.qml' ! -name "$n.qml")
   grep -lqE "\b$n\b" "${others[@]}" || _fail "singleton $n sem uso"
 done
+
+t "o fundo não traz nenhum lugar escrito à mão: a cidade e as coordenadas vêm do clima"
+fundo=$(<"$mare/Backdrop.qml")
+hasnt "$fundo" "PORTO VELHO"
+out=$(grep -nE '[0-9]+°[0-9]+′' "$mare/Backdrop.qml" || true)
+eq "" "$out"
+has "$fundo" "Place.coords(Weather.data.lat, Weather.data.lon)"
+has "$fundo" "Place.label(Weather.data.city, Weather.data.country)"
+
+t "papel de parede de fábrica: o Maré aplica um dos que vêm com ele, uma vez, só em instalação nova"
+w=$(<"$mare/Wallpaper.qml")
+fabrica=$(sed -nE 's/.*readonly property string factory: bundled \+ "\/([^"]+)".*/\1/p' "$mare/Wallpaper.qml")
+[[ -n $fabrica ]] || _fail "não achei o papel de parede de fábrica no Wallpaper.qml"
+exists "$mare/wallpapers/$fabrica"
+# Só com a migração já feita (o mk-update reinicia o Maré antes de rodá-la) e
+# sem a marca, e nunca por cima de uma escolha da pessoa.
+has "$w" "fresh && !marked"
+has "$w" 'current === ""'
+exists "$REPO/migrations/user/20261128-papel-de-fabrica.sh"

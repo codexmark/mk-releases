@@ -44,7 +44,7 @@ geo "Belo Horizonte" -19.92083 -43.93778
 previsao
 out=$(run)
 eq 1 "$(wc -l <<<"$out")"
-eq '{"city":"Belo Horizonte","temp":28,"feels":29,"code":2,"day":true,"max":29,"min":19,"hours":[{"time":"14:00","temp":28,"code":2},{"time":"16:00","temp":29,"code":61},{"time":"18:00","temp":26,"code":95},{"time":"20:00","temp":23,"code":2},{"time":"22:00","temp":21,"code":0},{"time":"00:00","temp":20,"code":45}]}' "$out"
+eq '{"city":"Belo Horizonte","country":"BR","lat":-19.92083,"lon":-43.93778,"temp":28,"feels":29,"code":2,"day":true,"max":29,"min":19,"hours":[{"time":"14:00","temp":28,"code":2},{"time":"16:00","temp":29,"code":61},{"time":"18:00","temp":26,"code":95},{"time":"20:00","temp":23,"code":2},{"time":"22:00","temp":21,"code":0},{"time":"00:00","temp":20,"code":45}]}' "$out"
 
 t "a busca da cidade leva o nome do arquivo, um resultado, em português"
 called "https://geocoding-api.open-meteo.com/v1/search --data-urlencode name=Belo Horizonte -d count=1 -d language=pt"
@@ -145,4 +145,21 @@ t "resposta que não é a previsão (portal cativo): nada de JSON pela metade"
 previsao
 echo "<html><body>Entre com seu usuário</body></html>" >"$SBX/fc.json"
 out=$(run 2>/dev/null)
-[[ -z $out ]] || ok jq -e . <<<"$out" >/dev/null
+eq '{"error":"resposta inesperada"}' "$out"
+
+t "resposta JSON que não é a previsão (sem a parte current): o mesmo erro"
+echo '{"error":true,"reason":"Too many requests"}' >"$SBX/fc.json"
+eq '{"error":"resposta inesperada"}' "$(run 2>/dev/null)"
+
+t "a busca responde algo que não é JSON (portal cativo): erro, sem pedir a previsão"
+calls_reset
+echo "<html>login</html>" >"$SBX/geo.json"
+eq '{"error":"resposta inesperada"}' "$(run 2>/dev/null)"
+not_called "forecast"
+
+t "sem o país na busca, o campo sai vazio e o resto continua"
+jq -n '{results: [{name: "Lugar", latitude: 1.5, longitude: -2.5}]}' >"$SBX/geo.json"
+previsao
+out=$(run)
+eq "" "$(jq -r .country <<<"$out")"
+eq "1.5 -2.5" "$(jq -r '"\(.lat) \(.lon)"' <<<"$out")"

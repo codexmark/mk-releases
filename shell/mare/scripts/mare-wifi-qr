@@ -17,19 +17,48 @@ dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i
 # aqui o valor é usado inteiro, como nome da conexão, SSID e senha.
 conn=$(nmcli -e no -g GENERAL.CONNECTION dev show "$dev")
 ssid=$(nmcli -e no -g 802-11-wireless.ssid con show "$conn")
-keymgmt=$(nmcli -e no -g 802-11-wireless-security.key-mgmt con show "$conn" 2>/dev/null || true)
-psk=$(nmcli -s -e no -g 802-11-wireless-security.psk con show "$conn" 2>/dev/null || true)
+# Daqui em diante o campo pode não existir (a rede aberta não tem a seção de
+# segurança): vazio no lugar de erro. O -s é o que mostra um segredo.
+campo() { nmcli -e no -g "$1" con show "$conn" 2>/dev/null || true; }
+segredo() { nmcli -s -e no -g "$1" con show "$conn" 2>/dev/null || true; }
+
+[[ -n $ssid ]] || { echo "conexão sem nome de rede" >&2; exit 1; }
+keymgmt=$(campo 802-11-wireless-security.key-mgmt)
+hidden=$(campo 802-11-wireless.hidden)
 
 # Caracteres especiais do formato WIFI: precisam de barra antes.
-escape() { sed -e 's/[\\;,:"]/\\&/g' <<<"$1"; }
+escape() { sed -e 's/[\;,:"]/\\&/g' <<<"$1"; }
 
-if [[ -z $keymgmt || $keymgmt == none ]]; then
-  payload="WIFI:T:nopass;S:$(escape "$ssid");;"
-else
-  [[ -n $psk ]] || { echo "sem acesso à senha desta rede" >&2; exit 1; }
-  payload="WIFI:T:WPA;S:$(escape "$ssid");P:$(escape "$psk");;"
+# O key-mgmt do NetworkManager:
+#   (vazio)        sem a seção de segurança: rede aberta
+#   owe            aberta para quem entra, cifrada no ar: também sem senha
+#   none           WEP (não é "sem segurança"): a chave é a wep-key<índice>
+#   wpa-psk, sae   WPA2 e WPA3 pessoal: os dois são T:WPA no QR
+#   wpa-eap..., ieee8021x   802.1X: usuário e senha de cada um, sem QR
+case $keymgmt in
+  "" | owe) tipo=nopass senha="" ;;
+  none)
+    idx=$(campo 802-11-wireless-security.wep-tx-keyidx)
+    [[ $idx == [0-3] ]] || idx=0
+    tipo=WEP senha=$(segredo "802-11-wireless-security.wep-key$idx")
+    ;;
+  wpa-eap* | ieee8021x)
+    echo "rede corporativa (802.1X): cada pessoa tem o seu usuário, não há QR" >&2
+    exit 1
+    ;;
+  *) tipo=WPA senha=$(segredo 802-11-wireless-security.psk) ;;
+esac
+
+payload="WIFI:T:$tipo;S:$(escape "$ssid");"
+if [[ $tipo != nopass ]]; then
+  [[ -n $senha ]] || { echo "sem acesso à senha desta rede" >&2; exit 1; }
+  payload+="P:$(escape "$senha");"
 fi
+# Rede oculta: sem isto o celular procura o nome, não acha e desiste.
+[[ $hidden == yes ]] && payload+="H:true;"
+payload+=";"
 
 umask 077
 qrencode -t PNG -m 2 -s 8 --foreground=cdc4ba --background=141211 -o "$out" "$payload"
-echo "$ssid"
+# printf: o echo engoliria uma rede chamada "-n".
+printf '%s\n' "$ssid"

@@ -13,7 +13,8 @@ log=${XDG_CACHE_HOME:-$HOME/.cache}/mk
 mkdir -p "$log"
 
 scale=$(jq -r '."ui.scale" // empty' "$root/ajustes.json" 2>/dev/null)
-[[ $scale =~ ^[0-9]+(\.[0-9]+)?$ ]] || scale=0.85
+# Só número, e maior que zero: "0" e "0.0" não têm nenhum dígito de 1 a 9.
+[[ $scale =~ ^[0-9]+(\.[0-9]+)?$ && $scale == *[1-9]* ]] || scale=0.85
 
 if [[ ${1:-} == --restart ]]; then
   qs kill -p "$shell" >/dev/null 2>&1
@@ -24,7 +25,8 @@ if [[ ${1:-} == --restart ]]; then
     for wait in 1.5 2; do
       sleep "$wait"
       win=$(hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty')
-      [[ $win == 0x* ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$win\" })" >/dev/null 2>&1
+      # O endereço entra numa expressão Lua: só hexadecimal, do início ao fim.
+      [[ $win =~ ^0x[0-9a-f]+$ ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$win\" })" >/dev/null 2>&1
     done
   ) &
 fi

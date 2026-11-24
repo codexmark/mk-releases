@@ -9,7 +9,7 @@
 # risky        hardware que sabidamente não volta do suspender (S3)
 #
 #   mare-sleep now       dorme do jeito escolhido em Ajustes › Energia
-#     (power.sleep no ajustes.json: suspender ou nada). É o passo de dormir do
+#     (power.sleep no ajustes.json: suspender, ou nada, que é o de fábrica). É o passo de dormir do
 #     config/hypr/hypridle.conf de fábrica, que não lê os Ajustes. O Mk não
 #     hiberna: um "hibernar" antigo no arquivo não faz nada.
 #     AJUSTES troca o ajustes.json.
@@ -62,11 +62,11 @@ done
 if [[ $action == now ]]; then
   # ~/.config/mk/ajustes.json, ao lado do shell (como o Settings.qml acha).
   ajustes=${AJUSTES:-$(cd "$(dirname "$0")/../.." && pwd)/ajustes.json}
-  mode=$(jq -r '."power.sleep" // "suspender"' "$ajustes" 2>/dev/null)
-  case ${mode:-suspender} in
-    nada | hibernar) ;;
-    *) [[ $can_suspend == true ]] && exec systemctl suspend ;;
-  esac
+  mode=$(jq -r '."power.sleep" // "nada"' "$ajustes" 2>/dev/null)
+  # Só "suspender" dorme: de fábrica (sem a escolha) fica o descanso de tela.
+  if [[ ${mode:-nada} == suspender && $can_suspend == true ]]; then
+    exec systemctl suspend
+  fi
   exit 0
 fi
 

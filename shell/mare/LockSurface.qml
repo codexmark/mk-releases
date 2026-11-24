@@ -208,7 +208,9 @@ Item {
                                 : Qt.rgba(205 / 255, 196 / 255, 186 / 255, parent.major ? 0.3 : 0.14)
                         }
                         Text {
-                            visible: parent.major
+                            // De 5 em 5 sempre; os outros só ao passar pela
+                            // pílula, para o minuto e o segundo exatos se lerem.
+                            visible: parent.major || parent.spot > 0
                             readonly property real r: ring.radius - ring.numInset * root.s
                             x: ring.width / 2 + r * Math.cos(parent.t) - width / 2
                             y: ring.height / 2 + r * Math.sin(parent.t) - height / 2

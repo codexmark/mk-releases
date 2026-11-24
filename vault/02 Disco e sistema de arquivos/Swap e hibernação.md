@@ -35,7 +35,7 @@ Esta nota registra uma ausência, porque ela surpreende: quem procura `zram` ou 
 
 ## Por quê assim
 
-**Por que a hibernação saiu.** Na VM a sessão era gravada e não voltava no boot seguinte (`systemd-hibernate-resume: Unable to resume from device`), e a causa não foi achada. O Mk passou a só suspender ou não dormir. O `remove` ficou para quem já tinha preparado a máquina poder desfazer. Detalhes em [[D05 Hibernação retirada]].
+**Por que a hibernação saiu.** Na VM a sessão era gravada e não voltava no boot seguinte (`systemd-hibernate-resume: Unable to resume from device`), e a causa não foi achada. O Mk passou a só suspender ou não dormir; depois, não dormir virou o padrão, com o descanso de tela no lugar ([[D16 Descanso de tela no lugar do suspender]]). O `remove` ficou para quem já tinha preparado a máquina poder desfazer. Detalhes em [[D05 Hibernação retirada]].
 
 **Por que um "hibernar" antigo não vira suspender sozinho.** O código só afirma a regra ("não vira suspender sozinho"); o motivo não está registrado. O efeito é que a escolha antiga cai em "não dormir".
 

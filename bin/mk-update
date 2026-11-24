@@ -5,6 +5,16 @@
 #   mk-update           atualiza tudo, perguntando antes
 #   mk-update --check   só mostra o que há (o mesmo que os Ajustes mostram)
 #
+# Uma confirmação só: depois do "Atualizar agora?", o pacman e o yay rodam sem
+# perguntar (--noconfirm). O que é decisão sua e não confirmação (tirar a trava
+# do pacman, os apps novos, o AUR que ficou de fora) é perguntado em seguida,
+# tudo antes da parte demorada: dá para responder e sair de perto. O que o
+# pacman não pode decidir sozinho (escolher um provedor, remover um pacote em
+# conflito) para a rodada com o aviso, em vez de escolher por você.
+#
+# Uma rodada de cada vez: a segunda sai com "já há uma atualização rodando"
+# (flock em $XDG_RUNTIME_DIR/mk-update.trava). O --check não entra nisso.
+#
 # Ordem: o próprio Mk, as migrações (migrations/: mudanças fora de
 # ~/.config/mk, cada uma roda uma vez), o Arch e o AUR. Depois de trocar o Mk,
 # o mk-update passa a vez para a versão nova dele mesmo (--after-mk), para
@@ -25,7 +35,8 @@
 # Para testar sem tocar na máquina: MK_ROOT=<pasta> troca a raiz de tudo que é
 # lido e escrito em /usr, /var e /etc (o mesmo MK_ROOT do scripts/mare-updates);
 # MK_SHARE troca só o /usr/share/mk. Os comandos (sudo, pacman, yay, git,
-# pgrep, uname, hyprctl) vêm do PATH.
+# pgrep, uname, hyprctl, flock) vêm do PATH. MK_UPDATE_SUDO_CADA troca o
+# intervalo (segundos) em que a senha do sudo é renovada.
 set -euo pipefail
 
 root=${MK_ROOT:-}
@@ -73,13 +84,56 @@ if [[ -z ${MK_UPDATE_LOG:-} && $mode != --check && -t 0 && -t 1 ]] && command -v
   exit "$rc"
 fi
 
+copper=$'\e[38;2;206;94;50m' bone=$'\e[38;2;205;196;186m' dim=$'\e[38;2;113;107;105m' off=$'\e[0m'
+say() { printf '\n%s──%s %s%s%s\n' "$copper" "$off" "$bone" "$*" "$off"; }
+note() { printf '%s%s%s\n' "$dim" "$*" "$off"; }
+ask() {
+  local reply
+  # Sem resposta (janela fechada) é não.
+  read -rp "$1 [S/n] " reply || return 1
+  [[ -z $reply || $reply == [sSyY]* ]]
+}
+closed=0
+pause() {
+  [[ -t 0 ]] && ((!closed)) || return 0
+  echo
+  read -rsp "${dim}Enter fecha.${off}" _ || true
+  echo
+}
+
+# Uma rodada de cada vez: duas ao mesmo tempo trocariam o /usr/share/mk uma por
+# cima da outra e disputariam o pacman. Roda de novo dentro do flock(1), que
+# segura a trava enquanto a rodada existir e a solta quando ela acaba ou morre:
+# o arquivo fica, mas a trava é do processo, e não há o que destravar à mão. O
+# -o não passa a trava adiante, senão um
+# processo que a rodada deixasse para trás (o gpg-agent que o yay sobe) ficaria
+# com ela. A versão nova que assume depois da troca do Mk (--after-mk) herda
+# MK_UPDATE_TRAVADO e segue na mesma trava. O --check não trava nem é travado.
+trava=${XDG_RUNTIME_DIR:-$state}/mk-update.trava
+ocupado=219 # o que o flock devolve quando a trava é de outro
+if [[ -z ${MK_UPDATE_TRAVADO:-} && $mode != --check ]] && command -v flock >/dev/null; then
+  mkdir -p "${trava%/*}"
+  rc=0
+  MK_UPDATE_TRAVADO=1 flock -n -o -E "$ocupado" "$trava" bash "$0" "$@" || rc=$?
+  if ((rc == ocupado)); then
+    say "já há uma atualização rodando"
+    note "Espere ela terminar (ou feche a janela dela) e rode de novo."
+    rc=1
+  fi
+  # Janela fechada no meio (HUP, TERM): não há a quem pedir o Enter.
+  ((rc == 129 || rc == 143)) || pause
+  exit "$rc"
+fi
+
 # A versão do Mk instalada (o commit, 12 letras).
 mk_version() {
   local f v=""
   for f in "$cfg/VERSION" "$share/VERSION"; do
+    # Um arquivo vazio (desligamento à força logo depois de atualizar) não
+    # é uma versão: vale o seguinte.
     if [[ -r $f ]]; then
       read -r v _ <"$f" || true
-      break
+      [[ -n $v ]] && break
     fi
   done
   printf '%s' "${v:0:12}"
@@ -146,29 +200,44 @@ run_migration() {
   fi
 }
 
-copper=$'\e[38;2;206;94;50m' bone=$'\e[38;2;205;196;186m' dim=$'\e[38;2;113;107;105m' off=$'\e[0m'
-say() { printf '\n%s──%s %s%s%s\n' "$copper" "$off" "$bone" "$*" "$off"; }
-note() { printf '%s%s%s\n' "$dim" "$*" "$off"; }
-ask() {
-  local reply
-  # Sem resposta (janela fechada) é não.
-  read -rp "$1 [S/n] " reply || return 1
-  [[ -z $reply || $reply == [sSyY]* ]]
+# O sudo esquece a senha em poucos minutos e a transação pode levar mais que
+# isso: o passo seguinte (anotar os apps, uma migração, o yay na hora de
+# instalar) pararia no meio pedindo a senha de novo, sem ninguém por perto.
+# Pede a senha uma vez, antes da parte demorada, e renova ao fundo enquanto a
+# rodada durar. Se o sudo não deixa renovar, o laço desiste em silêncio.
+sudo_pid=""
+segura_sudo() {
+  [[ -z $sudo_pid ]] || return 0
+  sudo -v
+  local eu=$$
+  (
+    exec </dev/null >/dev/null 2>&1
+    # O sleep fica ao fundo para o TERM do finish ser atendido na hora, sem
+    # deixar um sleep órfão.
+    trap 'kill "$dorme" 2>/dev/null; exit 0' TERM
+    while kill -0 "$eu" 2>/dev/null; do
+      sleep "${MK_UPDATE_SUDO_CADA:-50}" &
+      dorme=$!
+      wait "$dorme" || exit 0
+      sudo -n -v || exit 0
+    done
+  ) &
+  sudo_pid=$!
 }
-pause() {
-  [[ -t 0 ]] && ((!closed)) || return 0
-  echo
-  read -rsp "${dim}Enter fecha.${off}" _ || true
-  echo
-}
+
+# Qualquer saída (erro, janela fechada) passa por aqui: para de renovar o sudo,
+# apaga a pasta do clone, se sobrou, e grava o resumo.
+tmp=""
 finish() {
   local rc=$?
+  if [[ -n $sudo_pid ]]; then kill "$sudo_pid" 2>/dev/null || true; fi
+  if [[ -n $tmp && -d $tmp ]]; then rm -rf "${tmp:?}" || true; fi
   ((applying)) && { write_summary "$rc" || true; }
-  pause
+  # Com a trava, quem espera o Enter é quem a segura (lá em cima), já solta.
+  [[ -n ${MK_UPDATE_TRAVADO:-} ]] || pause
 }
 trap finish EXIT
 # Terminal fechado no meio também deixa o resumo ("parou em").
-closed=0
 trap 'closed=1; exit 129' HUP
 trap 'closed=1; exit 143' TERM
 
@@ -201,8 +270,9 @@ for m in "${pend[@]}"; do
     pend_now+=("$m")
   fi
 done
-# Os apps que entraram em apps.packages desde a última vez (passo 3). Contam
-# aqui para a oferta voltar mesmo quando não há mais nada a atualizar.
+# Os apps que entraram em apps.packages desde a última vez (oferecidos antes
+# do passo 2). Contam aqui para a oferta voltar mesmo quando não há mais nada a
+# atualizar.
 apps_seen=$root/var/lib/mk/apps-oferecidos
 apps_list=$share/system/packages/apps.packages
 apps_new=() apps_add=()
@@ -255,7 +325,8 @@ if [[ $mode == --after-mk ]]; then install_bins; fi
 if [[ $mk_available == true && $mode != --after-mk ]]; then
   say "Mk"
   step=mk
-  tmp=$(mktemp -d)
+  # Some em qualquer saída (finish): um clone que falha não deixa a pasta.
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/mk-update.XXXXXX")
   GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 "$channel" "$tmp/mk"
   # O lançamento traz o VERSION ("commit data"); sem ele, o commit do canal.
   if [[ -s $tmp/mk/VERSION ]]; then
@@ -287,8 +358,14 @@ if [[ $mk_available == true && $mode != --after-mk ]]; then
       note "mantido (não é do Mk): $dst"
     fi
   done
-  printf '%s\n' "$version" >"$cfg/VERSION"
+  # Inteiro e de uma vez: ao lado, no disco (sync), e só então no lugar. Um
+  # desligamento à força logo depois deixava o arquivo com 0 bytes, e o Mk
+  # passava a se achar sem versão.
+  printf '%s\n' "$version" >"$cfg/VERSION.novo"
+  sync -f "$cfg/VERSION.novo" 2>/dev/null || true
+  mv "$cfg/VERSION.novo" "$cfg/VERSION"
   rm -rf "${tmp:?}"
+  tmp=""
   # O Maré recarrega arquivos sozinho, mas não registra arquivos novos de
   # serviço (singletons): reinicia ele inteiro, como no login.
   if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && command -v qs >/dev/null; then
@@ -302,6 +379,11 @@ if [[ $mk_available == true && $mode != --after-mk ]]; then
   exec "$root/usr/bin/mk-update" --after-mk
 fi
 
+# As decisões, todas agora e em sequência, antes de qualquer passo demorado:
+# a trava do pacman, os apps novos e o AUR que ficou de fora. São escolhas suas,
+# ninguém responde por você; daqui para baixo nada mais pergunta. (Com Mk novo
+# elas vêm logo depois da troca, não antes: a lista de apps chega com ele.)
+
 # Um pacman interrompido (terminal fechado, queda de luz) deixa a base de
 # dados travada, e tudo daqui para a frente falharia. Sem nenhum gerenciador
 # de pacotes rodando, a trava é sobra: oferece tirar.
@@ -313,24 +395,11 @@ if [[ -e $lock ]] && ! pgrep -x 'pacman|yay|makepkg|pamac' >/dev/null; then
   fi
 fi
 
-# 2. Migrações: o que mudou no Mk fora de ~/.config/mk, cada uma uma vez.
-if ((${#pend_now[@]})); then
-  say "ajustes do Mk no sistema"
-  step=ajustes
-  for m in "${pend_now[@]}"; do
-    run_migration "$m"
-  done
-  # Uma migração pode ter acabado de criar a lista de apps já vistos.
-  find_new_apps
-fi
-
-# 3. Pacotes do Arch. Junto vão os apps que entraram em apps.packages desde a
-#    última vez. Cada um é oferecido uma vez só (anotado em $apps_seen), para
-#    não trazer de volta o que você tirou, e entra na mesma transação do -Syu:
-#    instalar app novo sobre um sistema desatualizado quebra bibliotecas.
-#    Pelo mesmo motivo vão junto os pacotes que as migrações pedem.
-step=sistema
-if ((${#apps_add[@]})); then
+# Os apps que entraram em apps.packages desde a última vez. Cada um é
+# oferecido uma vez só (anotado em $apps_seen, no passo 3), para não trazer de
+# volta o que você tirou.
+oferece_apps() {
+  ((${#apps_add[@]})) || return 0
   say "apps novos do Mk"
   note "  ${apps_add[*]}"
   if ask "Instalar junto com a atualização?"; then
@@ -345,16 +414,49 @@ if ((${#apps_add[@]})); then
   else
     apps_add=()
   fi
+}
+oferece_apps
+
+# Pacotes do AUR que não vieram no pendrive da instalação: pergunta agora,
+# instala no fim (passo 4).
+aur_pend=()
+if [[ -s $share/aur-pendentes.txt ]] && command -v yay >/dev/null; then
+  mapfile -t aur_pend <"$share/aur-pendentes.txt"
+  say "AUR que ficou de fora da instalação: ${aur_pend[*]}"
+  ask "Instalar no fim desta rodada?" || aur_pend=()
 fi
+
+# 2. Migrações: o que mudou no Mk fora de ~/.config/mk, cada uma uma vez.
+if ((${#pend_now[@]})); then
+  say "ajustes do Mk no sistema"
+  step=ajustes
+  for m in "${pend_now[@]}"; do
+    run_migration "$m"
+  done
+  # Uma migração pode ter acabado de criar a lista de apps já vistos: só então
+  # há o que oferecer, e a pergunta fica para cá. Se a oferta já foi feita lá
+  # em cima, vale a resposta dada.
+  if ((!${#apps_new[@]})); then
+    find_new_apps
+    oferece_apps
+  fi
+fi
+
+# 3. Pacotes do Arch. Junto, na mesma transação, vão os apps novos aceitos e
+#    os pacotes que as migrações pedem: instalar pacote novo sobre um sistema
+#    desatualizado quebra bibliotecas.
+step=sistema
 # Dos pacotes que as migrações pedem, só os que faltam.
 ((${#req[@]})) && mapfile -t req < <(pacman -T "${req[@]}" || true)
 if ((nsys > 0 || ${#apps_add[@]} || ${#req[@]})); then
   say "sistema (sudo pede a sua senha)"
+  segura_sudo
+  # Lista nova primeiro: é com ela que se vê o que saiu dos repositórios e o
+  # que a transação vai pedir.
+  sudo pacman -Sy
   if ((${#req[@]})); then
-    # Lista nova primeiro, para tirar do pedido o que saiu dos repositórios:
-    # um nome que não existe faria o pacman recusar a atualização inteira,
-    # hoje e sempre.
-    sudo pacman -Sy
+    # Tira do pedido o que saiu dos repositórios: um nome que não existe faria
+    # o pacman recusar a atualização inteira, hoje e sempre.
     want=("${req[@]}") req=()
     for p in "${want[@]}"; do
       if pacman -Si "$p" &>/dev/null; then
@@ -363,43 +465,71 @@ if ((nsys > 0 || ${#apps_add[@]} || ${#req[@]})); then
         note "  $p não está nos repositórios: fica de fora"
       fi
     done
-    sudo pacman -Su --needed "${req[@]}" "${apps_add[@]}"
-  else
-    sudo pacman -Syu --needed "${apps_add[@]}"
   fi
+  alvo=(--needed "${req[@]}" "${apps_add[@]}")
+  # Um ensaio antes (--print: não instala nada, não precisa de root). Com
+  # --noconfirm o pacman responde o padrão a tudo, e o padrão de "qual destes
+  # provedores?" é o primeiro da lista: seria escolher por você. Se o ensaio
+  # mostra essa pergunta, a rodada para aqui. (LC_ALL=C: o texto procurado é o
+  # do pacman em inglês.) O ensaio que falha por outro motivo não decide nada:
+  # a transação de verdade dá o erro dela.
+  plano=$(LC_ALL=C pacman -Su --print --noconfirm "${alvo[@]}" 2>&1 || true)
+  if grep -q 'providers available for' <<<"$plano"; then
+    say "o pacman precisa de uma escolha sua"
+    grep -E 'providers available for|^:: Repository |^ +[0-9]+\) ' <<<"$plano" || true
+    note "Mais de um pacote serve, e o Mk não escolhe por você. Rode neste terminal:"
+    note "  sudo pacman -Syu ${alvo[*]}"
+    note "responda ao pacman e, depois, rode mk-update de novo."
+    exit 1
+  fi
+  # Sem perguntas. O que sobra de decisão de verdade (dois pacotes em conflito,
+  # pacote que não dá para instalar) tem "não" como padrão: o pacman para sem
+  # mexer em nada. Trocar um pacote pelo sucessor que o Arch declarou
+  # ("Replace ...? [Y/n]") é aceito, como numa atualização feita à mão.
+  sudo pacman -Su --noconfirm "${alvo[@]}" || {
+    rc=$?
+    say "o pacman parou"
+    note "Ele rodou sem perguntar nada. Se o erro acima é um conflito entre pacotes ou"
+    note "outra escolha que só você pode fazer, rode neste terminal:"
+    note "  sudo pacman -Syu ${alvo[*]}"
+    note "responda ao pacman e, depois, rode mk-update de novo."
+    exit "$rc"
+  }
 fi
 # Só depois de o pacman dar certo: se ele falhar, a oferta volta na próxima.
 if ((${#apps_new[@]})); then
+  segura_sudo
   printf '%s\n' "${apps_new[@]}" | sudo tee -a "$apps_seen" >/dev/null
 fi
 # As migrações que esperavam os pacotes.
 if ((${#pend_late[@]})); then
   say "ajustes do Mk que dependiam dos pacotes"
   step=ajustes
+  segura_sudo
   for m in "${pend_late[@]}"; do
     run_migration "$m"
   done
 fi
 
-# 4. AUR, com o yay (compila como você, sem sudo, e pede a senha só para instalar).
+# 4. AUR, com o yay (compila como você, sem sudo, e usa a senha só para
+#    instalar: ela é pedida antes, para a compilação não acabar numa pergunta).
 if ((naur > 0)) && command -v yay >/dev/null; then
   say "AUR"
   step=aur
+  segura_sudo
   yay -Sua --noconfirm --answerclean None --answerdiff None
 fi
 
-# Pacotes do AUR que não vieram no pendrive da instalação.
-if [[ -s $share/aur-pendentes.txt ]] && command -v yay >/dev/null; then
-  mapfile -t aur_pend <"$share/aur-pendentes.txt"
-  say "AUR que ficou de fora da instalação: ${aur_pend[*]}"
+# O AUR que ficou de fora da instalação, aceito lá em cima.
+if ((${#aur_pend[@]})); then
+  say "AUR que ficou de fora"
   step=aur
-  if ask "Instalar agora?"; then
-    yay -S --needed --answerclean None --answerdiff None --removemake "${aur_pend[@]}" &&
-      sudo rm -f "$share/aur-pendentes.txt"
-    # Os ganchos do limine reescrevem o menu de boot: garante que ele ainda
-    # inicia sozinho.
-    [[ -f $share/system/mk/boot/limine-default ]] && sudo bash "$share/system/mk/boot/limine-default" || true
-  fi
+  segura_sudo
+  yay -S --needed --noconfirm --answerclean None --answerdiff None --removemake "${aur_pend[@]}" &&
+    sudo rm -f "$share/aur-pendentes.txt"
+  # Os ganchos do limine reescrevem o menu de boot: garante que ele ainda
+  # inicia sozinho.
+  [[ -f $share/system/mk/boot/limine-default ]] && sudo bash "$share/system/mk/boot/limine-default" || true
 fi
 
 # Kernel novo só vale depois de reiniciar.

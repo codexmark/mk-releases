@@ -39,6 +39,9 @@ conferidos:
 | Modelines nos monitores reais | `shell/mare/scripts/mare-monitors` | os números calculados diferem dos testados à mão num dos monitores |
 | Regras de monitor por descrição (`desc:`) | `mare-monitors` | não existe: as regras são pelo nome da saída (DP-1...) |
 | Firmware UEFI de placas reais | `finish_boot` em `installer/mk-install` | alguns firmwares recriam entradas ("UEFI OS") por conta própria |
+| Descanso de tela pelo hypridle | `shell/mare/ScreenSaver.qml`, `config/hypr/hypridle.conf` | visto ligar e desligar por IPC na sessão aninhada; a espera real de 3 min, dois monitores e o consumo com ele horas na tela não foram vistos |
+| `mk atualizar` com escolha de provedor | `bin/mk-update` (o ensaio antes da transação) | uma atualização de verdade em que o pacman precise escolher entre provedores |
+| Arranjo de três ou mais telas na página | `shell/mare/Monitors.qml` | a lógica é testada com sorteios; a página nunca foi vista com três monitores de verdade |
 | Dois monitores de larguras diferentes | `shell/mare/Monitor.qml` | a posição dos painéis foi conferida com uma tela virtual, não com duas físicas |
 
 ## Não funciona, de propósito ou por limite
@@ -47,36 +50,57 @@ conferidos:
   seguinte (`systemd-hibernate-resume: Unable to resume from device`), e a
   causa não foi achada. O Mk suspende ou não dorme. Quem preparou a
   hibernação numa versão antiga desfaz com `sudo mk-hibernate remove`.
+- **Dormir, de fábrica.** O Mk não suspende sozinho: no lugar fica o descanso
+  de tela, e a tela apaga aos 30 minutos. Suspender é uma escolha em Ajustes ›
+  Energia.
 - **Suspender na AMD Navi 10** (RX 5600/5700). A placa às vezes não volta: a
-  tela fica preta e só reiniciando. É um defeito do driver, não do Mk. O
-  instalador semeia "não dormir" nessas máquinas e Ajustes › Energia avisa.
+  tela fica preta e só reiniciando. É um defeito do driver, não do Mk.
+  Ajustes › Energia avisa quem escolher suspender nessas máquinas.
 - **BIOS antiga (sem UEFI)**: o instalador não instala.
 - **Sistemas de arquivos além do btrfs**: os snapshots e a volta atrás pelo
   menu de boot dependem dele.
 
-## Defeitos conhecidos, achados pelos testes e ainda abertos
+## Defeitos e limites conhecidos, ainda abertos
 
 Cada um tem dono certo: virar um caso que falha em `tests/` e depois a
 correção.
 
-- **Três ou mais monitores.** Com duas telas o desenho da página Monitores
-  fica sempre limpo (testado). Com três ou mais, pôr uma tela num lado já
-  ocupado, desfazer um espelho ou desligar uma tela pode deixar duas por cima
-  uma da outra ou uma solta pelo canto. A página avisa (sobreposição, tela
-  solta), mas não arruma sozinha.
-- **Calculadora da busca:** `-2^2` dá 4 (o menos prende mais que a potência),
-  e os espaços somem antes da conta (`1 2 + 3` dá 15).
-- **Ajustes:** um valor de tipo errado posto à mão no `ajustes.json` (texto
-  onde vai número) segue para o Hyprland sem ser recusado.
-- **`mk atualizar`:** não há trava contra duas rodadas ao mesmo tempo, e um
-  download que falha deixa a pasta temporária para trás.
-- **`bin/check-packages` sem rede** acusa todo pacote do AUR como inexistente,
-  em vez de dizer que não alcançou o AUR.
-- **`mare-gamepad`:** instalar ou remover o `xone` sai com 0 mesmo quando o
-  `yay` falha.
-- **`mare-wifi-qr`:** uma rede WEP é tratada como aberta.
-- **Clima:** um portal cativo que responde no lugar da previsão deixa o painel
-  vazio, sem dizer o motivo.
+- **Monitores vindos tortos de fora.** A página Monitores arruma sozinha tudo
+  o que se faz nela, com qualquer número de telas (nenhuma sobreposta, nenhuma
+  solta). O que o Hyprland já traz torto (um `hypr/monitors.lua` pessoal com
+  telas sobrepostas, por exemplo) não é arrumado ao ser lido: a página só
+  avisa. E o arranjo é guloso, não ótimo: um grupo solto pode encostar num
+  lado que você não escolheria.
+- **Ajustes, o painel.** Um valor de tipo errado ou fora da faixa posto à mão
+  no `ajustes.json` não chega mais ao Hyprland nem ao `hypridle.conf` (vale o
+  de fábrica), mas o painel ainda mostra o valor cru.
+- **Calculadora da busca:** `1.000 + 500` dá 501. O ponto é lido como
+  decimal; milhar com ponto não é aceito.
+- **Atalhos:** um combo com duas teclas (`SUPER + Q + W`) fica só com a
+  última.
+- **`mk atualizar`:**
+  - se a rodada parar entre baixar a lista de pacotes e atualizar, o sistema
+    fica com a lista nova e os pacotes antigos: rode `mk atualizar` de novo
+    antes de instalar qualquer pacote avulso;
+  - a pergunta "Replace X with Y?" do pacman é respondida "sim" sozinha (é o
+    sucessor que o Arch declarou); a escolha entre provedores não: aí a
+    rodada para e mostra o comando;
+  - a trava contra duas rodadas é por usuário; entre dois usuários da mesma
+    máquina só a trava do pacman segura.
+- **Desligar à força logo depois de atualizar, num Mk anterior a esta
+  correção.** O `~/.config/mk/VERSION` pode ficar vazio, e aí `mk atualizar`
+  diz "em dia ()" e não acha mais versão nova. Apague o arquivo
+  (`rm ~/.config/mk/VERSION`) e rode de novo. As versões novas gravam o
+  arquivo com segurança e ignoram um arquivo vazio.
+- **`shellcheck` puxa uns 55 pacotes do Haskell** (as bibliotecas dele no
+  Arch). Entra pela lista de desenvolvimento, para o lint do `tests/run` não
+  ser pulado num Mk instalado.
+- **`mare-wifi-qr`:** duas conexões salvas com o mesmo nome se confundem, e
+  uma rede WEP por frase-senha gera um QR que o celular pode não aceitar.
+- **`mare-shot`:** duas capturas no mesmo segundo usam o mesmo nome de arquivo.
+- **Descanso de tela:** ele desliga quando a tela é bloqueada (aos 5 min, de
+  fábrica), e daí em diante quem aparece é a tela de bloqueio, até a tela
+  apagar aos 30. Com "Bloquear" em 0 ele fica até a tela apagar.
 
 ## O que os testes automáticos não veem
 

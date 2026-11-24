@@ -3,15 +3,24 @@
 # Roda o cava e imprime uma linha por quadro: "12;40;7;...;" (0 a 100, dos
 # graves aos agudos).
 #   mare-cava [faixas]
-# Faixas que não são um número inteiro caem no padrão (28).
-# MARE_CAVA_SOURCE escolhe de onde ouvir (padrão: o que sai nos alto-falantes).
+# Faixas que não são um número inteiro de 1 a 256 caem no padrão (28).
+# MARE_CAVA_SOURCE escolhe de onde ouvir (padrão: o que sai nos alto-falantes):
+# o nome de uma fonte do PipeWire, como "alsa_output.usb-fone.monitor". Um
+# valor que não tem cara de nome de fonte cai no padrão.
 set -euo pipefail
 
 command -v cava >/dev/null || exit 127
 conf=${XDG_RUNTIME_DIR:-/tmp}/mare-cava.conf
 # O valor entra no arquivo do cava: só número, para não virar outras linhas.
+# Até 6 dígitos, para a conta abaixo não estourar; "10#" porque 08 não é octal.
 bars=${1:-28}
-[[ $bars =~ ^[0-9]+$ ]] || bars=28
+[[ $bars =~ ^[0-9]{1,6}$ ]] && bars=$((10#$bars)) || bars=28
+((bars >= 1 && bars <= 256)) || bars=28
+# A fonte entra no mesmo arquivo. Uma quebra de linha abriria outra seção, e
+# ";", "#", "=" e espaço mudam o que o cava lê na linha: só passam as letras
+# de um nome de nó do PipeWire.
+fonte=${MARE_CAVA_SOURCE:-auto}
+[[ $fonte =~ ^[A-Za-z0-9._:@+-]+$ ]] || fonte=auto
 cat >"$conf" <<EOF2
 [general]
 bars = $bars
@@ -22,7 +31,7 @@ higher_cutoff_freq = 9000
 
 [input]
 method = pipewire
-source = ${MARE_CAVA_SOURCE:-auto}
+source = $fonte
 
 [output]
 method = raw

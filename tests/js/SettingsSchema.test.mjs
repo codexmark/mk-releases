@@ -25,7 +25,7 @@ const DIR = "/home/ana/.config/mk/hypr";
 t("toda função do arquivo tem caso aqui", () => {
     const cobertas = ["defaults", "shown", "optionShown", "options", "pageRows", "rowOf", "touchesHypr",
         "pageName", "groupOf", "fold", "search", "kbOptions", "ours", "animationCode", "luaValue", "hyprTable",
-        "valueOf", "hyprCode", "hyprLua", "sleepMode", "sleepCommand", "sleepStep", "hypridleConf", "orphan"];
+        "valueOf", "saved", "valid", "clean", "hyprCode", "hyprLua", "sleepMode", "sleepCommand", "sleepStep", "hypridleConf", "orphan"];
     const funcoes = Object.keys(S).filter((k) => typeof S[k] === "function");
     igual(funcoes.filter((f) => !cobertas.includes(f)), [], "função sem teste: acrescente o caso e ponha na lista");
     igual(cobertas.filter((f) => !funcoes.includes(f)), [], "função que sumiu");
@@ -244,7 +244,7 @@ t("hibernação: nenhuma opção 'hibernar', e nada no esquema fala em hibernar"
             ruins.push("sleepCommands." + k);
     vazio(ruins, "restos da hibernação");
     igual(linha("power.sleep").options.map((o) => o.v), ["suspender", "nada"]);
-    eq(linha("power.sleep").def, "suspender");
+    eq(linha("power.sleep").def, "nada");
 });
 
 // --- defaults, valueOf, rowOf ---
@@ -257,7 +257,7 @@ t("defaults: o def de toda linha mais as chaves escondidas", () => {
     eq(d["apps.terminal"], "ghostty");
     eq(d["emoji.tone"], 0);
     igual(d["emoji.recent"], []);
-    eq(d["power.sleep"], "suspender");
+    eq(d["power.sleep"], "nada");
 });
 
 t("defaults: cada chamada devolve um objeto novo", () => {
@@ -276,9 +276,146 @@ t("valueOf: o valor guardado; sem ele, o de fábrica", () => {
     eq(S.valueOf({}, "hypr.gapsIn"), 6);
     eq(S.valueOf({ "hypr.gapsIn": 0 }, "hypr.gapsIn"), 0);
     eq(S.valueOf({ "island.sound": false }, "island.sound"), false);
-    eq(S.valueOf({ "hypr.kbLayout": "" }, "hypr.kbLayout"), "");
+    // Aqui havia `valueOf({ "hypr.kbLayout": "" }) === ""`: afirmava que um
+    // valor que não é nenhuma das opções da linha seguia adiante (e ia como
+    // kb_layout = "" para o hl.config). Agora o esquema é a autoridade: fora
+    // das opções, vale o de fábrica. O valor cru continua em saved().
+    eq(S.valueOf({ "hypr.kbLayout": "" }, "hypr.kbLayout"), "br");
+    eq(S.saved({ "hypr.kbLayout": "" }, "hypr.kbLayout"), "");
+    eq(S.valueOf({ "hypr.kbLayout": "us" }, "hypr.kbLayout"), "us");
     for (const r of S.rows)
         eq(S.valueOf({}, r.key), r.def, r.key);
+});
+
+// --- o esquema é a autoridade: valid, valueOf, saved, clean ---
+
+// O que alguém pode deixar no ajustes.json mexendo à mão (o JSON só tem
+// isto), mais o que uma conta errada produz.
+const TORTOS = ["abc", "", "6", "true", null, [], [6], {}, { v: 6 }, NaN, Infinity, -Infinity, 1e9, -1e9,
+    "constructor", "__proto__", '") os.exit(1) --', "a\nb"];
+
+t("valid: slider só aceita número finito dentro da faixa", () => {
+    const r = linha("hypr.gapsIn");
+    for (const v of [r.min, r.max, r.def, 6.5, 0])
+        eq(S.valid(r, v), true, String(v));
+    for (const v of TORTOS.concat([r.min - 1, r.max + 1, r.max + 0.001, true, false, undefined]))
+        eq(S.valid(r, v), false, JSON.stringify(v) + " " + String(v));
+    eq(S.valid(linha("hypr.sensitivity"), -1), true);
+    eq(S.valid(linha("hypr.sensitivity"), -1.1), false);
+});
+
+t("valid: switch só aceita true ou false", () => {
+    const r = linha("island.sound");
+    eq(S.valid(r, true), true);
+    eq(S.valid(r, false), true);
+    for (const v of TORTOS.concat([0, 1, "false", undefined]))
+        eq(S.valid(r, v), false, JSON.stringify(v) + " " + String(v));
+});
+
+t("valid: choice só aceita uma das opções, do mesmo tipo", () => {
+    for (const r of S.rows.filter((x) => x.ctl === "choice")) {
+        for (const o of r.options)
+            eq(S.valid(r, o.v), true, r.key + " " + o.v);
+        for (const v of TORTOS.concat([true, false, undefined, 0.123, "hibernar"]))
+            eq(S.valid(r, v), false, r.key + " " + JSON.stringify(v) + " " + String(v));
+    }
+    eq(S.valid(linha("motion.speed"), "1.4"), false);
+    eq(S.valid(linha("motion.speed"), 1.4), true);
+    eq(S.valid(linha("hypr.kbLayout"), "BR"), false);
+});
+
+t("valid: sem linha, ou com uma linha de tipo desconhecido, nada vale", () => {
+    eq(S.valid(null, 1), false);
+    eq(S.valid(undefined, true), false);
+    eq(S.valid({ ctl: "texto", def: "x" }, "x"), false);
+});
+
+t("valid: o valor de fábrica de toda linha vale, e toda opção também", () => {
+    vazio(S.rows.filter((r) => !S.valid(r, r.def)).map((r) => r.key), "linhas cujo def o esquema recusaria");
+});
+
+t("valueOf: valor torto no ajustes.json dá o de fábrica, em toda linha", () => {
+    const ruins = [];
+    for (const r of S.rows)
+        for (const v of TORTOS) {
+            const obtido = S.valueOf({ [r.key]: v }, r.key);
+            if (obtido !== r.def)
+                ruins.push(r.key + " = " + JSON.stringify(v) + " (" + String(v) + ") -> " + JSON.stringify(obtido));
+        }
+    vazio(ruins, "valores tortos que passaram");
+});
+
+t("valueOf: fora da faixa do slider vale o de fábrica, não a ponta", () => {
+    eq(S.valueOf({ "hypr.gapsIn": 999 }, "hypr.gapsIn"), 6);
+    eq(S.valueOf({ "hypr.gapsIn": -1 }, "hypr.gapsIn"), 6);
+    eq(S.valueOf({ "hypr.gapsIn": 24 }, "hypr.gapsIn"), 24);
+    eq(S.valueOf({ "idle.lock": 61 }, "idle.lock"), 5);
+});
+
+t("valueOf e saved: ajustes que não são um objeto (null, lista, texto) valem como vazios", () => {
+    for (const values of [null, undefined, "x", 7, true, [], [1, 2]]) {
+        eq(S.valueOf(values, "hypr.gapsIn"), 6, String(values));
+        eq(S.saved(values, "hypr.gapsIn"), undefined, String(values));
+    }
+});
+
+t("saved: o que está guardado, como está; undefined se não há", () => {
+    eq(S.saved({ "power.sleep": "hibernar" }, "power.sleep"), "hibernar");
+    eq(S.saved({ "hypr.gapsIn": "abc" }, "hypr.gapsIn"), "abc");
+    eq(S.saved({}, "hypr.gapsIn"), undefined);
+    // Só o que está escrito: o que todo objeto herda não é ajuste.
+    eq(S.saved({}, "constructor"), undefined);
+    eq(S.saved({}, "toString"), undefined);
+});
+
+t("clean: toda linha e toda chave escondida, com o valor guardado ou o de fábrica", () => {
+    igual(S.clean({}), S.defaults());
+    igual(Object.keys(S.clean({})), Object.keys(S.defaults()));
+    const limpo = S.clean({ "hypr.gapsIn": 10, "island.sound": false, "input.caps": "esc", "idle.lock": 0 });
+    igual(limpo, { ...S.defaults(), "hypr.gapsIn": 10, "island.sound": false, "input.caps": "esc", "idle.lock": 0 });
+});
+
+t("clean: o que veio torto vira o de fábrica", () => {
+    const tortos = { "hypr.gapsIn": "abc", "idle.lock": "x", "hypr.border": null, "island.sound": "sim",
+        "motion.speed": "1.4", "hypr.kbLayout": 'br"\n) os.exit(1) --', "power.sleep": "hibernar", "hypr.rounding": 99,
+        "hypr.sensitivity": NaN, "night.auto": 1 };
+    igual(S.clean(tortos), S.defaults());
+    for (const values of [null, undefined, "x", 7, [], [1]])
+        igual(S.clean(values), S.defaults(), String(values));
+});
+
+t("clean: as chaves escondidas valem pelo tipo do valor de fábrica", () => {
+    eq(S.clean({ "apps.terminal": "kitty" })["apps.terminal"], "kitty");
+    eq(S.clean({ "apps.terminal": 7 })["apps.terminal"], "ghostty");
+    eq(S.clean({ "apps.terminal": null })["apps.terminal"], "ghostty");
+    igual(S.clean({ "emoji.recent": ["a", "b"] })["emoji.recent"], ["a", "b"]);
+    igual(S.clean({ "emoji.recent": "ab" })["emoji.recent"], []);
+    igual(S.clean({ "emoji.recent": { 0: "a" } })["emoji.recent"], []);
+    eq(S.clean({ "emoji.tone": 3 })["emoji.tone"], 3);
+    eq(S.clean({ "emoji.tone": "3" })["emoji.tone"], 0);
+    eq(S.clean({ "emoji.tone": NaN })["emoji.tone"], 0);
+});
+
+t("clean: o que não é do esquema (keybinds) passa como está, e os values não mudam", () => {
+    const values = { "hypr.gapsIn": "abc", "keybinds": { "win.close": "SUPER + W" }, "outra.coisa": 1 };
+    const copia = JSON.parse(JSON.stringify(values));
+    const limpo = S.clean(values);
+    igual(limpo.keybinds, { "win.close": "SUPER + W" });
+    eq(limpo["outra.coisa"], 1);
+    eq(limpo["hypr.gapsIn"], 6);
+    igual(values, copia);
+    // E um "__proto__" escrito no JSON não troca o protótipo de ninguém.
+    const sujo = S.clean(JSON.parse('{"__proto__": {"hypr.gapsIn": 20}, "hypr.border": 2}'));
+    eq(sujo["hypr.gapsIn"], 6);
+    eq(sujo["hypr.border"], 2);
+    eq(Object.getPrototypeOf(sujo), Object.prototype);
+});
+
+t("clean: cada chamada devolve um objeto novo, e a lista de fábrica não é emprestada", () => {
+    const a = S.clean({});
+    a["emoji.recent"].push("x");
+    igual(S.clean({})["emoji.recent"], []);
+    igual(S.defaults()["emoji.recent"], []);
 });
 
 t("valueOf: chave que não é de nenhuma linha dá undefined", () => {
@@ -350,7 +487,7 @@ t("shown: a linha com `quando` segue o valor da outra chave (o de fábrica tamb�
 
 t("shown: `quando` com lista: 'Dormir' só aparece com power.sleep = suspender", () => {
     const r = linha("idle.suspend");
-    eq(S.shown(r, {}), true);
+    eq(S.shown(r, {}), false);
     eq(S.shown(r, { "power.sleep": "suspender" }), true);
     eq(S.shown(r, { "power.sleep": "nada" }), false);
     eq(S.shown(r, { "power.sleep": "hibernar" }), false);
@@ -360,7 +497,7 @@ t("shown: `quando` e `precisa` juntos: os dois têm de valer", () => {
     const r = { key: "x.y", precisa: "bateria", quando: { "night.auto": true, "power.sleep": ["nada"] } };
     eq(S.shown(r, { "night.auto": true, "power.sleep": "nada" }, { bateria: true }), true);
     eq(S.shown(r, { "night.auto": true, "power.sleep": "nada" }, { bateria: false }), false);
-    eq(S.shown(r, { "night.auto": true }, { bateria: true }), false);
+    eq(S.shown(r, { "night.auto": true, "power.sleep": "suspender" }, { bateria: true }), false);
     eq(S.shown(r, { "power.sleep": "nada" }, { bateria: true }), false);
 });
 
@@ -379,7 +516,8 @@ t("optionShown: a opção escolhida fica, mesmo sem a máquina ter", () => {
     const r = linha("power.sleep");
     eq(S.optionShown(r, { v: "nada", label: "x", precisa: "bateria" }, { "power.sleep": "nada" }, { bateria: false }), true);
     // A de fábrica conta como escolhida quando não há valor guardado.
-    eq(S.optionShown(r, { v: "suspender", label: "x", precisa: "bateria" }, {}, { bateria: false }), true);
+    eq(S.optionShown(r, { v: "nada", label: "x", precisa: "bateria" }, {}, { bateria: false }), true);
+    eq(S.optionShown(r, { v: "suspender", label: "x", precisa: "bateria" }, {}, { bateria: false }), false);
 });
 
 t("optionShown: opção sem `precisa` aparece sempre", () => {
@@ -390,9 +528,9 @@ t("optionShown: opção sem `precisa` aparece sempre", () => {
 
 t("options: as opções da linha que valem nesta máquina", () => {
     const r = { key: "power.sleep", options: [{ v: "suspender", label: "a" }, { v: "nada", label: "b", precisa: "bateria" }] };
-    igual(S.options(r, {}, { bateria: false }).map((o) => o.v), ["suspender"]);
+    igual(S.options(r, { "power.sleep": "suspender" }, { bateria: false }).map((o) => o.v), ["suspender"]);
     igual(S.options(r, { "power.sleep": "nada" }, { bateria: false }).map((o) => o.v), ["suspender", "nada"]);
-    igual(S.options(r, {}, { bateria: true }).map((o) => o.v), ["suspender", "nada"]);
+    igual(S.options(r, { "power.sleep": "suspender" }, { bateria: true }).map((o) => o.v), ["suspender", "nada"]);
     igual(S.options(linha("power.sleep")), linha("power.sleep").options);
     // Uma linha que não é choice não tem opções.
     igual(S.options(linha("hypr.gapsIn"), {}, {}), []);
@@ -413,7 +551,7 @@ t("pageRows: com values e caps, só as que aparecem", () => {
     igual(S.pageRows("tela", {}).map((r) => r.key), ["ui.scale", "hypr.scale", "night.temperature", "night.auto"]);
     eq(S.pageRows("tela", { "night.auto": true }).length, 6);
     igual(S.pageRows("energia", { "power.sleep": "nada" }, { brilho: false, bateria: false }).map((r) => r.key),
-        ["idle.lock", "idle.off", "power.sleep"]);
+        ["idle.saver", "idle.lock", "idle.off", "power.sleep"]);
     igual(S.pageRows("entrada", {}, { touchpad: false }).map((r) => r.key),
         ["hypr.kbLayout", "input.caps", "hypr.repeatRate", "hypr.repeatDelay", "hypr.sensitivity"]);
 });
@@ -726,6 +864,62 @@ t("hyprTable: a Velocidade liga ou desliga as animações, e de fábrica não fa
     assert.ok(!S.hyprTable({}).includes("animations"));
 });
 
+t("hyprTable: valor de tipo errado no ajustes.json não chega ao hl.config: vale o de fábrica", () => {
+    eq(S.hyprTable({ "hypr.gapsIn": "abc" }), TABELA_DE_FABRICA);
+    eq(S.hyprTable({ "hypr.gapsIn": null }), TABELA_DE_FABRICA);
+    assert.ok(!S.hyprTable({ "hypr.border": null, "hypr.rounding": {}, "hypr.gapsOut": [] }).includes("{  }"));
+    eq(S.hyprTable({ "hypr.gapsIn": 999, "hypr.repeatRate": -5, "hypr.inactiveOpacity": 7, "hypr.naturalScroll": "false",
+        "hypr.tapToClick": 0, "hypr.sensitivity": "0.5", "hypr.repeatDelay": NaN, "hypr.kbLayout": "xx" }), TABELA_DE_FABRICA);
+    // Toda linha do Hyprland, com todo valor torto: sai a tabela de fábrica.
+    const ruins = [];
+    for (const r of S.rows.filter((x) => x.hypr))
+        for (const v of TORTOS)
+            if (S.hyprTable({ [r.key]: v }) !== TABELA_DE_FABRICA)
+                ruins.push(r.key + " = " + JSON.stringify(v) + " -> " + S.hyprTable({ [r.key]: v }));
+    vazio(ruins, "valores tortos que mudaram a tabela");
+});
+
+t("hyprTable: um layout ou Caps Lock que não é opção não mexe no kb_options", () => {
+    assert.ok(!S.hyprTable({ "hypr.kbLayout": "xx,yy" }).includes("kb_options"));
+    assert.ok(!S.hyprTable({ "input.caps": "banana" }).includes("kb_options"));
+    eq(S.kbOptions({ "hypr.kbLayout": "xx,yy" }), "");
+    eq(S.kbOptions(null), "");
+});
+
+t("hyprTable: uma Velocidade que não é opção não liga nem desliga as animações", () => {
+    for (const v of ["0", -1, 5, null, "sem", NaN])
+        assert.ok(!S.hyprTable({ "motion.speed": v }).includes("animations"), String(v));
+});
+
+t("animationCode: uma Velocidade que não é opção não emite nada", () => {
+    for (const v of ["1.4", 5, 0.123, -1, null, NaN, Infinity, [1.4], "calmo"])
+        eq(S.animationCode({ "motion.speed": v }), "", String(v));
+    // Mexida nesta sessão e torta no arquivo: os números de fábrica.
+    eq(S.animationCode({ "motion.speed": "1.4" }, { "motion.speed": true }), S.animationCode({}, { "motion.speed": true }));
+});
+
+t("hyprCode: uma escala que não é opção não chega ao hl.monitor", () => {
+    for (const v of ["2", 3, 0, -1, null, NaN, '1 }) os.exit(1) --', 1e9])
+        eq(S.hyprCode({ "hypr.scale": v }), S.hyprCode({}), String(v));
+});
+
+t("hyprCode e hyprLua: ajustes que não são um objeto geram o de fábrica, sem derrubar", () => {
+    for (const values of [null, undefined, "x", 7, [], [1]]) {
+        eq(S.hyprLua(values), S.hyprLua({}), String(values));
+        eq(S.hyprCode(values, { "motion.speed": true }), S.hyprCode({}, { "motion.speed": true }), String(values));
+    }
+});
+
+t("luaValue: o que não tem como escrever em Lua (NaN, infinito, null, undefined) sai nil", () => {
+    for (const v of [NaN, Infinity, -Infinity, null, undefined])
+        eq(S.luaValue(v), "nil", String(v));
+});
+
+t("luaValue: lista, objeto e função não viram texto do Lua: nil", () => {
+    for (const v of [[], [1, 2], {}, { toString: () => "x" }, () => 1])
+        eq(S.luaValue(v), "nil");
+});
+
 t("hyprTable: não muda os values que recebeu", () => {
     const values = { "hypr.gapsIn": 10, "input.caps": "esc" };
     S.hyprTable(values, { "motion.speed": true });
@@ -779,8 +973,13 @@ t("hyprLua: o que sai é Lua que compila, com qualquer opção e com texto torto
     for (const r of S.rows.filter((x) => x.ctl === "choice"))
         for (const o of r.options)
             casos.push({ [r.key]: o.v });
+    // Todo valor torto em toda linha do Hyprland também.
+    for (const r of S.rows.filter((x) => x.hypr))
+        for (const v of TORTOS)
+            casos.push({ [r.key]: v });
     for (const values of casos)
         for (const texto of [S.hyprLua(values), S.hyprCode(values, { "motion.speed": true, "input.caps": true })]) {
+            assert.ok(!/os\.exit|NaN|Infinity|null|undefined|\{\s*\}/.test(texto), JSON.stringify(values) + "\n" + texto);
             const r = spawnSync("luac", ["-p", "-"], { input: texto, encoding: "utf8" });
             eq(r.status, 0, JSON.stringify(values) + "\n" + r.stderr + "\n" + texto);
         }
@@ -788,8 +987,11 @@ t("hyprLua: o que sai é Lua que compila, com qualquer opção e com texto torto
 
 // --- sleepMode, sleepCommand, sleepStep ---
 
-t("sleepMode: vale a escolha de power.sleep; de fábrica, suspender", () => {
-    eq(S.sleepMode({}), "suspender");
+// Quem escolheu suspender (de fábrica o Mk não dorme: fica o descanso de tela).
+const SUSP = { "power.sleep": "suspender" };
+
+t("sleepMode: vale a escolha de power.sleep; de fábrica, não dorme", () => {
+    eq(S.sleepMode({}), "nada");
     eq(S.sleepMode({ "power.sleep": "suspender" }), "suspender");
     eq(S.sleepMode({ "power.sleep": "nada" }), "nada");
 });
@@ -801,16 +1003,17 @@ t("sleepMode: um 'hibernar' antigo vira 'nada', não suspender, possa a máquina
 });
 
 t("sleepMode: suspender com o suspend proibido vira 'nada'", () => {
-    eq(S.sleepMode({}, { sono: { canSuspend: false, risky: [] } }), "nada");
+    eq(S.sleepMode(SUSP, { sono: { canSuspend: false, risky: [] } }), "nada");
     eq(S.sleepMode({ "power.sleep": "suspender" }, { sono: { canSuspend: false } }), "nada");
-    eq(S.sleepMode({}, { sono: { canSuspend: true, risky: ["AMD Navi 10 (1002:731f)"] } }), "suspender");
+    eq(S.sleepMode(SUSP, { sono: { canSuspend: true, risky: ["AMD Navi 10 (1002:731f)"] } }), "suspender");
 });
 
 t("sleepMode: sem caps, ou sem a parte do sono, vale a escolha", () => {
-    eq(S.sleepMode({}, undefined), "suspender");
-    eq(S.sleepMode({}, null), "suspender");
-    eq(S.sleepMode({}, {}), "suspender");
-    eq(S.sleepMode({}, { sono: {} }), "suspender");
+    eq(S.sleepMode(SUSP, undefined), "suspender");
+    eq(S.sleepMode(SUSP, null), "suspender");
+    eq(S.sleepMode(SUSP, {}), "suspender");
+    eq(S.sleepMode(SUSP, { sono: {} }), "suspender");
+    eq(S.sleepMode({}, undefined), "nada");
     eq(S.sleepMode({ "power.sleep": "nada" }, { sono: { canSuspend: true } }), "nada");
 });
 
@@ -819,12 +1022,30 @@ t("sleepMode: qualquer outro valor é 'nada'; só existem dois modos", () => {
         eq(S.sleepMode({ "power.sleep": ruim }), "nada", String(ruim));
 });
 
+t("sleepMode: uma escolha órfã é 'nada' mesmo que o de fábrica fosse suspender", () => {
+    // Uma cópia do esquema com outra fábrica: "hibernar" não pode virar o
+    // valor de fábrica e, por ele, suspender sozinho.
+    const S2 = load("SettingsSchema.js");
+    S2.rowOf("power.sleep").def = "suspender";
+    eq(S2.sleepMode({}), "suspender");
+    eq(S2.sleepMode({ "power.sleep": "hibernar" }), "nada");
+    eq(S2.sleepMode({ "power.sleep": null }), "nada");
+    eq(S2.sleepCommand({ "power.sleep": "hibernar" }), "");
+    assert.ok(!S2.hypridleConf({ "power.sleep": "hibernar" }, DIR).includes("systemctl"));
+});
+
+t("sleepMode: ajustes que não são um objeto valem como vazios", () => {
+    for (const values of [null, undefined, "x", []])
+        eq(S.sleepMode(values), "nada", String(values));
+});
+
 t("sleepCommand: suspender é 'systemctl suspend'; o resto não dorme ('')", () => {
-    eq(S.sleepCommand({}), "systemctl suspend");
+    eq(S.sleepCommand(SUSP), "systemctl suspend");
+    eq(S.sleepCommand({}), "");
     eq(S.sleepCommand({ "power.sleep": "nada" }), "");
     eq(S.sleepCommand({ "power.sleep": "hibernar" }), "");
     eq(S.sleepCommand({ "power.sleep": "hibernar" }, { sono: { canSuspend: true } }), "");
-    eq(S.sleepCommand({}, { sono: { canSuspend: false } }), "");
+    eq(S.sleepCommand(SUSP, { sono: { canSuspend: false } }), "");
     eq(S.sleepCommand({ "power.sleep": "constructor" }), "");
 });
 
@@ -847,10 +1068,11 @@ t("sleepStep: acha o hibernate de um arquivo antigo, para o syncIdle reescrever 
 });
 
 t("sleepStep: lê de volta o passo do hypridle.conf que os Ajustes geram", () => {
-    eq(S.sleepStep(S.hypridleConf({}, DIR)), "systemctl suspend");
+    eq(S.sleepStep(S.hypridleConf(SUSP, DIR)), "systemctl suspend");
+    eq(S.sleepStep(S.hypridleConf({}, DIR)), "");
     eq(S.sleepStep(S.hypridleConf({ "power.sleep": "nada" }, DIR)), "");
-    eq(S.sleepStep(S.hypridleConf({ "idle.suspend": 0 }, DIR)), "");
-    eq(S.sleepStep(S.hypridleConf({}, DIR, { sono: { canSuspend: false } })), "");
+    eq(S.sleepStep(S.hypridleConf({ ...SUSP, "idle.suspend": 0 }, DIR)), "");
+    eq(S.sleepStep(S.hypridleConf(SUSP, DIR, { sono: { canSuspend: false } })), "");
 });
 
 // --- hypridleConf ---
@@ -861,15 +1083,31 @@ function listeners(conf) {
         .map((m) => ({ timeout: m[1], on: m[2], resume: m[3] || "" }));
 }
 
-t("hypridleConf: de fábrica, escurece em 4 min, bloqueia em 5, apaga em 6 e dorme em 30", () => {
+const SAVER_ON = "qs -p " + DIR.replace(/\/hypr$/, "/shell") + " ipc call mare saver on";
+const SAVER_OFF = "qs -p " + DIR.replace(/\/hypr$/, "/shell") + " ipc call mare saver off";
+
+t("hypridleConf: de fábrica, descanso de tela em 3 min, escurece em 4, bloqueia em 5, apaga em 30 e não dorme", () => {
     const conf = S.hypridleConf({}, DIR);
     igual(listeners(conf), [
         { timeout: "240", on: "brightnessctl -s set 15%", resume: "brightnessctl -r" },
+        { timeout: "180", on: SAVER_ON, resume: SAVER_OFF },
         { timeout: "300", on: "loginctl lock-session", resume: "" },
-        { timeout: "360", on: "hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })'", resume: "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'" },
-        { timeout: "1800", on: "systemctl suspend", resume: "" }
+        { timeout: "1800", on: "hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })'", resume: "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'" }
     ]);
     eq((conf.match(/^listener \{$/gm) || []).length, 4);
+    assert.ok(!/systemctl/.test(conf), "de fábrica o Mk não dorme");
+});
+
+t("hypridleConf: quem escolheu suspender ganha o passo de dormir aos 30", () => {
+    const l = listeners(S.hypridleConf(SUSP, DIR));
+    igual(l[l.length - 1], { timeout: "1800", on: "systemctl suspend", resume: "" });
+    eq(l.length, 5);
+});
+
+t("hypridleConf: o descanso de tela liga e desliga pelo Maré da pasta dada; 0 = sem descanso", () => {
+    const conf = S.hypridleConf({ "idle.saver": 10 }, "/opt/mk/hypr");
+    assert.ok(conf.includes("    timeout = 600\n    on-timeout = qs -p /opt/mk/shell ipc call mare saver on\n    on-resume = qs -p /opt/mk/shell ipc call mare saver off\n"));
+    assert.ok(!S.hypridleConf({ "idle.saver": 0 }, DIR).includes("saver"));
 });
 
 t("hypridleConf: o cabeçalho avisa que é gerado, e o general bloqueia antes de dormir", () => {
@@ -887,36 +1125,63 @@ t("hypridleConf: o lock_cmd usa o shell e o hyprlock.conf da pasta dada", () => 
 });
 
 t("hypridleConf: minutos viram segundos", () => {
-    const l = listeners(S.hypridleConf({ "idle.dim": 1, "idle.lock": 10, "idle.off": 60, "idle.suspend": 120 }, DIR));
-    igual(l.map((x) => x.timeout), ["60", "600", "3600", "7200"]);
-    eq(listeners(S.hypridleConf({ "idle.lock": 0.5 }, DIR))[1].timeout, "30");
+    const l = listeners(S.hypridleConf({ ...SUSP, "idle.dim": 1, "idle.saver": 2, "idle.lock": 10, "idle.off": 60, "idle.suspend": 120 }, DIR));
+    igual(l.map((x) => x.timeout), ["60", "120", "600", "3600", "7200"]);
+    eq(listeners(S.hypridleConf({ "idle.lock": 0.5 }, DIR))[2].timeout, "30");
 });
 
 t("hypridleConf: zero quer dizer nunca: aquele passo não acontece", () => {
-    igual(listeners(S.hypridleConf({ "idle.dim": 0 }, DIR)).map((x) => x.timeout), ["300", "360", "1800"]);
-    igual(listeners(S.hypridleConf({ "idle.lock": 0 }, DIR)).map((x) => x.timeout), ["240", "360", "1800"]);
-    igual(listeners(S.hypridleConf({ "idle.off": 0 }, DIR)).map((x) => x.timeout), ["240", "300", "1800"]);
-    igual(listeners(S.hypridleConf({ "idle.suspend": 0 }, DIR)).map((x) => x.timeout), ["240", "300", "360"]);
-    const nada = S.hypridleConf({ "idle.dim": 0, "idle.lock": 0, "idle.off": 0, "idle.suspend": 0 }, DIR);
+    igual(listeners(S.hypridleConf({ ...SUSP, "idle.dim": 0 }, DIR)).map((x) => x.timeout), ["180", "300", "1800", "1800"]);
+    igual(listeners(S.hypridleConf({ ...SUSP, "idle.saver": 0 }, DIR)).map((x) => x.timeout), ["240", "300", "1800", "1800"]);
+    igual(listeners(S.hypridleConf({ ...SUSP, "idle.lock": 0 }, DIR)).map((x) => x.timeout), ["240", "180", "1800", "1800"]);
+    igual(listeners(S.hypridleConf({ ...SUSP, "idle.off": 0 }, DIR)).map((x) => x.timeout), ["240", "180", "300", "1800"]);
+    igual(listeners(S.hypridleConf({ ...SUSP, "idle.suspend": 0 }, DIR)).map((x) => x.timeout), ["240", "180", "300", "1800"]);
+    const nada = S.hypridleConf({ "idle.dim": 0, "idle.saver": 0, "idle.lock": 0, "idle.off": 0, "idle.suspend": 0 }, DIR);
     igual(listeners(nada), []);
     assert.ok(!nada.includes("listener"));
+});
+
+t("hypridleConf: minutos tortos no ajustes.json não viram timeout: vale o de fábrica", () => {
+    const fabrica = S.hypridleConf(SUSP, DIR);
+    const ruins = [];
+    for (const key of ["idle.dim", "idle.saver", "idle.lock", "idle.off", "idle.suspend"])
+        for (const v of TORTOS.concat([-5, 100000, "5", true])) {
+            const conf = S.hypridleConf({ ...SUSP, [key]: v }, DIR);
+            if (conf !== fabrica)
+                ruins.push(key + " = " + JSON.stringify(v) + " (" + String(v) + ") -> " + listeners(conf).map((x) => x.timeout));
+        }
+    vazio(ruins, "minutos tortos que mudaram o hypridle.conf");
+    const conf = S.hypridleConf({ "idle.lock": "x", "idle.off": -5, "idle.dim": null, "idle.saver": Infinity }, DIR);
+    assert.ok(!/NaN|Infinity|null|timeout = -/.test(conf), conf);
+    igual(listeners(conf).map((x) => x.timeout), ["240", "180", "300", "1800"]);
+});
+
+t("hypridleConf: todo timeout é um inteiro de segundos, maior que zero", () => {
+    for (const values of [{}, SUSP, { "idle.lock": 0.5 }, { "idle.lock": 0.001 }, { "idle.dim": 0.004, "idle.off": 1e-9 }])
+        for (const l of listeners(S.hypridleConf(values, DIR)))
+            assert.match(l.timeout, /^[1-9][0-9]*$/, JSON.stringify(values));
+});
+
+t("hypridleConf: ajustes que não são um objeto geram o de fábrica", () => {
+    for (const values of [null, undefined, "x", []])
+        eq(S.hypridleConf(values, DIR), S.hypridleConf({}, DIR), String(values));
 });
 
 t("hypridleConf: sem brilho para mexer, o passo de escurecer não entra", () => {
     const conf = S.hypridleConf({}, DIR, { brilho: false });
     assert.ok(!conf.includes("brightnessctl"));
-    igual(listeners(conf).map((x) => x.timeout), ["300", "360", "1800"]);
+    igual(listeners(conf).map((x) => x.timeout), ["180", "300", "1800"]);
     assert.ok(S.hypridleConf({}, DIR, { brilho: true }).includes("brightnessctl"));
     assert.ok(S.hypridleConf({}, DIR, {}).includes("brightnessctl"));
 });
 
 t("hypridleConf: o passo de dormir segue power.sleep e o que a máquina pode", () => {
-    assert.ok(S.hypridleConf({}, DIR).includes("on-timeout = systemctl suspend\n"));
+    assert.ok(S.hypridleConf(SUSP, DIR).includes("on-timeout = systemctl suspend\n"));
     for (const [values, caps] of [[{ "power.sleep": "nada" }, undefined], [{ "power.sleep": "hibernar" }, undefined],
-        [{}, { sono: { canSuspend: false } }], [{ "power.sleep": "hibernar" }, { sono: { canSuspend: true } }]]) {
+        [SUSP, { sono: { canSuspend: false } }], [{}, undefined], [{ "power.sleep": "hibernar" }, { sono: { canSuspend: true } }]]) {
         const conf = S.hypridleConf(values, DIR, caps);
         assert.ok(!conf.includes("systemctl"), JSON.stringify(values));
-        igual(listeners(conf).map((x) => x.timeout), ["240", "300", "360"]);
+        igual(listeners(conf).map((x) => x.timeout), ["240", "180", "300", "1800"]);
     }
 });
 
@@ -926,13 +1191,13 @@ t("hypridleConf: nunca hiberna, escolha o que escolher", () => {
 });
 
 t("hypridleConf: os passos são os das linhas de Energia, e respeitam a faixa de cada uma", () => {
-    for (const key of ["idle.dim", "idle.lock", "idle.off", "idle.suspend"]) {
+    for (const key of ["idle.dim", "idle.saver", "idle.lock", "idle.off", "idle.suspend"]) {
         const r = linha(key);
         eq(r.page, "energia");
         eq(r.unit, "min");
         // O zero ("nunca", como diz a página) tem de caber no slider.
         eq(r.min, 0, key);
-        const conf = S.hypridleConf({ "idle.dim": 0, "idle.lock": 0, "idle.off": 0, "idle.suspend": 0, [key]: r.max }, DIR);
+        const conf = S.hypridleConf({ ...SUSP, "idle.dim": 0, "idle.saver": 0, "idle.lock": 0, "idle.off": 0, "idle.suspend": 0, [key]: r.max }, DIR);
         igual(listeners(conf).map((x) => x.timeout), [String(r.max * 60)], key);
     }
 });
@@ -948,6 +1213,24 @@ t("orphan: uma escolha que existe, ou nenhuma (vale a de fábrica), não é órf
     eq(S.orphan({ "power.sleep": "suspender" }, "power.sleep"), false);
     eq(S.orphan({ "power.sleep": "nada" }, "power.sleep"), false);
     eq(S.orphan({}, "power.sleep"), false);
+});
+
+t("orphan: olha o valor guardado, não o limpo; qualquer coisa fora das opções é órfã", () => {
+    for (const v of [null, 0, true, "", [], {}, "SUSPENDER"])
+        eq(S.orphan({ "power.sleep": v }, "power.sleep"), true, String(v));
+    eq(S.orphan({ "motion.speed": "1.4" }, "motion.speed"), true);
+    eq(S.orphan({ "motion.speed": 1.4 }, "motion.speed"), false);
+    // E o valor que vale, nesse caso, é o de fábrica.
+    eq(S.valueOf({ "power.sleep": "hibernar" }, "power.sleep"), "nada");
+    for (const values of [null, undefined, "x", []])
+        eq(S.orphan(values, "power.sleep"), false, String(values));
+});
+
+t("shown e optionShown: seguem o valor limpo, não o torto", () => {
+    // night.auto: "sim" não é true: as horas continuam escondidas.
+    eq(S.shown(linha("night.from"), { "night.auto": "sim" }), false);
+    eq(S.shown(linha("night.from"), { "night.auto": true }), true);
+    eq(S.shown(linha("idle.suspend"), { "power.sleep": "hibernar" }), false);
 });
 
 t("orphan: só vale para linhas de escolha; chave desconhecida ou de outro tipo dá false", () => {

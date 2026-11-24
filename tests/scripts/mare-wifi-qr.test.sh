@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shell/mare/scripts/mare-wifi-qr: o texto que vai para o QR (formato WIFI:),
-# a rede aberta, a rede com senha e os avisos, com ip, nmcli e qrencode falsos.
+# a rede aberta, a rede com senha (WPA e WEP), a rede oculta e os avisos, com
+# ip, nmcli e qrencode falsos.
 . "$(dirname "$0")/../lib.sh"
 
 qr_sh=$REPO/shell/mare/scripts/mare-wifi-qr
@@ -11,6 +12,7 @@ mkdir -p "$sys/class/net/wlan0/wireless" "$sys/class/net/enp3s0" "$nm"
 # valor saem escapados, a não ser com "-e no". O nome da conexão tem de chegar
 # inteiro, senão é "no such connection profile" (saída 10).
 #   $nm/conn  nome da conexão do wlan0     $nm/ssid, $nm/keymgmt, $nm/psk
+#   $nm/hidden  yes|no     $nm/wepidx  wep-tx-keyidx     $nm/wep0..3  as chaves WEP
 stub nmcli '
 printf "[%s]" "$@" >>"$SBX/args"; echo >>"$SBX/args"
 nm=$SBX/nm esc=1 prev=""
@@ -27,7 +29,14 @@ if [[ " $* " == *" con show "* ]]; then
   [[ -n $last && $last == "$(<"$nm/conn")" ]] || { echo "Error: $last - no such connection profile." >&2; exit 10; }
   case " $* " in
     *" 802-11-wireless.ssid "*) val ssid ;;
+    *" 802-11-wireless.hidden "*) val hidden ;;
     *" 802-11-wireless-security.key-mgmt "*) val keymgmt ;;
+    *" 802-11-wireless-security.wep-tx-keyidx "*) val wepidx ;;
+    *" 802-11-wireless-security.wep-key"[0-3]" "*)
+      for i in 0 1 2 3; do
+        [[ " $* " == *".wep-key$i "* ]] || continue
+        if [[ " $* " == *" -s "* ]]; then val "wep$i"; else echo "<hidden>"; fi
+      done ;;
     *" 802-11-wireless-security.psk "*)
       # Sem -s a senha vem escondida.
       if [[ " $* " == *" -s "* ]]; then val psk; else echo "<hidden>"; fi ;;
@@ -48,7 +57,9 @@ rede() { # rede <conexão> <ssid> <key-mgmt> <senha>
   printf '%s\n' "$2" >"$nm/ssid"
   printf '%s\n' "$3" >"$nm/keymgmt"
   printf '%s\n' "$4" >"$nm/psk"
-  rm -f "$png"
+  echo no >"$nm/hidden"
+  echo 0 >"$nm/wepidx"
+  rm -f "$png" "$nm"/wep[0-3]
   calls_reset
   : >"$SBX/args"
 }
@@ -75,10 +86,114 @@ out=$(run "$png")
 eq "Cafe" "$out"
 eq 'WIFI:T:nopass;S:Cafe;;' "$(<"$png")"
 
-t "rede aberta com key-mgmt 'none': também nopass"
-rede "Cafe" "Cafe" none ""
+t "rede aberta: não pede senha nenhuma ao NetworkManager"
+not_called "nmcli -s "
+
+t "key-mgmt 'none' é WEP, não rede aberta: WIFI:T:WEP com a chave wep-key0"
+rede "Velha" "Velha" none ""
+echo "abcde" >"$nm/wep0"
+out=$(run "$png" 2>&1)
+eq 0 $?
+eq "Velha" "$out"
+eq 'WIFI:T:WEP;S:Velha;P:abcde;;' "$(<"$png")"
+has "$(<"$SBX/args")" "[-s][-e][no][-g][802-11-wireless-security.wep-key0]"
+
+t "WEP: a chave em uso é a do wep-tx-keyidx"
+rede "Velha" "Velha" none ""
+echo "0123456789" >"$nm/wep0"
+echo "fedcba9876" >"$nm/wep2"
+echo 2 >"$nm/wepidx"
+ok run "$png" >/dev/null
+eq 'WIFI:T:WEP;S:Velha;P:fedcba9876;;' "$(<"$png")"
+
+t "WEP: wep-tx-keyidx vazio ou fora de 0 a 3 cai na chave 0"
+for idx in "" 7 "x" "-1"; do
+  rede "Velha" "Velha" none ""
+  echo "abcde" >"$nm/wep0"
+  echo "$idx" >"$nm/wepidx"
+  ok run "$png" >/dev/null
+  eq 'WIFI:T:WEP;S:Velha;P:abcde;;' "$(<"$png")" "wep-tx-keyidx '$idx'"
+done
+
+t "WEP: a chave também ganha a barra do formato WIFI:"
+rede "Velha" "Velha" none ""
+echo 'a;b:c' >"$nm/wep0"
+ok run "$png" >/dev/null
+eq 'WIFI:T:WEP;S:Velha;P:a\;b\:c;;' "$(<"$png")"
+
+t "WEP sem acesso à chave: avisa, sai com 1 e não gera um QR de rede aberta"
+rede "Velha" "Velha" none ""
+err=$(run "$png" 2>&1 >/dev/null)
+eq 1 $?
+has "$err" "sem acesso à senha"
+not_called "qrencode"
+absent "$png"
+
+t "WEP: a senha WPA guardada por engano não entra no lugar da chave"
+rede "Velha" "Velha" none "senha-wpa"
+echo "abcde" >"$nm/wep0"
+ok run "$png" >/dev/null
+eq 'WIFI:T:WEP;S:Velha;P:abcde;;' "$(<"$png")"
+
+t "rede OWE (aberta com criptografia): nopass, sem campo de senha"
+rede "Cafe" "Cafe" owe ""
 ok run "$png" >/dev/null
 eq 'WIFI:T:nopass;S:Cafe;;' "$(<"$png")"
+
+t "rede corporativa (802.1X): não cabe num QR; avisa, sai com 1 e não gera nada"
+for km in wpa-eap wpa-eap-suite-b-192 ieee8021x; do
+  rede "Empresa" "Empresa" "$km" ""
+  err=$(run "$png" 2>&1 >/dev/null)
+  eq 1 $? "$km"
+  has "$err" "802.1X" "$km"
+  not_called "qrencode"
+  absent "$png"
+done
+
+t "rede oculta: o QR leva H:true, com senha ou aberta"
+rede "Casa" "Casa" wpa-psk "segredo123"
+echo yes >"$nm/hidden"
+ok run "$png" >/dev/null
+eq 'WIFI:T:WPA;S:Casa;P:segredo123;H:true;;' "$(<"$png")"
+rede "Cafe" "Cafe" "" ""
+: >"$nm/keymgmt"
+echo yes >"$nm/hidden"
+ok run "$png" >/dev/null
+eq 'WIFI:T:nopass;S:Cafe;H:true;;' "$(<"$png")"
+rede "Velha" "Velha" none ""
+echo "abcde" >"$nm/wep0"
+echo yes >"$nm/hidden"
+ok run "$png" >/dev/null
+eq 'WIFI:T:WEP;S:Velha;P:abcde;H:true;;' "$(<"$png")"
+
+t "rede visível (hidden 'no' ou sem resposta): sem o campo H"
+rede "Casa" "Casa" wpa-psk "segredo123"
+ok run "$png" >/dev/null
+hasnt "$(<"$png")" "H:"
+rm -f "$nm/hidden"
+ok run "$png" >/dev/null
+hasnt "$(<"$png")" "H:"
+
+t "caracteres especiais repetidos e no fim: cada um ganha a sua barra"
+rede "Casa" ';;::,,""\\' wpa-psk 'fim\'
+ok run "$png" >/dev/null
+eq 'WIFI:T:WPA;S:\;\;\:\:\,\,\"\"\\\\;P:fim\\;;' "$(<"$png")"
+
+t "SSID que parece opção do echo (-n, -e) é impresso como nome"
+for nome in "-n" "-e" "-E"; do
+  rede "Casa" "$nome" wpa-psk "segredo123"
+  out=$(run "$png")
+  eq "$nome" "$out"
+  eq "WIFI:T:WPA;S:$nome;P:segredo123;;" "$(<"$png")"
+done
+
+t "conexão sem SSID: avisa e não gera um QR sem nome"
+rede "Casa" "" wpa-psk "segredo123"
+: >"$nm/ssid"
+err=$(run "$png" 2>&1 >/dev/null)
+eq 1 $?
+has "$err" "sem nome de rede"
+not_called "qrencode"
 
 t "SSID e senha com ; , : \" e barra ganham a barra do formato WIFI:"
 rede "Casa" 'a;b,c:d"e\f' wpa-psk 'p;1,2:3"4\5'

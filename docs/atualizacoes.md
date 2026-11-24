@@ -79,7 +79,10 @@ do git: o script não cuida de login.
 - Pacote novo que uma migração usa está na linha `# pacotes:` dela. App novo
   para todo mundo está em `system/packages/apps.packages` (o `mk-update`
   oferece sozinho).
-- Mexeu nas listas de pacotes? Rode `bin/check-packages`.
+- Mexeu nas listas de pacotes? Rode `bin/check-packages`, com rede. Sem
+  alcançar o AUR ele diz "não alcancei o AUR", deixa os pacotes de
+  `aur.packages` sem conferir e sai com 1: isso não quer dizer que algum
+  pacote falte. As outras listas são conferidas do mesmo jeito.
 - Não lance duas vezes o mesmo commit esperando efeito, nem um commit mais
   antigo que o último lançado: os Mk instalados não aceitam data anterior.
 - Depois de lançar não há "desfazer" no script. O conserto é um commit novo e
@@ -98,7 +101,58 @@ mk-update --check
 ```
 
 `mk atualizar` e o botão "atualizar tudo" dos Ajustes chamam o mesmo
-`/usr/bin/mk-update`. A ordem:
+`/usr/bin/mk-update`.
+
+### Uma confirmação só
+
+Depois do "Atualizar agora?", o `pacman` e o `yay` rodam com `--noconfirm`:
+nenhum deles pergunta "Continuar a instalação?". O que é decisão sua, e não
+confirmação, continua sendo pergunta, mas vem em seguida, antes de qualquer
+passo demorado (passo 3): tirar a trava do pacman, os apps novos e o AUR que
+ficou de fora. Respondidas essas, dá para sair de perto: nada mais lê o
+teclado até o "Enter fecha" do fim.
+
+A senha do `sudo` é pedida uma vez, no começo da parte demorada (antes do
+pacman; numa rodada só de AUR, antes de o `yay` compilar), e renovada ao fundo
+a cada 50 segundos (`sudo -n -v`) enquanto a rodada durar. Sem isso, uma
+transação mais longa que a validade da senha terminaria noutro pedido de
+senha, no meio. Rodada que não precisa de root não chama o `sudo`. Se o
+`sudoers` não deixa renovar (`timestamp_timeout=0`), a senha volta a ser
+pedida a cada passo.
+
+O `--noconfirm` responde o padrão a cada pergunta do pacman. O que isso dá em
+cada decisão de verdade:
+
+| Pergunta do pacman | Padrão | O que o `mk-update` faz |
+|---|---|---|
+| mais de um pacote serve (provedores) | o primeiro da lista | **não deixa escolher**: um ensaio antes da transação (`pacman -Su --print`, sem root, `LC_ALL=C`) mostra a pergunta; a rodada para em `sistema` com a lista na tela e o comando para você rodar à mão |
+| dois pacotes em conflito, remover um? | não | o pacman para sem mexer em nada; a rodada para em `sistema` com o aviso |
+| pacote que não dá para instalar, pular? | não | idem |
+| trocar um pacote pelo sucessor declarado pelo Arch ("Replace") | sim | aceita, como numa atualização feita à mão |
+| importar a chave de um empacotador | sim | aceita |
+
+Nos casos em que para, o conserto é rodar `sudo pacman -Syu` no terminal,
+responder ao pacman e rodar `mk-update` de novo. O `yay` com `--noconfirm`
+também não resolve conflito sozinho: falha, e a rodada para em `aur`.
+
+O ensaio procura o texto do pacman em inglês ("providers available for"). O
+comportamento do pacman e do `yay` de verdade com `--noconfirm` foi deduzido do
+manual e das mensagens deles, **não ensaiado**: os testes usam um pacman falso.
+
+### Uma rodada de cada vez
+
+A rodada roda dentro do `flock(1)`, com a trava em
+`$XDG_RUNTIME_DIR/mk-update.trava` (sem `XDG_RUNTIME_DIR`, em
+`~/.local/state/mk/`). Uma segunda rodada, de outro terminal ou do botão dos
+Ajustes, diz "já há uma atualização rodando" e sai com 1 sem tocar em nada.
+Conta como rodando desde a procura, inclusive parada no "Atualizar agora?";
+o "Enter fecha" do fim já não segura a trava. Ela é do processo, não do
+arquivo: se a rodada morre, some junto, e não há o que destravar à mão. O
+`--check` não trava nem é travado. A trava é por usuário: não impede outro
+usuário da mesma máquina (aí quem segura é a trava do próprio pacman). Sem o
+`flock` instalado, a rodada roda sem trava.
+
+A ordem:
 
 ### 0. O registro
 
@@ -115,14 +169,16 @@ sem o `script`, a atualização roda igual, sem registro.
 Roda `shell/mare/scripts/mare-updates` (o mesmo dos Ajustes) e mostra: o Mk, o número de
 pacotes do sistema e do AUR, as migrações pendentes ("ajustes") e os apps
 novos do Mk. Sem nada a fazer, diz "tudo em dia" e sai. Senão pergunta
-"Atualizar agora?".
+"Atualizar agora?". É a única confirmação da rodada.
 
 ### 2. O próprio Mk
 
 Só quando o canal tem versão nova:
 
-1. Clona o canal (raso), tira o `.git` e preserva o
-   `/usr/share/mk/aur-pendentes.txt`, se existir.
+1. Clona o canal (raso) numa pasta temporária (`mk-update.XXXXXX`), tira o
+   `.git` e preserva o `/usr/share/mk/aur-pendentes.txt`, se existir. A pasta
+   é apagada em qualquer saída: clone que falha, erro no meio da troca,
+   janela fechada.
 2. Copia para `/usr/share/mk.novo`, apaga `/usr/share/mk` e renomeia.
 3. Reinstala `/usr/bin/mk-session`, `/usr/bin/mk-update`,
    `/usr/bin/mk-hibernate` (só serve para desfazer um preparo antigo) e o gancho
@@ -142,11 +198,27 @@ A troca de `~/.config/mk` vale para quem rodou o `mk-update`. Outro usuário da
 mesma máquina continua com a versão antiga na pasta dele até rodar o
 `mk-update` também.
 
-### 3. Trava do pacman
+### 3. As decisões
 
-Se existe `/var/lib/pacman/db.lck` e não há `pacman`, `yay`, `makepkg` nem
-`pamac` rodando, a trava é sobra de uma atualização interrompida. Ele oferece
-remover.
+Três perguntas possíveis, nesta ordem, uma atrás da outra. Só aparece a que
+tem motivo:
+
+1. **A trava do pacman.** Se existe `/var/lib/pacman/db.lck` e não há
+   `pacman`, `yay`, `makepkg` nem `pamac` rodando, a trava é sobra de uma
+   atualização interrompida. Ele oferece remover.
+2. **Os apps novos do Mk** (veja o passo 5): "Instalar junto com a
+   atualização?" e, à parte, o LibreOffice.
+3. **O AUR que ficou de fora da instalação** (veja o passo 7): "Instalar no
+   fim desta rodada?".
+
+Por que aqui: é o primeiro ponto em que todas podem ser feitas. Com Mk novo,
+elas vêm depois da troca (passo 2, segundos), e não antes, porque a lista de
+apps chega com o Mk novo e quem pergunta já é o `mk-update` novo. Vêm antes
+das migrações, do pacman e do AUR, que são o que demora.
+
+Uma exceção: se `/var/lib/mk/apps-oferecidos` ainda não existe e uma migração
+do passo 4 o cria nesta rodada, a oferta de apps só passa a existir depois
+dela, e a pergunta é feita ali, ainda antes do pacman.
 
 ### 4. Migrações que não pedem pacote
 
@@ -164,18 +236,30 @@ Entram na mesma transação do `pacman`:
 - os **pacotes pedidos pelas migrações** (só os que faltam);
 - os **apps novos do Mk**: o que está em `system/packages/apps.packages` e
   ainda não consta em `/var/lib/mk/apps-oferecidos`, menos o que já está
-  instalado. Ele pergunta "Instalar junto com a atualização?" e, à parte, pelo
-  LibreOffice. Aceito o LibreOffice num sistema com `LANG=pt_BR` em
-  `/etc/locale.conf`, entra junto o `libreoffice-fresh-pt-br`.
+  instalado. A pergunta foi feita no passo 3. Aceito o LibreOffice num sistema
+  com `LANG=pt_BR` em `/etc/locale.conf`, entra junto o
+  `libreoffice-fresh-pt-br`.
 
 A oferta de apps só existe se `/var/lib/mk/apps-oferecidos` existir e não
 estiver vazio. Com o arquivo vazio, nada é oferecido nunca.
 
 Nunca se instala pacote novo sobre um sistema desatualizado: é por isso que
-tudo vai junto. Sem pacotes pedidos por migração, o comando é
-`pacman -Syu --needed <apps>`. Com eles, primeiro `pacman -Sy`, depois sai do
-pedido o nome que não existe mais nos repositórios, e então
-`pacman -Su --needed <pedidos> <apps>`.
+tudo vai junto. Os comandos, em ordem:
+
+1. `sudo pacman -Sy`: a lista nova.
+2. Sai do pedido das migrações o nome que não existe mais nos repositórios,
+   com aviso.
+3. O ensaio: `pacman -Su --print --noconfirm --needed <pedidos> <apps>`, sem
+   root e sem instalar nada. Se ele mostra uma escolha de provedor, a rodada
+   para aqui (veja "Uma confirmação só"). Se o ensaio falha por outro motivo,
+   segue: o erro quem dá é a transação.
+4. `sudo pacman -Su --noconfirm --needed <pedidos> <apps>`: a transação, sem
+   perguntas. Se ela falha, a rodada para com o erro do pacman e a instrução
+   de rodar `sudo pacman -Syu` à mão.
+
+Se a rodada para no ensaio ou na transação, a lista já foi baixada (`-Sy`) e o
+sistema não foi atualizado: não instale pacote avulso com `pacman -S` nesse
+estado; termine a atualização primeiro.
 
 Sem pacotes do sistema a atualizar, sem app aceito e sem pacote pedido, o
 pacman é pulado.
@@ -199,11 +283,12 @@ Se há pacotes do AUR a atualizar e o `yay` existe:
 passo é pulado em silêncio.
 
 Se existe `/usr/share/mk/aur-pendentes.txt` (pacotes do AUR que não vieram no
-ISO) e o `yay` existe, ele pergunta se instala agora. Se o `yay` dá certo, o
-arquivo é apagado; se falha, o arquivo fica para a próxima rodada e esta
-termina como "pronto" mesmo assim. Respondendo sim, roda em seguida
-`system/mk/boot/limine-default`, com o `yay` dando certo ou não, porque os
-ganchos do limine reescrevem o menu de boot.
+ISO) e o `yay` existe, a pergunta foi feita no passo 3. Aceita, é aqui que
+roda: `yay -S --needed --noconfirm --answerclean None --answerdiff None
+--removemake <pacotes>`. Se o `yay` dá certo, o arquivo é apagado; se falha, o
+arquivo fica para a próxima rodada e esta termina como "pronto" mesmo assim.
+Roda em seguida `system/mk/boot/limine-default`, com o `yay` dando certo ou
+não, porque os ganchos do limine reescrevem o menu de boot.
 
 ### 8. Fim
 
@@ -334,12 +419,14 @@ less -R +G "$(jq -r .log ~/.local/state/mk/ultima-atualizacao.json)"
 Depois, quase sempre, **rode `mk-update` de novo**. Cada passo aguenta
 repetição: a troca do Mk se refaz inteira, migração feita não roda outra vez,
 a trava do pacman é oferecida para remoção, e o pacman continua de onde dá.
+Se a resposta for "já há uma atualização rodando", há outra rodada viva (outra
+janela, talvez parada numa pergunta): termine ou feche aquela.
 
 | Parou em | O que costuma ser | O que fazer |
 |---|---|---|
 | `mk` | sem rede ou sem acesso ao canal durante o clone; `sudo` recusado | `mk-update` de novo. Enquanto `~/.config/mk/VERSION` não muda, a versão nova continua sendo oferecida |
 | `ajustes` | uma migração saiu com erro | o registro diz qual (a última linha `system/…` ou `user/…`). Ela continua pendente. Se ela não tem `# pacotes:`, os pacotes e o AUR não rodaram; se tem, o pacman já rodou e só o AUR ficou por fazer. Corrija a causa e rode de novo. Se o defeito é da migração, o conserto é um lançamento novo |
-| `sistema` | o pacman falhou: espelho, chave, conflito de arquivo, disco cheio | leia o erro do pacman no registro, resolva e rode de novo. Os apps oferecidos voltam a ser oferecidos |
+| `sistema` | o pacman falhou: espelho, chave, conflito de arquivo, disco cheio; ou precisava de uma escolha sua (provedor, conflito entre pacotes), que o `mk-update` não faz por você | leia o erro do pacman no registro, resolva e rode de novo. Se era uma escolha, rode `sudo pacman -Syu` no terminal, responda e rode `mk-update` de novo. Os apps oferecidos voltam a ser oferecidos |
 | `aur` | um pacote do AUR não compilou | o sistema já está atualizado. Tente de novo mais tarde, ou trate o pacote com o `yay` |
 | `início` | parou antes do primeiro passo | `mk-update` de novo |
 

@@ -15,6 +15,12 @@
 //           máquina não tem (scripts/mare-caps). Vale também numa opção de
 //           um "choice" (veja optionShown)
 // A ideia vem do Hub do Ryoku: a página é dado, não layout.
+//
+// O esquema é a autoridade sobre o que vale. O ajustes.json é um arquivo da
+// pessoa e pode ter sido mexido à mão: um valor só segue adiante (para o Lua
+// do Hyprland, para o hypridle.conf) se for o que a linha aceita (veja
+// valid); se não, vale o de fábrica. Quem lê um ajuste aqui dentro usa
+// valueOf (ou clean, para todos de uma vez), nunca values[key].
 
 var groups = [
     { name: "APARÊNCIA", items: [
@@ -123,20 +129,25 @@ var rows = [
       desc: "Minutos sem mexer no teclado ou no mouse", ctl: "slider",
       min: 0, max: 30, step: 1, def: 4, unit: "min", precisa: "brilho",
       kw: "inatividade ocioso brilho hypridle" },
+    // O descanso de tela do Maré (ScreenSaver.qml): a marca sendo construída,
+    // por cima de tudo, até alguém mexer. Faz o papel que era do suspender.
+    { page: "energia", group: "AO SE AFASTAR", key: "idle.saver", label: "Descanso de tela",
+      desc: "A marca do Mk toma a tela; qualquer tecla ou o mouse devolve", ctl: "slider",
+      min: 0, max: 60, step: 1, def: 3, unit: "min", kw: "protetor de tela screensaver inatividade ocioso" },
     { page: "energia", group: "AO SE AFASTAR", key: "idle.lock", label: "Bloquear",
       desc: "Pede a senha para voltar", ctl: "slider",
       min: 0, max: 60, step: 1, def: 5, unit: "min", kw: "bloqueio senha hyprlock tela de bloqueio" },
     { page: "energia", group: "AO SE AFASTAR", key: "idle.off", label: "Desligar a tela",
       desc: "A tela apaga; qualquer tecla acende", ctl: "slider",
-      min: 0, max: 60, step: 1, def: 6, unit: "min", kw: "dpms monitor apagar" },
+      min: 0, max: 120, step: 1, def: 30, unit: "min", kw: "dpms monitor apagar" },
     { page: "energia", group: "BATERIA", key: "power.lowWarn", label: "Avisar bateria fraca",
       desc: "Um aviso quando a carga está acabando", ctl: "switch", def: true, precisa: "bateria",
       kw: "carga pouca acabando notificação" },
     // Uma escolha só, usada em todo lugar: o passo de dormir abaixo, o painel
     // de sessão e a tela de bloqueio (veja sleepMode). O Mk não hiberna.
     { page: "energia", group: "DORMIR", key: "power.sleep", label: "Ao dormir",
-      desc: "Suspender guarda na memória e volta na hora",
-      ctl: "choice", def: "suspender",
+      desc: "De fábrica o Mk não dorme: fica o descanso de tela. Suspender guarda na memória e volta na hora",
+      ctl: "choice", def: "nada",
       options: [ { v: "suspender", label: "suspender" }, { v: "nada", label: "não dormir" } ],
       kw: "suspender suspensão sleep suspend s3" },
     { page: "energia", group: "DORMIR", key: "idle.suspend", label: "Dormir",
@@ -207,8 +218,9 @@ function defaults() {
     var out = {};
     for (var i = 0; i < rows.length; i++)
         out[rows[i].key] = rows[i].def;
+    // A lista de fábrica sai copiada: quem recebe pode mexer na sua.
     for (var k in hidden)
-        out[k] = hidden[k];
+        out[k] = Array.isArray(hidden[k]) ? hidden[k].slice() : hidden[k];
     return out;
 }
 
@@ -370,8 +382,12 @@ function animationCode(values, changed) {
 function luaValue(v) {
     if (typeof v === "boolean")
         return v ? "true" : "false";
+    // NaN e infinito não têm como escrever em Lua ("NaN" seria uma variável).
     if (typeof v === "number")
-        return String(Math.round(v * 1000) / 1000);
+        return isFinite(v) ? String(Math.round(v * 1000) / 1000) : "nil";
+    // Só texto vira texto: null, lista e objeto não são valor de ajuste.
+    if (typeof v !== "string")
+        return "nil";
     // Uma quebra de linha crua dentro das aspas é erro de sintaxe no Lua.
     var text = String(v).replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
     return "\"" + text.replace(/\n/g, "\\n").replace(/\r/g, "\\r") + "\"";
@@ -383,7 +399,7 @@ function hyprTable(values, changed) {
         var row = rows[i];
         if (!row.hypr || row.hypr[0] === "@")
             continue;
-        var v = values[row.key] !== undefined ? values[row.key] : row.def;
+        var v = valueOf(values, row.key);
         var parts = row.hypr.split(".");
         var node = tree;
         for (var p = 0; p < parts.length - 1; p++) {
@@ -405,11 +421,64 @@ function hyprTable(values, changed) {
     return emit(tree);
 }
 
+// O que está guardado em `values` para a chave, como está (sem conferir);
+// undefined se não há. Ajustes que não são um objeto valem como vazios.
+function saved(values, key) {
+    if (values === null || typeof values !== "object" || Array.isArray(values)
+            || !Object.prototype.hasOwnProperty.call(values, key))
+        return undefined;
+    return values[key];
+}
+
+// O valor serve para a linha? Slider: número finito entre min e max. Switch:
+// true ou false. Choice: uma das opções, do mesmo tipo ("1.4" não é 1.4).
+function valid(row, v) {
+    if (!row)
+        return false;
+    if (row.ctl === "slider")
+        return typeof v === "number" && isFinite(v) && v >= row.min && v <= row.max;
+    if (row.ctl === "switch")
+        return typeof v === "boolean";
+    if (row.ctl === "choice") {
+        for (var i = 0; i < (row.options || []).length; i++)
+            if (row.options[i].v === v)
+                return true;
+    }
+    return false;
+}
+
+// O valor que vale para a chave: o guardado, se a linha o aceita (valid); se
+// não (não há, é de outro tipo, está fora da faixa ou das opções), o de
+// fábrica. Chave que não é de nenhuma linha dá undefined.
 function valueOf(values, key) {
+    var row = rowOf(key);
+    if (row === null)
+        return undefined;
+    var v = saved(values, key);
+    return valid(row, v) ? v : row.def;
+}
+
+// Todos os ajustes de uma vez, já limpos: cada linha com o valueOf dela, cada
+// chave escondida com o valor guardado se for do tipo do de fábrica (texto,
+// número finito, lista). O que não é do esquema (as trocas de "keybinds", que
+// o Keybinds.js limpa) passa como está. Não muda os `values` recebidos.
+function clean(values) {
+    var out = defaults();
     for (var i = 0; i < rows.length; i++)
-        if (rows[i].key === key)
-            return values[key] !== undefined ? values[key] : rows[i].def;
-    return undefined;
+        out[rows[i].key] = valueOf(values, rows[i].key);
+    for (var h in hidden) {
+        var v = saved(values, h);
+        if (Array.isArray(hidden[h]) ? Array.isArray(v)
+                : typeof v === typeof hidden[h] && (typeof v !== "number" || isFinite(v)))
+            out[h] = Array.isArray(v) ? v.slice() : v;
+    }
+    if (values !== null && typeof values === "object" && !Array.isArray(values))
+        for (var k in values)
+            // "__proto__" escrito no JSON trocaria o protótipo do resultado.
+            if (Object.prototype.hasOwnProperty.call(values, k) && k !== "__proto__"
+                    && !Object.prototype.hasOwnProperty.call(out, k))
+                out[k] = values[k];
+    return out;
 }
 
 // O Lua que aplica tudo: hl.config, as animações e a escala dos monitores.
@@ -432,6 +501,9 @@ function hyprLua(values) {
 // que sobrou de quando o Mk hibernava também: não vira suspender sozinho.
 // Sem caps (o mare-caps ainda não respondeu), vale a escolha.
 function sleepMode(values, caps) {
+    // Uma escolha que não existe não é a de fábrica: é não dormir.
+    if (orphan(values, "power.sleep"))
+        return "nada";
     var mode = valueOf(values, "power.sleep");
     if (mode === "suspender")
         return caps && caps.sono && caps.sono.canSuspend === false ? "nada" : "suspender";
@@ -440,16 +512,14 @@ function sleepMode(values, caps) {
 
 // O valor salvo de uma linha de escolha não é nenhuma das opções dela: sobrou
 // de uma opção que o Mk tirou ("hibernar") ou veio torto do ajustes.json. O
-// painel avisa em vez de mostrar a linha sem nada marcado.
+// painel avisa em vez de mostrar a linha sem nada marcado. Olha o valor
+// guardado (saved): o valueOf já devolveria o de fábrica no lugar dele.
 function orphan(values, key) {
     var r = rowOf(key);
     if (!r || r.ctl !== "choice" || !r.options)
         return false;
-    var v = valueOf(values, key);
-    for (var i = 0; i < r.options.length; i++)
-        if (r.options[i].v === v)
-            return false;
-    return true;
+    var v = saved(values, key);
+    return v !== undefined && !valid(r, v);
 }
 
 // O comando de cada jeito de dormir; "" = não dorme.
@@ -468,7 +538,9 @@ function sleepStep(text) {
 
 // O hypridle.conf dos Ajustes (Energia). Minutos 0 = aquele passo não acontece.
 // Sem brilho para mexer (caps), o passo de escurecer também não; o de dormir
-// segue power.sleep.
+// segue power.sleep. Os minutos vêm do valueOf (um número da faixa da linha),
+// e o timeout é sempre um inteiro de pelo menos um segundo: "0" dispararia
+// na hora.
 function hypridleConf(values, hyprDir, caps) {
     var out = "# Gerado pelos Ajustes do Mk (Super + ,), página Energia. Não edite.\n\n"
         + "general {\n"
@@ -476,8 +548,10 @@ function hypridleConf(values, hyprDir, caps) {
         + "    before_sleep_cmd = loginctl lock-session\n"
         + "    after_sleep_cmd = hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'\n"
         + "}\n";
+    var qs = "qs -p " + hyprDir.replace(/\/hypr$/, "/shell") + " ipc call mare ";
     var steps = [
         ["idle.dim", "brightnessctl -s set 15%", "brightnessctl -r"],
+        ["idle.saver", qs + "saver on", qs + "saver off"],
         ["idle.lock", "loginctl lock-session", ""],
         ["idle.off", "hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })'", "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'"],
         ["idle.suspend", sleepCommand(values, caps), ""]
@@ -486,7 +560,7 @@ function hypridleConf(values, hyprDir, caps) {
         var min = valueOf(values, steps[i][0]);
         if (!min || !steps[i][1] || (steps[i][0] === "idle.dim" && caps && caps.brilho === false))
             continue;
-        out += "\nlistener {\n    timeout = " + Math.round(min * 60) + "\n    on-timeout = " + steps[i][1] + "\n"
+        out += "\nlistener {\n    timeout = " + Math.max(1, Math.round(min * 60)) + "\n    on-timeout = " + steps[i][1] + "\n"
             + (steps[i][2] ? "    on-resume = " + steps[i][2] + "\n" : "") + "}\n";
     }
     return out;

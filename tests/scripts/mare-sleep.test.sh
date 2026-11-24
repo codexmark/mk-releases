@@ -43,11 +43,16 @@ echo '{"power.sleep":"suspender"}' >"$SBX/ajustes.json"
 run now
 called "systemctl suspend"
 
-t "now: sem ajustes.json, suspende"
+t "now: sem ajustes.json, não dorme (de fábrica fica o descanso de tela)"
 calls_reset
 rm -f "$SBX/ajustes.json"
-run now
-called "systemctl suspend"
+ok run now
+not_called "systemctl"
+
+t "now: um ajustes.json sem a escolha também não dorme"
+echo '{"hypr.gapsIn":4}' >"$SBX/ajustes.json"
+ok run now
+not_called "systemctl"
 
 t "now: 'nada' não chama nada"
 calls_reset

@@ -6,6 +6,7 @@ tags:
   - recuperação
   - diagnóstico
 fontes:
+  - "docs/limites.md"
   - "docs/atualizacoes.md"
   - "bin/mk-update"
 ---
@@ -31,9 +32,10 @@ less -R +G "$(jq -r .log ~/.local/state/mk/ultima-atualizacao.json)"
 |---|---|---|
 | `mk` | sem rede ou sem acesso ao canal durante o clone; `sudo` recusado | `mk-update` de novo; enquanto `<raiz>/VERSION` não muda, a versão nova continua sendo oferecida |
 | `ajustes` | uma migração saiu com erro | o registro diz qual; ela continua pendente. Corrija a causa e rode de novo. Se o defeito é da migração, o conserto é um lançamento novo |
-| `sistema` | o pacman falhou: espelho, chave, conflito de arquivo, disco cheio | leia o erro, resolva, rode de novo; os apps oferecidos voltam a ser oferecidos |
+| `sistema` | o pacman falhou (espelho, chave, conflito de arquivo, disco cheio), ou parou porque precisava escolher entre provedores | leia o erro, resolva, rode de novo; na escolha de provedor, rode o `sudo pacman -Syu …` que a mensagem mostra, responda e rode `mk-update` de novo. Se parou depois do `-Sy`, o sistema está com a lista nova e os pacotes antigos: atualize antes de instalar qualquer pacote avulso |
 | `aur` | um pacote do AUR não compilou | o sistema já está atualizado; tente mais tarde ou trate o pacote com o `yay` |
 | `início` | parou antes do primeiro passo | `mk-update` de novo |
+| (nem começa) | "já há uma atualização rodando" | há outra rodada do mesmo usuário; espere ela terminar ou feche a janela dela |
 
 Por que repetir funciona: a troca do Mk se refaz inteira, migração feita não roda outra vez, a trava do pacman é oferecida para remoção, e o pacman continua de onde dá.
 

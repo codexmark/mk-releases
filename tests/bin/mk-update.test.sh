@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # bin/mk-update: a rodada inteira numa raiz falsa (MK_ROOT): a procura, a troca
 # do Mk, as migrações, o pacman, os apps novos, o AUR, a trava, o resumo e o
-# registro. sudo, pacman, yay, git, pgrep e uname são stubs.
+# registro, a trava contra duas rodadas e a confirmação única. sudo, pacman, yay,
+# git, pgrep e uname são stubs.
 . "$(dirname "$0")/../lib.sh"
 
 R=$SBX/raiz
@@ -10,6 +11,7 @@ cfg=$XDG_CONFIG_HOME/mk
 state=$XDG_STATE_HOME/mk
 resumo=$state/ultima-atualizacao.json
 vistos=$R/var/lib/mk/apps-oferecidos
+trava=$XDG_RUNTIME_DIR/mk-update.trava
 kernel=6.0-teste
 velha="aaaaaaaaaaaa 2026-11-01"
 nova="bbbbbbbbbbbb 2026-11-10"
@@ -26,8 +28,10 @@ monta_mk() { # monta_mk <pasta> <"commit data">
     mkdir -p "$d/$p"
     echo "$2" >"$d/$p/versao"
   done
-  # A procura: devolve o que o caso escreveu em $SBX/info.json.
-  printf '#!/bin/bash\ncat "$SBX/info.json"\n' >"$d/shell/mare/scripts/mare-updates"
+  # A procura: devolve o que o caso escreveu em $SBX/info.json. Com PRENDE no
+  # ambiente, só responde depois que $SBX/solta existir (uma procura demorada).
+  printf '#!/bin/bash\nwhile [[ -n ${PRENDE:-} && ! -e $SBX/solta ]]; do sleep 0.1; done\ncat "$SBX/info.json"\n' \
+    >"$d/shell/mare/scripts/mare-updates"
   chmod +x "$d/shell/mare/scripts/mare-updates"
   printf '#!/bin/bash\necho limine-default >>"$SBX/ordem"\n' >"$d/system/mk/boot/limine-default"
   echo "$2" >"$d/VERSION"
@@ -50,7 +54,7 @@ migra() { # migra <system|user> <nome> [linha do cabeçalho] [código de saída]
 
 # Máquina instalada na versão velha, tudo em dia, canal com a nova.
 zera() {
-  rm -rf "${R:?}" "${cfg:?}" "${state:?}" "${SBX:?}/canal" "${SBX:?}"/{instalados,sumiram,pacman-rc,yay-rc,git-falha,pacman-rodando,passou}
+  rm -rf "${R:?}" "${cfg:?}" "${state:?}" "${SBX:?}/canal" "${SBX:?}"/{instalados,sumiram,pacman-rc,yay-rc,git-falha,git-fecha,pacman-rodando,passou,pacman-plano,pacman-demora,solta}
   calls_reset
   : >"$SBX/ordem"
   monta_mk "$share" "$velha"
@@ -68,7 +72,9 @@ zera() {
 
 # O sudo falso executa o comando, mas só aceita caminhos dentro de $SBX: um
 # caminho do sistema de verdade reprova o arquivo (o MK_ROOT não cobriu algo).
+# "sudo -v" (pedir a senha) e "sudo -n -v" (renovar) só ficam anotados.
 stub sudo '
+[[ $* == -v || $* == "-n -v" ]] && exit 0
 for a in "$@"; do
   case $a in /*) p=$a ;; *=/*) p=${a#*=} ;; *) continue ;; esac
   case $p in "$SBX"/* | /dev/null) ;; *)
@@ -78,20 +84,29 @@ for a in "$@"; do
 done
 exec "$@"'
 # pacman: -T devolve os que faltam (os que não estão em $SBX/instalados), -Si
-# falha para os de $SBX/sumiram, e a transação sai com o código de $SBX/pacman-rc.
+# falha para os de $SBX/sumiram, e a transação sai com o código de $SBX/pacman-rc
+# (depois de $SBX/pacman-demora segundos, se houver). O ensaio (--print) não
+# entra em $SBX/ordem e responde o que estiver em $SBX/pacman-plano.
 stub pacman '
+case " $* " in *" --print "*) cat "$SBX/pacman-plano" 2>/dev/null; exit 0 ;; esac
 case $1 in
   -T) shift; for p in "$@"; do grep -qxF -- "$p" "$SBX/instalados" 2>/dev/null || echo "$p"; done ;;
   -Si) ! grep -qxF -- "$2" "$SBX/sumiram" 2>/dev/null ;;
   -Sy) echo "pacman $*" >>"$SBX/ordem" ;;
-  -S*) echo "pacman $*" >>"$SBX/ordem"; exit "$(cat "$SBX/pacman-rc" 2>/dev/null || echo 0)" ;;
+  -S*) echo "pacman $*" >>"$SBX/ordem"; sleep "$(cat "$SBX/pacman-demora" 2>/dev/null || echo 0)"; exit "$(cat "$SBX/pacman-rc" 2>/dev/null || echo 0)" ;;
 esac'
 stub yay 'echo "yay $*" >>"$SBX/ordem"; exit "$(cat "$SBX/yay-rc" 2>/dev/null || echo 0)"'
-# git: o clone copia $SBX/canal (com um .git, para ver que ele sai).
+# git: o clone copia $SBX/canal (com um .git, para ver que ele sai). Com
+# $SBX/git-falha, morre deixando um clone pela metade; com $SBX/git-fecha, a
+# janela é fechada (TERM) no meio dele.
 stub git '
 case " $* " in
   *" clone "*)
-    [[ -e $SBX/git-falha ]] && exit 128
+    if [[ -e $SBX/git-falha || -e $SBX/git-fecha ]]; then
+      mkdir -p "${@: -1}/.git" && echo metade >"${@: -1}/.git/pack"
+      [[ -e $SBX/git-fecha ]] && kill -TERM "$PPID"
+      exit 128
+    fi
     cp -a "$SBX/canal" "${@: -1}" && mkdir -p "${@: -1}/.git" ;;
   *" show HEAD:"*) f=${*: -1}; cat "$2/${f#HEAD:}" 2>/dev/null ;;
   *rev-parse*) echo abcdef123456 ;;
@@ -155,7 +170,7 @@ jq -c '.mk.channel = ""' "$SBX/info.json" >"$SBX/info.novo" && mv "$SBX/info.nov
 out=$(run <<<"s")
 eq 0 $?
 has "$out" "sem canal de atualização"
-called "sudo pacman -Syu --needed"
+called "sudo pacman -Su --noconfirm --needed"
 not_called "git"
 
 t "responder 'n' não aplica nada e não grava resumo"
@@ -182,7 +197,7 @@ t "Enter sozinho é sim"
 zera
 info false 1 0
 run <<<"" >/dev/null
-called "sudo pacman -Syu --needed"
+called "sudo pacman -Su --noconfirm --needed"
 
 t "mais de 40 pacotes: lista 40 e diz quantos ficaram de fora"
 zera
@@ -238,6 +253,13 @@ for d in hypr shell ghostty fastfetch bash; do
   absent "$cfg/$d.velho"
 done
 eq "$nova" "$(cat "$cfg/VERSION")"
+
+t "Mk novo: o VERSION de ~/.config/mk é gravado inteiro e de uma vez (arquivo ao lado, sync, troca)"
+# Um desligamento à força logo depois da atualização deixava o arquivo com 0
+# bytes (visto na VM): gravar por cima sem sync não garante o conteúdo.
+absent "$cfg/VERSION.novo"
+has "$(sed -n '/install_bins$/,/after-mk$/p' "$REPO/bin/mk-update")" 'mv "$cfg/VERSION.novo" "$cfg/VERSION"'
+has "$(sed -n '/install_bins$/,/after-mk$/p' "$REPO/bin/mk-update")" 'sync'
 
 t "Mk novo: o resumo diz de qual versão para qual"
 eq true "$(campo ok)"
@@ -349,7 +371,7 @@ eq 0 $?
 eq "$nova" "$(cat "$share/VERSION")"
 eq true "$(campo ok)"
 eq "" "$(campo step)"
-called "sudo pacman -Syu --needed"
+called "sudo pacman -Su --noconfirm --needed"
 
 t "o mk-update novo quebra logo depois da troca: o resumo fica 'parou em: mk', já na versão nova"
 zera
@@ -442,7 +464,8 @@ eq 0 $?
 eq "system/20260202-quebra.sh $share
 system/20260303-c.sh $share
 user/20260101-u.sh $share
-pacman -Syu --needed
+pacman -Sy
+pacman -Su --noconfirm --needed
 yay -Sua --noconfirm --answerclean None --answerdiff None" "$(cat "$SBX/ordem")"
 eq true "$(campo ok)"
 
@@ -456,10 +479,9 @@ eq 0 $?
 eq "system/20260101-antes.sh $share
 user/20260101-u.sh $share
 pacman -Sy
-pacman -Su --needed wtype cups
+pacman -Su --noconfirm --needed wtype cups
 system/20260202-pede.sh $share" "$(cat "$SBX/ordem")"
 exists "$R/var/lib/mk/migrations/20260202-pede.sh"
-not_called "pacman -Syu"
 has "$out" "ajustes do Mk que dependiam dos pacotes"
 
 t "# pacotes: o que já está instalado não entra no pedido"
@@ -468,7 +490,7 @@ migra system 20260202-pede.sh "# pacotes: wtype cups"
 echo cups >"$SBX/instalados"
 run <<<"s" >/dev/null
 eq "pacman -Sy
-pacman -Su --needed wtype
+pacman -Su --noconfirm --needed wtype
 system/20260202-pede.sh $share" "$(cat "$SBX/ordem")"
 
 t "# pacotes: com tudo já instalado e nada a atualizar, o pacman é pulado e a migração roda"
@@ -487,7 +509,7 @@ out=$(run <<<"s")
 eq 0 $?
 has "$out" "sumido não está nos repositórios: fica de fora"
 eq "pacman -Sy
-pacman -Su --needed wtype
+pacman -Su --noconfirm --needed wtype
 system/20260202-pede.sh $share" "$(cat "$SBX/ordem")"
 
 t "# pacotes: nome fora de ^[a-z0-9@._+-]+\$ é descartado em silêncio"
@@ -495,7 +517,7 @@ zera
 migra system 20260202-pede.sh '# pacotes: wtype Maiusculo $(reboot) a;b'
 run <<<"s" >/dev/null
 eq 0 $?
-called "pacman -Su --needed wtype"
+called "pacman -Su --noconfirm --needed wtype"
 not_called "Maiusculo"
 not_called "reboot"
 
@@ -523,17 +545,18 @@ migra system 20260202-pede.sh "# pacotes: wtype" 1
 run <<<"s" >/dev/null
 [[ $? -ne 0 ]] || _fail "devia sair com erro"
 eq ajustes "$(campo step)"
-called "pacman -Su --needed wtype"
+called "pacman -Su --noconfirm --needed wtype"
 not_called "yay"
 
 # ------------------------------------------------------------------ o Arch
 
-t "pacotes do sistema: um 'sudo pacman -Syu --needed' só"
+t "pacotes do sistema: lista nova (-Sy) e uma transação só (-Su --noconfirm --needed)"
 zera
 info false 3 0
 out=$(run <<<"s")
 eq 0 $?
-eq "pacman -Syu --needed" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed" "$(cat "$SBX/ordem")"
 has "$out" "pronto"
 
 t "nada do Arch a atualizar (só AUR): o pacman é pulado"
@@ -558,7 +581,7 @@ not_called "yay"
 
 apps() { printf '%s\n' "$@" >"$share/system/packages/apps.packages"; }
 
-t "app novo em apps.packages: é oferecido e entra na mesma transação do -Syu"
+t "app novo em apps.packages: é oferecido e entra na mesma transação da atualização"
 zera
 info false 1 0
 apps chromium nautilus loupe
@@ -567,7 +590,8 @@ out=$(run <<<$'s\ns')
 eq 0 $?
 has "$out" "apps       1 novos do Mk"
 has "$out" "apps novos do Mk"
-eq "pacman -Syu --needed loupe" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed loupe" "$(cat "$SBX/ordem")"
 
 t "app novo: depois da rodada fica anotado em apps-oferecidos, uma vez"
 eq "chromium
@@ -586,7 +610,8 @@ echo chromium >"$vistos"
 out=$(run <<<$'s\ns')
 eq 0 $?
 hasnt "$out" "tudo em dia"
-eq "pacman -Syu --needed loupe" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed loupe" "$(cat "$SBX/ordem")"
 
 t "app recusado: não instala, mas fica anotado para não voltar"
 zera
@@ -595,7 +620,8 @@ apps chromium loupe
 echo chromium >"$vistos"
 run <<<$'s\nn' >/dev/null
 eq 0 $?
-eq "pacman -Syu --needed" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed" "$(cat "$SBX/ordem")"
 eq 1 "$(grep -cx loupe "$vistos")"
 
 t "app recusado sem pacotes a atualizar: o pacman é pulado e a oferta fica anotada"
@@ -616,7 +642,8 @@ echo loupe >"$SBX/instalados"
 out=$(run <<<"s")
 hasnt "$out" "novos do Mk"
 hasnt "$out" "Instalar junto"
-eq "pacman -Syu --needed" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed" "$(cat "$SBX/ordem")"
 
 t "comentários, linhas vazias e comentário no fim da linha de apps.packages não viram oferta"
 zera
@@ -624,7 +651,8 @@ info false 1 0
 printf '# Navegador\nchromium\n\n   \nloupe   # visor de imagens\n# gimp\n' >"$share/system/packages/apps.packages"
 echo chromium >"$vistos"
 run <<<$'s\ns' >/dev/null
-eq "pacman -Syu --needed loupe" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed loupe" "$(cat "$SBX/ordem")"
 eq "chromium
 loupe" "$(cat "$vistos")"
 
@@ -634,7 +662,8 @@ info false 1 0
 apps chromium loupe
 out=$(run <<<"s")
 hasnt "$out" "novos do Mk"
-eq "pacman -Syu --needed" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed" "$(cat "$SBX/ordem")"
 absent "$vistos"
 
 t "apps-oferecidos vazio: nada é oferecido nunca"
@@ -653,7 +682,7 @@ printf '#!/usr/bin/env bash\necho chromium >"%s"\n' "$vistos" >"$share/migration
 out=$(run <<<$'s\ns')
 eq 0 $?
 has "$out" "apps novos do Mk"
-called "sudo pacman -Syu --needed loupe"
+called "sudo pacman -Su --noconfirm --needed loupe"
 
 t "o pacman falha com app aceito: a oferta não é anotada e volta na próxima"
 zera
@@ -676,7 +705,8 @@ apps chromium loupe libreoffice-fresh
 echo chromium >"$vistos"
 out=$(run <<<$'s\ns\nn')
 eq 0 $?
-eq "pacman -Syu --needed loupe" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed loupe" "$(cat "$SBX/ordem")"
 eq 1 "$(grep -cx libreoffice-fresh "$vistos")"
 
 t "LibreOffice aceito num sistema em pt_BR: entra junto o libreoffice-fresh-pt-br"
@@ -685,7 +715,8 @@ apps chromium libreoffice-fresh
 echo chromium >"$vistos"
 echo "LANG=pt_BR.UTF-8" >"$R/etc/locale.conf"
 run <<<$'s\ns\ns' >/dev/null
-eq "pacman -Syu --needed libreoffice-fresh libreoffice-fresh-pt-br" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed libreoffice-fresh libreoffice-fresh-pt-br" "$(cat "$SBX/ordem")"
 
 t "LibreOffice aceito noutro idioma: sem o pacote de pt-br"
 zera
@@ -693,7 +724,8 @@ apps chromium libreoffice-fresh
 echo chromium >"$vistos"
 echo "LANG=en_US.UTF-8" >"$R/etc/locale.conf"
 run <<<$'s\ns\ns' >/dev/null
-eq "pacman -Syu --needed libreoffice-fresh" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed libreoffice-fresh" "$(cat "$SBX/ordem")"
 
 t "apps novos e pacotes de migração vão na mesma transação"
 zera
@@ -702,7 +734,7 @@ echo chromium >"$vistos"
 migra system 20260202-pede.sh "# pacotes: wtype"
 run <<<$'s\ns' >/dev/null
 eq "pacman -Sy
-pacman -Su --needed wtype loupe
+pacman -Su --noconfirm --needed wtype loupe
 system/20260202-pede.sh $share" "$(cat "$SBX/ordem")"
 
 # -------------------------------------------------------------------- AUR
@@ -712,7 +744,8 @@ zera
 info false 1 2
 run <<<"s" >/dev/null
 eq 0 $?
-eq "pacman -Syu --needed
+eq "pacman -Sy
+pacman -Su --noconfirm --needed
 yay -Sua --noconfirm --answerclean None --answerdiff None" "$(cat "$SBX/ordem")"
 not_called "sudo yay"
 
@@ -733,7 +766,8 @@ out=$(sem_yay <<<"s")
 eq 0 $?
 has "$out" "pronto"
 hasnt "$out" "AUR que ficou de fora"
-eq "pacman -Syu --needed" "$(cat "$SBX/ordem")"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed" "$(cat "$SBX/ordem")"
 eq true "$(campo ok)"
 exists "$share/aur-pendentes.txt"
 
@@ -744,8 +778,9 @@ printf 'limine-mkinitcpio-hook\nlimine-snapper-sync\n' >"$share/aur-pendentes.tx
 out=$(run <<<$'s\ns')
 eq 0 $?
 has "$out" "AUR que ficou de fora da instalação: limine-mkinitcpio-hook limine-snapper-sync"
-eq "pacman -Syu --needed
-yay -S --needed --answerclean None --answerdiff None --removemake limine-mkinitcpio-hook limine-snapper-sync
+eq "pacman -Sy
+pacman -Su --noconfirm --needed
+yay -S --needed --noconfirm --answerclean None --answerdiff None --removemake limine-mkinitcpio-hook limine-snapper-sync
 limine-default" "$(cat "$SBX/ordem")"
 absent "$share/aur-pendentes.txt"
 called "sudo bash $share/system/mk/boot/limine-default"
@@ -791,7 +826,7 @@ eq 0 $?
 has "$out" "o pacman ficou travado por uma atualização interrompida"
 absent "$R/var/lib/pacman/db.lck"
 called "sudo rm -f $R/var/lib/pacman/db.lck"
-called "sudo pacman -Syu"
+called "sudo pacman -Su --noconfirm"
 
 t "trava do pacman recusada: fica onde está"
 zera
@@ -814,6 +849,234 @@ zera
 info false 1 0
 out=$(run <<<"s")
 hasnt "$out" "Destravar"
+
+# ------------------------------------------------------ uma confirmação só
+
+t "as decisões (trava, apps, AUR que ficou de fora) vêm todas antes da transação"
+# Visto em uso: a pessoa respondeu a primeira pergunta, saiu, e a rodada ficou
+# nove minutos parada na pergunta seguinte, no meio.
+zera
+info false 1 1
+touch "$R/var/lib/pacman/db.lck"
+apps chromium loupe
+echo chromium >"$vistos"
+echo "limine-snapper-sync" >"$share/aur-pendentes.txt"
+out=$(run <<<$'s\ns\ns\ns')
+eq 0 $?
+antes=${out%%"sistema (sudo pede"*}
+has "$antes" "o pacman ficou travado"
+has "$antes" "apps novos do Mk"
+has "$antes" "AUR que ficou de fora da instalação: limine-snapper-sync"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed loupe
+yay -Sua --noconfirm --answerclean None --answerdiff None
+yay -S --needed --noconfirm --answerclean None --answerdiff None --removemake limine-snapper-sync
+limine-default" "$(cat "$SBX/ordem")"
+
+t "a ordem das decisões: a trava, os apps, o AUR que ficou de fora"
+zera
+info false 1 0
+touch "$R/var/lib/pacman/db.lck"
+apps chromium loupe
+echo chromium >"$vistos"
+echo "limine-snapper-sync" >"$share/aur-pendentes.txt"
+run <<<$'s\nn\ns\nn' >/dev/null
+eq 0 $?
+exists "$R/var/lib/pacman/db.lck"
+eq "pacman -Sy
+pacman -Su --noconfirm --needed loupe" "$(cat "$SBX/ordem")"
+exists "$share/aur-pendentes.txt"
+
+t "as decisões vêm antes também das migrações"
+zera
+info false 1 0
+migra system 20260101-a.sh
+echo "limine-snapper-sync" >"$share/aur-pendentes.txt"
+out=$(run <<<$'s\ns')
+eq 0 $?
+has "${out%%"ajustes do Mk no sistema"*}" "AUR que ficou de fora"
+eq "system/20260101-a.sh $share
+pacman -Sy
+pacman -Su --noconfirm --needed
+yay -S --needed --noconfirm --answerclean None --answerdiff None --removemake limine-snapper-sync
+limine-default" "$(cat "$SBX/ordem")"
+
+t "depois da última decisão ninguém lê mais nada do terminal"
+# Uma resposta a mais do que as perguntas: tem de sobrar, sem ninguém para ler.
+zera
+info false 1 1
+echo "limine-snapper-sync" >"$share/aur-pendentes.txt"
+sobra=$({ printf 's\ns\n'; echo SOBRA; } | { run >/dev/null; cat; })
+eq SOBRA "$sobra"
+
+t "o pacman teria de escolher um provedor: para em 'sistema' com a escolha na tela, sem transação"
+# Com --noconfirm o pacman pegaria o primeiro da lista sozinho. O ensaio
+# (--print, sem sudo) mostra a escolha antes, e a rodada para.
+zera
+info false 1 0
+apps chromium loupe
+echo chromium >"$vistos"
+printf ':: There are 2 providers available for jack:\n:: Repository extra\n   1) jack2  2) pipewire-jack\n\nEnter a number (default=1): \n' >"$SBX/pacman-plano"
+out=$(run <<<$'s\ns')
+[[ $? -ne 0 ]] || _fail "devia sair com erro"
+has "$out" "o pacman precisa de uma escolha sua"
+has "$out" "There are 2 providers available for jack:"
+has "$out" "1) jack2  2) pipewire-jack"
+has "$out" "sudo pacman -Syu --needed loupe"
+eq "pacman -Sy" "$(cat "$SBX/ordem")"
+eq false "$(campo ok)"
+eq sistema "$(campo step)"
+eq chromium "$(cat "$vistos")"
+
+t "o ensaio do pacman roda sem sudo, com os mesmos pacotes da transação"
+called "pacman -Su --print --noconfirm --needed loupe"
+not_called "sudo pacman -Su --print"
+
+t "o ensaio que não pede escolha nenhuma deixa a transação seguir"
+zera
+info false 1 0
+printf 'https://espelho/pacote0-2.pkg.tar.zst\n' >"$SBX/pacman-plano"
+out=$(run <<<"s")
+eq 0 $?
+hasnt "$out" "escolha sua"
+called "sudo pacman -Su --noconfirm --needed"
+
+t "o pacman falha na transação: diz que ele rodou sem perguntar e como responder à mão"
+zera
+info false 1 0
+echo 1 >"$SBX/pacman-rc"
+out=$(run <<<"s")
+eq 1 $?
+has "$out" "o pacman parou"
+has "$out" "sudo pacman -Syu"
+eq sistema "$(campo step)"
+
+t "a senha do sudo é pedida uma vez, antes da transação, e renovada enquanto ela roda"
+zera
+info false 1 1
+echo 1 >"$SBX/pacman-demora"
+MK_UPDATE_SUDO_CADA=0.2 run <<<"s" >/dev/null
+eq 0 $?
+eq "sudo -v" "$(grep '^sudo' "$SBX/calls" | head -1)"
+called "sudo -n -v"
+
+t "terminada a rodada, ninguém continua renovando o sudo"
+n=$(grep -c '^sudo -n -v' "$SBX/calls")
+sleep 0.7
+eq "$n" "$(grep -c '^sudo -n -v' "$SBX/calls")"
+
+t "só AUR a atualizar: a senha é pedida antes de o yay começar a compilar"
+zera
+info false 0 1
+run <<<"s" >/dev/null
+eq 0 $?
+eq "sudo -v
+yay -Sua --noconfirm --answerclean None --answerdiff None" "$(grep -E '^(sudo|yay)' "$SBX/calls")"
+
+t "rodada que não precisa de root (só migração de usuário) não chama o sudo"
+zera
+migra user 20260101-u.sh
+run <<<"s" >/dev/null
+eq 0 $?
+not_called "sudo"
+
+# ------------------------------------------------- duas rodadas ao mesmo tempo
+
+t "com uma rodada em curso, a segunda diz 'já há uma atualização rodando' e sai com erro, sem tocar em nada"
+zera
+info false 1 0
+exec 8>"$trava"
+ok flock -n 8
+out=$(run <<<"s")
+[[ $? -ne 0 ]] || _fail "devia sair com erro"
+has "$out" "já há uma atualização rodando"
+hasnt "$out" "procurando"
+not_called "sudo"
+absent "$resumo"
+
+t "--check não é travado por uma rodada em curso"
+out=$(run --check)
+eq 0 $?
+has "$out" "sistema    1 pacotes"
+hasnt "$out" "já há uma atualização"
+exec 8>&-
+
+t "terminada a outra, a rodada roda"
+out=$(run <<<"s")
+eq 0 $?
+hasnt "$out" "já há uma atualização"
+called "sudo pacman -Su --noconfirm --needed"
+
+t "--check não trava: uma rodada começa com um --check ainda procurando"
+zera
+info false 1 0
+PRENDE=1 run --check >/dev/null &
+pid=$!
+out=$(run <<<"s")
+eq 0 $?
+hasnt "$out" "já há uma atualização"
+touch "$SBX/solta"
+wait "$pid"
+
+t "duas rodadas de verdade: a que chega depois é recusada enquanto a primeira está no pacman"
+zera
+info false 1 0
+echo 30 >"$SBX/pacman-demora"
+MK_ROOT=$R setsid bash "$REPO/bin/mk-update" <<<"s" >/dev/null 2>&1 &
+pid=$!
+for _ in $(seq 100); do grep -q 'pacman -Su' "$SBX/ordem" && break; sleep 0.1; done
+has "$(cat "$SBX/ordem")" "pacman -Su --noconfirm"
+rm "$SBX/pacman-demora"
+out=$(run <<<"s")
+[[ $? -ne 0 ]] || _fail "devia sair com erro"
+has "$out" "já há uma atualização rodando"
+eq 1 "$(grep -c 'pacman -Su' "$SBX/ordem")"
+
+t "a trava some sozinha quando a rodada morre (kill -9)"
+kill -KILL -- "-$pid" 2>/dev/null
+wait "$pid" 2>/dev/null
+for _ in $(seq 50); do flock -n "$trava" true && break; sleep 0.1; done
+out=$(run <<<"s")
+eq 0 $?
+hasnt "$out" "já há uma atualização"
+eq 2 "$(grep -c 'pacman -Su' "$SBX/ordem")"
+
+t "sem o flock instalado, a rodada roda do mesmo jeito (sem trava)"
+zera
+info false 1 0
+out=$(PATH=$(path_sem flock) run <<<"s")
+eq 0 $?
+called "sudo pacman -Su --noconfirm --needed"
+
+# ------------------------------------------------------ a pasta temporária
+
+t "o clone do canal falha: a pasta temporária não fica para trás"
+zera
+info true 0 0
+rm -rf "${TMPDIR:?}"/*
+echo meu >"$TMPDIR/alheio"
+touch "$SBX/git-falha"
+run <<<"s" >/dev/null
+[[ $? -ne 0 ]] || _fail "devia sair com erro"
+eq "$TMPDIR/alheio" "$(find "$TMPDIR" -mindepth 1 -maxdepth 1)"
+
+t "janela fechada no meio do clone (TERM): também limpa, e o resumo fica em 'mk'"
+zera
+info true 0 0
+touch "$SBX/git-fecha"
+run <<<"s" >/dev/null
+eq 143 $?
+eq "$TMPDIR/alheio" "$(find "$TMPDIR" -mindepth 1 -maxdepth 1)"
+eq mk "$(campo step)"
+
+t "a troca do Mk que dá certo não deixa pasta temporária nem apaga o que não é dela"
+zera
+info true 0 0
+run <<<"s" >/dev/null
+eq 0 $?
+eq "$TMPDIR/alheio" "$(find "$TMPDIR" -mindepth 1 -maxdepth 1)"
+eq meu "$(cat "$TMPDIR/alheio")"
+rm -f "$TMPDIR/alheio"
 
 # ----------------------------------------------------------------- o resumo
 
@@ -938,7 +1201,7 @@ if command -v script >/dev/null; then
   has "$(cat "${logs[0]}" 2>/dev/null)" "sistema (sudo pede a sua senha)"
   hasnt "$(cat "${logs[0]}" 2>/dev/null)" $'\r'
   hasnt "$(cat "${logs[0]}" 2>/dev/null)" "COMMAND="
-  called "sudo pacman -Syu --needed"
+  called "sudo pacman -Su --noconfirm --needed"
 
   t "num terminal, com Mk novo: uma pergunta só, e o mk-update novo segue no mesmo registro"
   zera
@@ -987,3 +1250,14 @@ if command -v script >/dev/null; then
   eq sistema "$(campo step)"
   exists "$(campo log)"
 fi
+
+t "um VERSION vazio em ~/.config/mk (desligamento à força) não esconde a versão instalada"
+zera
+info false 0 0
+: >"$cfg/VERSION"
+MK_ROOT=$R bash "$REPO/bin/mk-update" --check >/dev/null 2>&1 </dev/null
+# O resumo de uma rodada parte da versão de /usr/share/mk.
+info true 0 0
+out=$(run <<<"s")
+eq aaaaaaaaaaaa "$(campo from)"
+eq "$nova" "$(cat "$cfg/VERSION")"

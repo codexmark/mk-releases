@@ -39,7 +39,7 @@ Referência do que se configura onde, e de quais páginas são só linhas do esq
 | 07 | Dispositivos | Monitores | `monitores` | `SettingsMonitorsPage.qml` | [[Monitores]] |
 | 08 | Dispositivos | Som | `som` | conteúdo da `SettingsWindow` | saída e microfone |
 | 09 | Dispositivos | Teclado e mouse | `entrada` | linhas | layout, Caps Lock, repetição, sensibilidade, touchpad |
-| 10 | Dispositivos | Energia | `energia` | linhas + `SettingsSleepBlock.qml` | tempos de ociosidade, bateria fraca, "Ao dormir" ([[Energia e suspensão]]) |
+| 10 | Dispositivos | Energia | `energia` | linhas + `SettingsSleepBlock.qml` | descanso de tela, escurecer, bloquear, desligar a tela; bateria fraca; "Ao dormir", de fábrica "não dormir" ([[Ociosidade e bloqueio]], [[Energia e suspensão]]) |
 | 11 | Dispositivos | Impressoras | `impressoras` | `SettingsPrintersPage.qml` | [[Impressão]] |
 | 12 | Dispositivos | Controle | `controle` | `SettingsGamepadPage.qml` | o controle Xbox e o driver xone |
 | 13 | Rede | VPN | `vpn` | `SettingsVpnPage.qml` | WireGuard e OpenVPN ([[Rede]]) |

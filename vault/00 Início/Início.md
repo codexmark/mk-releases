@@ -69,7 +69,7 @@ As camadas 01 a 08 são o sistema em execução, de baixo para cima. As camadas 
 [[Hyprland em Lua]] · [[Ordem de carga]] · [[Atalhos]] · [[Atalhos do usuário]] · [[Monitores]] · [[Recuperação de monitores]] · [[Regras de janela]] · [[Animações]] · [[Autostart]]
 
 ### 06 Shell Maré
-[[Maré]] · [[Ilha]] · [[Painel líquido (Tide)]] · [[Monitor por tela]] · [[Clique fora e teclado exclusivo]] · [[Singletons]] · [[Painéis]] · [[Projetos e workspaces]] · [[Ajustes]] · [[Páginas dos Ajustes]] · [[Busca e calculadora]] · [[Emoji]] · [[Notificações e OSD]] · [[Boas-vindas]] · [[Tela de bloqueio]] · [[IPC do Maré]] · [[Scripts mare]] · [[Armadilhas do Maré]]
+[[Maré]] · [[Ilha]] · [[Painel líquido (Tide)]] · [[Monitor por tela]] · [[Clique fora e teclado exclusivo]] · [[Singletons]] · [[Painéis]] · [[Projetos e workspaces]] · [[Ajustes]] · [[Páginas dos Ajustes]] · [[Busca e calculadora]] · [[Emoji]] · [[Notificações e OSD]] · [[Boas-vindas]] · [[Tela de bloqueio]] · [[Descanso de tela]] · [[IPC do Maré]] · [[Scripts mare]] · [[Armadilhas do Maré]]
 
 ### 07 Aparência
 [[Direção Folha]] · [[Fontes]] · [[Papéis de parede]] · [[Tema GTK, ícones e Qt]] · [[Ghostty]] · [[Fastfetch]] · [[Arte e geradores]]

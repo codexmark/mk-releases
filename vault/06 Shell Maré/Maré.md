@@ -77,4 +77,4 @@ flowchart TD
 
 ## Ligações
 
-Depende de: [[Autostart]], [[Hyprland em Lua]], [[Pasta do usuário]]. Peças: [[Ilha]], [[Painel líquido (Tide)]], [[Monitor por tela]], [[Clique fora e teclado exclusivo]], [[Singletons]], [[Painéis]], [[Ajustes]], [[IPC do Maré]], [[Scripts mare]], [[Armadilhas do Maré]].
+Depende de: [[Autostart]], [[Hyprland em Lua]], [[Pasta do usuário]]. Peças: [[Ilha]], [[Painel líquido (Tide)]], [[Monitor por tela]], [[Clique fora e teclado exclusivo]], [[Singletons]], [[Painéis]], [[Ajustes]], [[IPC do Maré]], [[Descanso de tela]], [[Scripts mare]], [[Armadilhas do Maré]].

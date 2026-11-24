@@ -6,6 +6,7 @@ tags:
   - testes
   - tdd
 fontes:
+  - "migrations/system/20261128-shellcheck.sh"
   - "tests/README.md"
   - "tests/run"
   - "tests/lib.sh"
@@ -24,7 +25,7 @@ fontes:
 
 # Testes e TDD
 
-O Mk tem uma suíte de testes automáticos em `tests/` (cerca de cem arquivos e dois mil casos) que não precisa de root, de rede nem de sessão gráfica, e uma regra: **teste primeiro**.
+O Mk tem uma suíte de testes automáticos em `tests/` (119 arquivos e 2576 casos na última contagem registrada) que não precisa de root, de rede nem de sessão gráfica, e uma regra: **teste primeiro**.
 
 ## Para quê
 
@@ -51,7 +52,7 @@ Um defeito achado em uso vira primeiro um caso que o reproduz, e só então a co
 | Pasta | O que testa | Apoio |
 |---|---|---|
 | `tests/lint.test.sh` | sintaxe e lint de tudo: `bash -n`, shellcheck, QML, JavaScript, Lua, JSON, Python; bit de execução; `rm -rf` sempre com `${VAR:?}`; nenhum teste com `/usr/bin` no `PATH` | |
-| `tests/js/` | o JavaScript do shell (`Calc`, `Emoji`, `Keybinds`, `SettingsSchema`) e a lógica pura de `Monitors.qml`, no node | `load.mjs`, `harness.mjs`, `qml-puro.mjs` |
+| `tests/js/` | o JavaScript do shell (`Calc`, `Emoji`, `Keybinds`, `SettingsSchema`, `Place`) e a lógica pura tirada de arquivos QML (`Monitors`, `Projects`, `Updates`, `BatteryWatch`, `NetworkPanel`, `LauncherPanel`, `CalendarPanel` e outros painéis e páginas), no node | `load.mjs`, `harness.mjs`, `qml-puro.mjs` |
 | `tests/scripts/` | os 24 `shell/mare/scripts/mare-*` | |
 | `tests/bin/` | `bin/*` (`mk-update`, `mk-release`, `mk-hibernate`, `try-session`…) | |
 | `tests/installer/` | `installer/mk-install`: respostas, disco, sistema, boot, modo desassistido | `carrega.sh` |
@@ -77,7 +78,7 @@ Um arquivo de teste por arquivo testado, com o mesmo nome: `shell/mare/scripts/m
 **Os apoios por linguagem**:
 
 - `tests/js/load.mjs` carrega um `.js` do shell (biblioteca `.pragma library` do QML) como módulo do node;
-- `tests/js/qml-puro.mjs` tira de um `.qml` o trecho entre os comentários `// --- puro: início ---` e `puro: fim` e o testa no node (é assim que o cálculo de modelines do `Monitors.qml` é conferido);
+- `tests/js/qml-puro.mjs` tira de um `.qml` o trecho entre os comentários `// --- puro: início ---` e `puro: fim` e o testa no node (é assim que o cálculo de modelines e o arranjador do `Monitors.qml` são conferidos; treze arquivos QML passaram a ter a lógica num bloco puro testado);
 - `tests/config/hl.lua` é um `hl` falso: anota o que a configuração pediu ao Hyprland e **recusa uma função que o Mk não usa**;
 - `tests/installer/carrega.sh` carrega o `mk-install` como biblioteca, sem chamar o `main`, com `$target`, `$log` e `$live_root` dentro de `$SBX`;
 - `tests/migrations/mig.sh` monta um sistema falso (a raiz em `$R`, passada como `MK_ROOT`, e o Mk em `$SHARE`) e dá `mig`, `instalados`, `estado`, `de_novo` e `sem_mudanca`.
@@ -95,6 +96,7 @@ Um arquivo de teste por arquivo testado, com o mesmo nome: `shell/mare/scripts/m
 - **O instalador nunca roda inteiro num teste**: ele formata discos. O arquivo só chama o `main` quando é executado; os testes carregam as funções e rodam uma de cada vez.
 - **Cada migração tem três casos de base**: monta o "antes", roda e confere o "depois"; roda de novo e nada muda; num sistema sem nada a fazer, não quebra.
 - **Docs contra o código** (`tests/docs`) e **estrutura do shell** (`tests/qml`): pegam o que nenhum compilador pega (um script sem linha no README, um painel registrado sem arquivo).
+- **O shellcheck faz parte do kit**: está em `dev.packages`, e a migração `20261128-shellcheck.sh` o leva a quem já instalou. Sem ele, o lint de shell do `tests/run` é pulado.
 - **Sem CI na nuvem**: "tudo roda aqui" ([[D15 Teste primeiro e CI local]]).
 - **O que os testes não veem**: o desenho dos painéis, o foco do teclado, as animações, o Hyprland de verdade, a instalação num disco e o boot. Isso continua com o [[dev-shot]] e a [[VM de teste]].
 

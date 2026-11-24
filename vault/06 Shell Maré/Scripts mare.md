@@ -35,7 +35,7 @@ Manter no QML só desenho e estado, e no bash tudo o que é leitura do sistema o
 | `mare-about` | detalhes da máquina | página Sobre |
 | `mare-stats` | CPU, memória, rede, temperatura, disco | `Stats.qml`, a cada 2 s |
 | `mare-project` | branch, mudanças, runtime, containers, portas | `Projects.qml`, a cada 5 s |
-| `mare-weather` | clima via Open-Meteo | `Weather.qml`, a cada 30 min |
+| `mare-weather` | clima via Open-Meteo, com onde é (`city`, `country`, `lat`, `lon`) para o carimbo do fundo | `Weather.qml`, a cada 30 min |
 | `mare-cava` | o espectro do som | `Sound.qml` |
 | `mare-palette` | a cor principal de uma imagem (matugen) | `Wallpaper.qml` |
 | `mare-battery` | ciclos, saúde, limite de carga | `PowerPanel.qml` |

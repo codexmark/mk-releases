@@ -14,6 +14,9 @@ Singleton {
         "launcher", "switcher", "notifications", "session", "media", "bluetooth", "display", "system",
         "clipboard", "wallpaper", "settings", "capture", "emoji"]
     readonly property var transients: ["toast", "osd"]
+
+    // O descanso de tela está na tela (ScreenSaver.qml, um por monitor).
+    property bool saver: false
     property string mode: "rest"
 
     // Quando um painel deu lugar a outro (e não abriu do repouso). O Monitor
@@ -180,7 +183,24 @@ Singleton {
         // Bloqueia a tela (Super + L, hypridle, antes de suspender).
         function lock(): void {
             root.close();
+            root.saver = false;
             Lock.lock();
+        }
+
+        // O descanso de tela: saver on | off | toggle. Quem liga é o
+        // hypridle (Ajustes › Energia); qualquer tecla ou o mouse desliga.
+        function saver(state: string): string {
+            if (state === "on") {
+                root.close();
+                root.saver = !Lock.locked;
+            } else if (state === "off")
+                root.saver = false;
+            else if (state === "toggle") {
+                root.close();
+                root.saver = !root.saver && !Lock.locked;
+            } else
+                return "uso: saver on | off | toggle";
+            return root.saver ? "ligado" : "desligado";
         }
 
         // Abre os Ajustes numa página: settings janelas
@@ -224,7 +244,7 @@ Singleton {
         }
 
         function state(): string {
-            return root.mode;
+            return root.saver ? "saver" : root.mode;
         }
 
         // Abre um painel embaixo da posição x da tela (como um clique na ilha).

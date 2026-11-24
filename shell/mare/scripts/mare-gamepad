@@ -41,19 +41,33 @@ status() {
     --argjson yay "$yay" '{ installed: $installed, loaded: $loaded, yay: $yay, controllers: . }'
 }
 
+# O fim de install e remove: a janela do terminal fecha no Enter, então o que
+# aconteceu tem de estar na tela antes dele. A saída do script é a do yay ou
+# do pacman, não a do `read` (que ainda falha quando não há quem dê o Enter).
+fecha() { # fecha <código> <o que falhou> <recado quando deu certo>
+  echo
+  if (($1 != 0)); then
+    echo "$2 falhou (código $1). O erro está acima."
+    read -rp 'Enter fecha. ' _ || true
+  else
+    read -rp "Enter fecha. $3 " _ || true
+  fi
+  exit "$1"
+}
+
 case ${1:-status} in
   status) status ;;
   install)
-    command -v yay >/dev/null || { echo "falta o yay (o xone-dkms é do AUR)"; read -rp 'Enter fecha.' _; exit 1; }
+    command -v yay >/dev/null || { echo "falta o yay (o xone-dkms é do AUR)"; read -rp 'Enter fecha.' _ || true; exit 1; }
     # Os cabeçalhos do kernel e o dkms já são do Mk; --needed não reinstala.
-    yay -S --needed linux-headers dkms xone-dkms
-    echo
-    read -rp 'Enter fecha. Tire e ponha o cabo do controle (ou reinicie) para o driver novo assumir. ' _
+    rc=0
+    yay -S --needed linux-headers dkms xone-dkms || rc=$?
+    fecha "$rc" "A instalação" "Tire e ponha o cabo do controle (ou reinicie) para o driver novo assumir."
     ;;
   remove)
-    sudo pacman -Rns xone-dkms
-    echo
-    read -rp 'Enter fecha. O controle volta ao driver do kernel no próximo reinício. ' _
+    rc=0
+    sudo pacman -Rns xone-dkms || rc=$?
+    fecha "$rc" "A remoção" "O controle volta ao driver do kernel no próximo reinício."
     ;;
   *)
     echo "uso: mare-gamepad status | install | remove" >&2

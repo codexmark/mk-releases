@@ -2,7 +2,9 @@
 # Confere se cada pacote das listas existe onde deveria:
 #   base/desktop/dev/apps/hardware -> repositórios oficiais (core, extra, multilib)
 #   aur                            -> AUR
-# Não instala nada. Sai com erro se algum pacote estiver no lugar errado.
+# Não instala nada. Sai com erro se algum pacote estiver no lugar errado, ou se
+# não deu para consultar o AUR (sem rede): aí diz isso, e não que os pacotes
+# faltam.
 set -uo pipefail
 source "$(dirname "$0")/lib-packages.sh"
 
@@ -38,19 +40,33 @@ check_official hardware < <(read_hardware amd intel nvidia vm)
 echo "== aur.packages"
 mapfile -t aur < <(read_list "$PKG_DIR/aur.packages")
 query=$(printf '&arg[]=%s' "${aur[@]}")
-found=$(curl -fsS "https://aur.archlinux.org/rpc/v5/info?${query#&}" | jq -r '.results[].PackageBase, .results[].Name' | sort -u)
-for pkg in "${aur[@]}"; do
-  if ! grep -qx "$pkg" <<<"$found"; then
-    echo "  FALTA   $pkg (aur): não encontrado no AUR"
-    fail=1
-  elif [[ $(repo_of "$pkg") == @(core|extra|multilib) ]]; then
-    echo "  AVISO   $pkg (aur): também existe nos oficiais, mova para outra lista"
-    fail=1
-  fi
-done
-
-if ((fail)); then
-  echo "Há problemas nas listas."
-  exit 1
+# "Não alcancei o AUR" não é "o pacote não existe": sem rede, ou com o AUR
+# respondendo outra coisa que não a lista (erro da API, página de um portal
+# cativo), nenhum pacote é acusado. Diz o que houve e sai com erro.
+aur_fora=""
+if ! reply=$(curl -fsS --max-time 30 "https://aur.archlinux.org/rpc/v5/info?${query#&}"); then
+  aur_fora="não alcancei o AUR (sem rede?)"
+elif ! found=$(jq -r 'if type == "object" and .type != "error" and (.results | type) == "array"
+    then .results[] | (.PackageBase, .Name) else error("sem lista") end' <<<"$reply" 2>/dev/null); then
+  aur_fora="o AUR não devolveu a lista de pacotes"
+  why=$(jq -r '.error? // empty' <<<"$reply" 2>/dev/null) || why=""
+  [[ -n $why ]] && aur_fora+=" ($why)"
 fi
+if [[ -n $aur_fora ]]; then
+  echo "  ERRO    $aur_fora: os ${#aur[@]} pacotes de aur.packages ficaram sem conferir"
+else
+  for pkg in "${aur[@]}"; do
+    if ! grep -qxF -- "$pkg" <<<"$found"; then
+      echo "  FALTA   $pkg (aur): não encontrado no AUR"
+      fail=1
+    elif [[ $(repo_of "$pkg") == @(core|extra|multilib) ]]; then
+      echo "  AVISO   $pkg (aur): também existe nos oficiais, mova para outra lista"
+      fail=1
+    fi
+  done
+fi
+
+((fail)) && echo "Há problemas nas listas."
+[[ -n $aur_fora ]] && echo "Não deu para conferir o AUR: rode de novo quando houver rede."
+((fail)) || [[ -n $aur_fora ]] && exit 1
 echo "Tudo certo: todas as listas batem com os repositórios."

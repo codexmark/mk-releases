@@ -156,6 +156,38 @@ not_called "wl-copy"
 eq "" "$(arquivos)"
 echo '{"address":"0x55d0c0ffee","at":[12,34],"size":[800,600]}' >"$SBX/janela.json"
 
+t "janela: o hyprctl falhando (Hyprland fora do ar) dá o mesmo aviso, não um fim mudo"
+zera
+stub hyprctl 'echo "HYPRLAND_INSTANCE_SIGNATURE not set!" >&2; exit 1'
+run janela 2>/dev/null
+eq 1 $?
+called "notify-send -a Mk Sem janela em foco"
+not_called "grim"
+not_called "wl-copy"
+absent "$dir"
+
+t "janela: resposta que não é JSON, ou sem posição e tamanho em números, também avisa"
+for resp in 'isto não é JSON' '{"at":[12,34]}' '{"at":[12,34],"size":null}' '{"at":["a","b"],"size":[1,2]}' \
+  '{"at":[12,34],"size":[0,0]}' '{"at":[1,2],"size":["3 -o /tmp/x","4"]}'; do
+  zera
+  printf '%s\n' "$resp" >"$SBX/janela.json"
+  stub hyprctl 'cat "$SBX/janela.json" 2>/dev/null'
+  run janela 2>/dev/null
+  eq 1 $? "$resp"
+  called "notify-send -a Mk Sem janela em foco"
+  not_called "grim"
+done
+
+t "janela: sem janela em foco, a pasta de Capturas não é criada"
+absent "$dir"
+
+t "janela: num monitor à esquerda (posição negativa) a área segue inteira para o grim"
+zera
+echo '{"at":[-1920,-40],"size":[800,600]}' >"$SBX/janela.json"
+ok run janela
+called "grim -g -1920,-40 800x600 $(arquivos)"
+echo '{"address":"0x55d0c0ffee","at":[12,34],"size":[800,600]}' >"$SBX/janela.json"
+
 # ---------------------------------------------------------------- erros
 
 t "o grim falhando: sai com erro, sem copiar e sem dizer que salvou"
@@ -176,6 +208,40 @@ has "$out" "uso: mare-shot copiar | area | janela | tela | pasta | gravacao"
 not_called "grim"
 not_called "slurp"
 not_called "notify-send"
+
+t "subcomando desconhecido: não cria a pasta de Capturas nem nada na pasta de imagens"
+absent "$dir"
+absent "$pics"
+for arg in "--help" "Tela" "tela extra" $'tela\nx'; do
+  zera
+  run "$arg" >/dev/null 2>&1
+  eq 2 $? "'$arg'"
+  absent "$pics"
+done
+
+t "area e copiar cancelados (Esc): a pasta de Capturas não é criada"
+zera
+: >"$SBX/slurp-cancela"
+ok run area
+absent "$dir"
+ok run copiar
+absent "$dir"
+rm -f "$SBX/slurp-cancela"
+
+t "copiar: não cria a pasta de Capturas (nada é salvo)"
+zera
+ok run copiar
+absent "$dir"
+
+t "o wl-copy falhando depois de salvar: a captura fica, o aviso sai e o erro não some"
+zera
+stub wl-copy 'cat >/dev/null; exit 1'
+run tela
+eq 1 $?
+f=$(arquivos)
+like "$f" "\.png$"
+called "notify-send -a Mk -i $f Captura salva"
+stub wl-copy 'cat >"$SBX/clip"'
 
 t "pasta de imagens com espaço no nome"
 zera

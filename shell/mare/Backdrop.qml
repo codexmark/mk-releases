@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "Place.js" as Place
 
 // O fundo, desenhado pelo próprio Maré na camada de baixo: uma folha de
 // desenho técnico na linguagem do perfil. Moldura com marcas de corte e régua,
@@ -149,7 +150,8 @@ PanelWindow {
         }
     }
 
-    // Cota do vão e coordenadas de Porto Velho, junto ao horizonte.
+    // Cota do vão e, junto ao horizonte, as coordenadas de onde a máquina
+    // está (as que o clima achou: Place.js). Sem clima, não há coordenadas.
     Text {
         x: backdrop.archX - implicitWidth / 2
         y: backdrop.horizon + 28
@@ -164,7 +166,8 @@ PanelWindow {
     Text {
         x: backdrop.frameR - implicitWidth - 18
         y: backdrop.horizon - implicitHeight - 8
-        text: "8°45′ s · 63°54′ o"
+        visible: text !== ""
+        text: Weather.ready ? Place.coords(Weather.data.lat, Weather.data.lon) : ""
         color: Theme.textFaint
         font.family: Theme.mono
         font.pixelSize: 10
@@ -349,7 +352,7 @@ PanelWindow {
                 model: [
                     { k: "projeto", v: (Projects.current && !Projects.free ? Projects.name : "livre").toUpperCase() },
                     { k: "folha", v: backdrop.letter + " · " + String(backdrop.wsId).padStart(2, "0") },
-                    { k: "Mk", v: "PORTO VELHO · RO" },
+                    { k: "Mk", v: (Weather.ready ? Place.label(Weather.data.city, Weather.data.country) : "") || "—" },
                     { k: "data", v: Qt.formatDateTime(clock.date, "dd.MM.yyyy") }
                 ]
 

@@ -11,7 +11,7 @@ Singleton {
 
     readonly property var dev: UPower.displayDevice
     readonly property bool present: dev !== null && dev.ready && dev.isLaptopBattery
-    readonly property int pct: dev ? Math.round(dev.percentage > 1 ? dev.percentage : dev.percentage * 100) : 0
+    readonly property int pct: dev ? percent(dev.percentage) : 0
     readonly property int state: dev ? dev.state : UPowerDeviceState.Unknown
 
     readonly property int low: 20
@@ -26,30 +26,62 @@ Singleton {
         property bool critical: false
     }
 
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no UPower nem no Maré: é a conta dos
+    // degraus, testada fora do shell com node (tests/js/BatteryWatch.test.mjs).
+    // O UPower dá a carga de 0 a 100; se um dia vier de 0 a 1, não zera.
+    function percent(p) {
+        return Math.round(p > 1 ? p : p * 100);
+    }
+
+    // Um passo do aviso. `charging`: na tomada (carregando, cheia ou esperando
+    // carga); `discharging`: gastando a bateria; `enabled`: o aviso está ligado
+    // nos Ajustes; `wasLow`/`wasCritical`: os degraus já avisados nesta
+    // descarga. Devolve os degraus avisados depois do passo e o aviso a dar
+    // agora: { low, critical, warn: "" | "low" | "critical" }.
+    function step(p, charging, discharging, enabled, wasLow, wasCritical) {
+        const next = { warn: "" };
+        next.low = wasLow;
+        next.critical = wasCritical;
+        if (charging) {
+            next.low = false;
+            next.critical = false;
+            return next;
+        }
+        if (p > low + slack)
+            next.low = false;
+        if (p > critical + slack)
+            next.critical = false;
+        if (!discharging || !enabled)
+            return next;
+        if (p <= critical && !next.critical) {
+            next.critical = true;
+            next.low = true;
+            next.warn = "critical";
+        } else if (p <= low && !next.low) {
+            next.low = true;
+            next.warn = "low";
+        }
+        return next;
+    }
+    // --- puro: fim ---
+
     function check() {
         if (!present)
             return;
-        if (state === UPowerDeviceState.Charging || state === UPowerDeviceState.FullyCharged
-                || state === UPowerDeviceState.PendingCharge) {
-            warned.low = false;
-            warned.critical = false;
-            return;
-        }
-        if (pct > low + slack)
-            warned.low = false;
-        if (pct > critical + slack)
-            warned.critical = false;
-        if (state !== UPowerDeviceState.Discharging || Settings.get("power.lowWarn") === false)
-            return;
-        if (pct <= critical && !warned.critical) {
-            warned.critical = true;
-            warned.low = true;
+        const charging = state === UPowerDeviceState.Charging || state === UPowerDeviceState.FullyCharged
+            || state === UPowerDeviceState.PendingCharge;
+        const discharging = state === UPowerDeviceState.Discharging;
+        // O ajuste só é lido quando decide algo (fora da tomada e descarregando).
+        const enabled = discharging && Settings.get("power.lowWarn") !== false;
+        const next = step(pct, charging, discharging, enabled, warned.low, warned.critical);
+        warned.low = next.low;
+        warned.critical = next.critical;
+        if (next.warn === "critical")
             Quickshell.execDetached(["notify-send", "-a", "Mk", "-u", "critical", "-i", "battery-caution",
                 "bateria em " + pct + "%: ligue na tomada"]);
-        } else if (pct <= low && !warned.low) {
-            warned.low = true;
+        else if (next.warn === "low")
             Quickshell.execDetached(["notify-send", "-a", "Mk", "-i", "battery-low", "bateria em " + pct + "%"]);
-        }
     }
 
     onPresentChanged: settle.restart()

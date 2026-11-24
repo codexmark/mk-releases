@@ -57,6 +57,7 @@ Instalado, o shell fica em `~/.config/mk/shell`, e não em
 | `PolkitDialog.qml` | Overlay (`mare-polkit`) | O pedido de senha de administrador: o Maré é o agente de polkit da sessão (só um registra; o `hyprpolkitagent` fica instalado, de reserva). Cancela o pedido se a tela estiver bloqueada. |
 | `WelcomeWindow.qml` | Overlay (`mare-welcome`) | As boas-vindas do primeiro login. Quem decide quando aparece é o `Welcome.qml`. |
 | `LockScreen.qml` | bloqueio de sessão | `WlSessionLock` ligado a `Lock.locked`; cada tela ganha uma `LockSurface`. |
+| `ScreenSaver.qml` | Overlay (`mare-saver`) | O descanso de tela: no lugar de dormir, a folha fica preta e a marca "Mk" é construída (como na tela de entrada), fica um tempo, some e volta noutro canto, com a hora embaixo. Liga quando `Mare.saver` é verdadeiro (o hypridle, pelo IPC `saver on`); qualquer tecla, clique ou movimento do mouse desliga. Não aparece com a tela bloqueada. |
 
 Peças pequenas usadas pelos painéis: `PanelHeader`, `PillButton`, `MkSlider`,
 `MkToggle`, `Sparkline`, `IslandItem`, `TrayIcon`, `NotifIcon`.
@@ -160,7 +161,7 @@ Cada arquivo com `pragma Singleton` é dono de um pedaço do estado.
 | `Notifs` | O servidor de notificações: a lista, o não perturbe (`dnd`) e o aviso na tela (`toastItem`). |
 | `Lock` | A tela de bloqueio: `locked`, a senha digitada, a conversa com o PAM e os números da animação. |
 | `Welcome` | As boas-vindas: `shown`, `step`, `paused` e o "já vi" (`<raiz>/.bem-vindo`). |
-| `Wallpaper` | O papel de parede em uso, a cor tirada dele (`primary`, `hue`) e a lista de imagens. Tem um IPC próprio. |
+| `Wallpaper` | O papel de parede em uso, a cor tirada dele (`primary`, `hue`) e a lista de imagens. Uma instalação nova nasce com o de fábrica (`factory`, o Maré dos autorais), aplicado uma vez só; quem já usava o Mk não o recebe (`migrations/user/20261128-papel-de-fabrica.sh`). Tem um IPC próprio. |
 | `Display` | Brilho (`brightnessctl`) e luz noturna (`hyprsunset`), com o horário automático. |
 | `Monitors` | As telas para a página Monitores: o que o Hyprland tem (`live`), o rascunho (`draft`) e a contagem de 15 s depois de aplicar. Gera o texto do `<raiz>/monitores.lua`; quem grava é o `scripts/mare-monitors trial`. |
 | `Keyboard` | Os layouts do teclado principal e qual está ativo. |
@@ -244,6 +245,10 @@ qs -p ~/.config/mk/shell ipc call mare record
 qs -p ~/.config/mk/shell ipc call mare lock
 ```
 
+```bash
+qs -p ~/.config/mk/shell ipc call mare saver toggle
+```
+
 ```
 qs -p ~/.config/mk/shell ipc call mare welcome estado
 ```
@@ -292,7 +297,7 @@ administrador, pelo `pkexec`, quando o CUPS recusa uma ação.
 | `mare-about` | JSON com os detalhes da máquina. | `SettingsWindow.qml` (página Sobre) |
 | `mare-stats` | Leituras cruas de CPU, memória, rede, temperatura e disco da raiz, uma por linha. | `Stats.qml`, a cada 2 s |
 | `mare-project` | JSON do projeto: branch, arquivos mexidos, runtime, containers, portas. | `Projects.qml`, a cada 5 s |
-| `mare-weather` | JSON do clima, via Open-Meteo. A cidade vem de `~/.config/mare/city` ou do fuso horário. | `Weather.qml`, a cada 30 min |
+| `mare-weather` | JSON do clima, via Open-Meteo, com o lugar (`city`, `country`, `lat`, `lon`). A cidade vem de `~/.config/mare/city` ou do fuso horário. Um portal cativo respondendo no lugar vira `{"error": "resposta inesperada"}`. | `Weather.qml`, a cada 30 min; o `Backdrop.qml` escreve o lugar na folha (`Place.js`) |
 | `mare-cava` | Roda o `cava` e imprime uma linha de faixas (0 a 100) por quadro. | `Sound.qml` |
 | `mare-palette` | Imprime a cor principal de uma imagem. | `Wallpaper.qml` |
 | `mare-battery` | JSON com ciclos, saúde e limite de carga da bateria. | `PowerPanel.qml` |

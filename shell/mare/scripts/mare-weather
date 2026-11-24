@@ -2,7 +2,10 @@
 # Clima atual e das próximas horas, via Open-Meteo (sem conta, sem chave).
 # A cidade vem de ~/.config/mare/city (uma linha, ex.: "Belo Horizonte");
 # sem esse arquivo, sai do fuso horário do sistema (America/Sao_Paulo -> Sao Paulo).
-# Saída: um JSON pequeno para o painel do calendário.
+# Saída: um JSON pequeno para o painel do calendário. Leva também onde é
+# (city, country, lat, lon), que o fundo do Maré escreve no carimbo da folha.
+# Um erro sai como {"error": "..."}: sem cidade, sem rede, cidade não
+# encontrada, ou resposta inesperada (um portal cativo respondendo no lugar).
 set -uo pipefail
 
 city_file="${XDG_CONFIG_HOME:-$HOME/.config}/mare/city"
@@ -17,9 +20,11 @@ fi
 
 geo=$(curl -fsS --max-time 10 -G "https://geocoding-api.open-meteo.com/v1/search" \
   --data-urlencode "name=$city" -d count=1 -d language=pt) || { echo '{"error":"sem rede"}'; exit 0; }
+jq -e 'type == "object"' >/dev/null 2>&1 <<<"$geo" || { echo '{"error":"resposta inesperada"}'; exit 0; }
 lat=$(jq -r '.results[0].latitude // empty' <<<"$geo")
 lon=$(jq -r '.results[0].longitude // empty' <<<"$geo")
 name=$(jq -r '.results[0].name // empty' <<<"$geo")
+country=$(jq -r '.results[0].country_code // empty' <<<"$geo")
 [[ -z $lat ]] && { jq -n --arg c "$city" '{error: ("cidade não encontrada: " + $c)}'; exit 0; }
 
 fc=$(curl -fsS --max-time 10 -G "https://api.open-meteo.com/v1/forecast" \
@@ -28,8 +33,14 @@ fc=$(curl -fsS --max-time 10 -G "https://api.open-meteo.com/v1/forecast" \
   -d hourly=temperature_2m,weather_code \
   -d daily=temperature_2m_max,temperature_2m_min) || { echo '{"error":"sem rede"}'; exit 0; }
 
-jq -c --arg city "$name" '{
+jq -e '(.current | type) == "object" and (.hourly.time | type) == "array" and (.daily | type) == "object"' \
+  >/dev/null 2>&1 <<<"$fc" || { echo '{"error":"resposta inesperada"}'; exit 0; }
+
+jq -c --arg city "$name" --arg country "$country" --argjson lat "$lat" --argjson lon "$lon" '{
   city: $city,
+  country: $country,
+  lat: $lat,
+  lon: $lon,
   temp: (.current.temperature_2m | round),
   feels: (.current.apparent_temperature | round),
   code: .current.weather_code,

@@ -47,6 +47,8 @@ mise
 go
 rust
 nodejs
+# shellcheck: o lint de shell do tests/run (sem ele essa checagem é pulada)
+shellcheck
 npm
 pnpm
 python

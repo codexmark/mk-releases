@@ -6,6 +6,7 @@ tags:
   - ajustes
   - configuração
 fontes:
+  - "tests/js/SettingsSchema.test.mjs"
   - "shell/mare/Settings.qml"
   - "shell/mare/SettingsSchema.js"
   - "shell/mare/SettingsWindow.qml"
@@ -66,6 +67,8 @@ flowchart LR
 - **O `ajustes.lua` só é regravado se o Hyprland aceitar**: assim o arquivo carregado no login nunca contém algo que o compositor recusa. Se recusar, o valor volta e o motivo aparece.
 - **400 ms de espera**: um slider arrastado não escreve o arquivo a cada pixel.
 - **`ajustes.json` ilegível não é sobrescrito**: fica onde está, uma cópia vai para `ajustes.json.quebrado`, `Settings.broken` fica verdadeiro e nada é gravado até a pessoa escolher começar do zero.
+- **O esquema é a autoridade sobre o que vale**: o `ajustes.json` é um arquivo da pessoa e pode ter sido mexido à mão. Um valor só segue adiante (para o Lua do Hyprland, para o `hypridle.conf`) se for o que a linha aceita (`valid`: slider é número finito entre `min` e `max`; switch é `true` ou `false`; choice é uma das opções, do mesmo tipo). Se não, vale o de fábrica: quem lê um ajuste dentro do esquema usa `valueOf` (ou `clean`, para todos de uma vez), nunca `values[key]`. O painel ainda mostra o valor cru ([[Limitações conhecidas]]).
+- **Escolha órfã** (`orphan`): o valor salvo de uma linha de escolha não é nenhuma das opções dela, porque sobrou de uma opção que o Mk tirou ("hibernar") ou veio torto. O painel avisa, em vez de mostrar a linha sem nada marcado.
 - **Linhas somem quando não fazem sentido** (`precisa`, `quando`): um desktop sem bateria não mostra o aviso de bateria fraca.
 - **Folha, não painel da ilha**: os Ajustes são uma janela *Overlay* própria (`mare-settings`) com teclado exclusivo; para o `Tide`, o modo `settings` é `rest`. O porquê de não descerem da ilha **não está registrado**.
 

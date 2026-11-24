@@ -44,6 +44,10 @@ Item {
     implicitWidth: 440
     implicitHeight: column.implicitHeight + 42
 
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no BlueZ nem no painel: são funções de
+    // um aparelho para texto, testadas fora do shell com node
+    // (tests/js/BluetoothPanel.test.mjs).
     function icon(d) {
         const i = d.icon || "";
         if (i.indexOf("headset") >= 0)
@@ -81,6 +85,7 @@ Item {
             return "";
         return Math.round(d.battery <= 1 ? d.battery * 100 : d.battery) + "%";
     }
+    // --- puro: fim ---
 
     function status(d) {
         if (d.pairing)

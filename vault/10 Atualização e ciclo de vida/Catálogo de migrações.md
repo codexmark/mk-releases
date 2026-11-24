@@ -6,6 +6,8 @@ tags:
   - migrações
   - catálogo
 fontes:
+  - "migrations/user/20261128-papel-de-fabrica.sh"
+  - "migrations/system/20261128-entrada-marca.sh"
   - "migrations/system/20261120-boot-mk.sh"
   - "migrations/system/20261122-boot-entrada.sh"
   - "migrations/system/20261125-apps-oferecidos.sh"
@@ -49,6 +51,8 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261126-chaveiro-ssh.sh` | `gcr-ssh-agent.socket` para todos | `gcr-4` |
 | `20261127-editor-nuvem.sh` | `vercel` no `aur-pendentes.txt` | `code aws-cli-v2 wrangler` |
 | `20261127-mktunes.sh` | os links do MkTunes | `jre-openjdk-headless mpv ffmpeg` |
+| `20261128-entrada-marca.sh` | o tema novo do sddm (a marca construída), mantendo o `theme.conf.user` | |
+| `20261128-shellcheck.sh` | só avisa se o `shellcheck` não veio | `shellcheck` |
 
 ### De usuário (`migrations/user/`)
 
@@ -61,6 +65,7 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261122-papeis-de-parede.sh` | move `~/Pictures/Wallpapers` para a pasta de imagens do sistema |
 | `20261123-bem-vindo.sh` | grava `<raiz>/.bem-vindo` para quem já usava o Mk |
 | `20261125-apps-padrao.sh` | `~/.config/mimeapps.list`, se não existe |
+| `20261128-papel-de-fabrica.sh` | grava `<raiz>/.papel-de-fabrica`: quem já usava o Mk não recebe o papel de parede de fábrica |
 
 ## Por quê assim
 
@@ -77,7 +82,7 @@ Essa migração existe porque o instalador, até certa versão, **descartava** o
 
 ## Onde está no código
 
-`migrations/system/` (19 arquivos) e `migrations/user/` (7 arquivos).
+`migrations/system/` (21 arquivos) e `migrations/user/` (8 arquivos).
 
 ## Ligações
 

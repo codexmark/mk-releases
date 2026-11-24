@@ -15,7 +15,7 @@ fontes:
 
 # Arte e geradores
 
-As imagens da marca (o logo, a marca compacta, o emblema, o grão e os doze papéis de parede) são geradas por três scripts Python em `system/mk/art/`. O que eles geram **está no git**.
+As imagens da marca (o logo, a marca compacta, o emblema, o grão, as peças da tela de entrada e doze dos papéis de parede) são geradas por três scripts Python em `system/mk/art/`. O que eles geram **está no git**.
 
 ## Para quê
 

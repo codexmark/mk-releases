@@ -35,7 +35,7 @@ Sair da instalação com terminal, git, editor, linguagens e containers prontos,
 | linguagens | `mise`, `go`, `rust`, `nodejs`, `npm`, `pnpm`, `python`, `python-pip`, `python-pipx`, `uv`, `ruby`, `lua51`, `luarocks` |
 | compilação nativa | `clang`, `llvm`, `cmake`, `postgresql-libs`, `mariadb-libs`, `libyaml` |
 | containers | `docker`, `docker-compose`, `docker-buildx`, `lazydocker` |
-| projeto | `just`, `direnv`, `httpie`, `pgcli` |
+| projeto | `just`, `direnv`, `httpie`, `pgcli`, `shellcheck` (o lint de shell do `tests/run`) |
 | editor gráfico e nuvem | `code`, `aws-cli-v2`, `wrangler` |
 
 Mais, do AUR: `vercel`.

@@ -133,6 +133,78 @@ out=$(run remove <<<"")
 called "sudo pacman -Rns xone-dkms"
 not_called "yay"
 
+# Roda install/remove com o Enter preso num fifo: o que estiver em $SBX/tela
+# quando o aviso aparece foi escrito antes de o script parar no "Enter fecha".
+# Só depois o Enter é dado. Deixa a saída do script em $rc.
+com_enter_preso() { # com_enter_preso <subcomando> <trecho esperado antes do Enter>
+  local pid antes=0
+  rm -f "$SBX/enter" "$SBX/tela"
+  mkfifo "$SBX/enter"
+  run "$1" <"$SBX/enter" >"$SBX/tela" 2>&1 &
+  pid=$!
+  exec 9>"$SBX/enter"
+  for _ in $(seq 1 50); do
+    grep -qF -- "$2" "$SBX/tela" 2>/dev/null && { antes=1; break; }
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  eq 1 "$antes" "'$2' na tela antes do Enter"
+  echo >&9
+  exec 9>&-
+  wait "$pid"
+  rc=$?
+}
+
+t "install: o yay falhando sai com o código do yay, não com o do Enter"
+zera
+stub yay 'exit 7'
+out=$(run install <<<"" 2>&1)
+eq 7 $?
+has "$out" "falhou"
+hasnt "$out" "driver novo"
+
+t "install: a falha aparece na tela antes do 'Enter fecha'"
+zera
+stub yay 'exit 7'
+com_enter_preso install "falhou"
+eq 7 "$rc"
+has "$(<"$SBX/tela")" "código 7"
+
+t "install: o yay dando certo sai com 0 e não fala em falha"
+zera
+stub yay
+out=$(run install <<<"" 2>&1)
+eq 0 $?
+hasnt "$out" "falhou"
+
+t "install: sem ninguém para dar o Enter (entrada fechada), a saída ainda é a do yay"
+zera
+stub yay
+run install </dev/null >/dev/null 2>&1
+eq 0 $?
+stub yay 'exit 5'
+run install </dev/null >/dev/null 2>&1
+eq 5 $?
+
+t "remove: o pacman falhando (ou a senha do sudo recusada) sai com o código dele e avisa antes do Enter"
+zera
+stub sudo 'exit 3'
+com_enter_preso remove "falhou"
+eq 3 "$rc"
+has "$(<"$SBX/tela")" "código 3"
+stub sudo
+out=$(run remove <<<"" 2>&1)
+eq 0 $?
+hasnt "$out" "falhou"
+run remove </dev/null >/dev/null 2>&1
+eq 0 $?
+
+t "install: sem yay e sem ninguém para dar o Enter, ainda sai com 1"
+zera
+out=$(SYS=$sys PATH=$SBX/limpo "$bash_bin" "$pad_sh" install </dev/null 2>&1)
+eq 1 $?
+has "$out" "falta o yay"
+
 t "subcomando desconhecido: uso, sai com 2 e não chama nada"
 zera
 err=$(run bobagem 2>&1 >/dev/null)

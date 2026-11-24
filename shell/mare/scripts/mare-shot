@@ -27,27 +27,47 @@ if [[ ${1:-} == gravacao ]]; then
   exit 0
 fi
 
-mkdir -p "$dir"
-file=$dir/$(date +%F_%H-%M-%S).png
-
-case ${1:-area} in
-  copiar)
-    geo=$(slurp -b 0b0b0b66 -c ce5e32 -w 1) || exit 0
-    grim -g "$geo" - | wl-copy --type image/png
-    notify-send -a Mk "Captura copiada" "A área está na área de transferência."
-    exit 0 ;;
-  area)
-    geo=$(slurp -b 0b0b0b66 -c ce5e32 -w 1) || exit 0
-    grim -g "$geo" "$file" ;;
-  janela)
-    geo=$(hyprctl -j activewindow | jq -r 'select(.at != null) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
-    [[ -n $geo ]] || { notify-send -a Mk "Sem janela em foco" "Nada foi capturado."; exit 1; }
-    grim -g "$geo" "$file" ;;
-  tela)
-    grim "$file" ;;
+# O subcomando é conferido antes de qualquer coisa ser criada: um engano de
+# digitação só mostra o uso.
+modo=${1:-area}
+case $modo in
+  copiar | area | janela | tela) ;;
   *)
     echo "uso: mare-shot copiar | area | janela | tela | pasta | gravacao" >&2
     exit 2 ;;
 esac
-wl-copy --type image/png <"$file"
+
+# A área da captura ("x,y LxA", como o grim pede). Vazia = a tela inteira.
+geo=""
+case $modo in
+  copiar | area)
+    geo=$(slurp -b 0b0b0b66 -c ce5e32 -w 1) || exit 0 ;;
+  janela)
+    # O hyprctl falhando, uma resposta que não é JSON ou uma janela sem
+    # posição e tamanho em números dão no mesmo: não há o que capturar.
+    geo=$(hyprctl -j activewindow 2>/dev/null | jq -r '
+      try (
+        [.at[0], .at[1], .size[0], .size[1]]
+        | select(all(.[]; type == "number")) | map(floor)
+        | select(.[2] > 0 and .[3] > 0)
+        | "\(.[0]),\(.[1]) \(.[2])x\(.[3])"
+      ) catch empty' 2>/dev/null) || geo=""
+    [[ -n $geo ]] || { notify-send -a Mk "Sem janela em foco" "Nada foi capturado."; exit 1; } ;;
+esac
+
+if [[ $modo == copiar ]]; then
+  grim -g "$geo" - | wl-copy --type image/png
+  notify-send -a Mk "Captura copiada" "A área está na área de transferência."
+  exit 0
+fi
+
+# A pasta só nasce quando há o que salvar (depois do Esc e do "sem janela").
+mkdir -p "$dir"
+file=$dir/$(date +%F_%H-%M-%S).png
+if [[ -n $geo ]]; then grim -g "$geo" "$file"; else grim "$file"; fi
+# A captura já está salva: se a cópia falhar, o aviso sai do mesmo jeito e o
+# erro do wl-copy vira a saída do script.
+rc=0
+wl-copy --type image/png <"$file" || rc=$?
 notify-send -a Mk -i "$file" "Captura salva" "${file/#$HOME/\~}"
+exit "$rc"

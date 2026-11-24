@@ -14,8 +14,8 @@ const bloco = puro("Monitors.qml");
 const chamadas = new Set();
 const M = new Proxy(bloco, { get: (alvo, nome) => { chamadas.add(nome); return alvo[nome]; } });
 
-const FUNCOES = ["bounds", "closeGaps", "copy", "detached", "enabledCount", "entry", "extraRates", "fileText",
-    "find", "fitScale", "hz", "listed", "logical", "lua", "matches", "merge", "mirrorsOf", "missingScales",
+const FUNCOES = ["arrange", "bounds", "clash", "closeGaps", "copy", "detached", "enabledCount", "enter", "entry", "extraRates", "fileText",
+    "find", "fitScale", "hz", "islands", "listed", "logical", "lua", "matches", "merge", "mirrorsOf", "missingScales",
     "modeFor", "modeText", "modeline", "modelineInfo", "nearestMode", "neighbour", "normalize", "overlaps",
     "percent", "pickMode", "place", "placed", "quote", "rates", "references", "relationTo", "resize",
     "resolutions", "round2", "rule", "same", "sameScale", "scaleOptions", "seat", "setEnabled", "shownRate",
@@ -186,27 +186,35 @@ function desenho(rnd, n) {
     return lista;
 }
 
-// Uma operação do painel, sorteada: [descrição, lista nova].
+// Uma operação do painel, sorteada: [descrição, lista nova, o que o pedido
+// tinha de garantir (uma função que devolve os problemas)].
 function operacao(rnd, lista) {
     const a = rnd.um(lista).name, b = rnd.um(lista).name;
     switch (rnd.int(0, 7)) {
     case 0: case 1: case 2: {
         const lado = rnd.um(LADOS.concat(["espelhar"]));
-        return ["place " + a + " " + lado + " " + b, M.place(lista, a, lado, b)];
+        const out = M.place(lista, a, lado, b);
+        // O pedido vale se as duas estão ligadas, a referência tem lugar e a tela tem tamanho.
+        const ma = lista.find((m) => m.name === a), mb = lista.find((m) => m.name === b);
+        const vale = a !== b && ma.enabled && mb.enabled && !mb.mirror && (lado === "espelhar" || (noDesenho(mb) && ma.w > 0));
+        return ["place " + a + " " + lado + " " + b, out,
+            () => vale && M.relationTo(out, a, b) !== lado ? [a + " ficou '" + M.relationTo(out, a, b) + "' de " + b + ", não '" + lado + "'"] : []];
     }
     case 3:
-        return ["setEnabled " + a + " false", M.setEnabled(lista, a, false)];
+        return ["setEnabled " + a + " false", M.setEnabled(lista, a, false), () => []];
     case 4:
-        return ["setEnabled " + a + " true", M.setEnabled(lista, a, true)];
+        return ["setEnabled " + a + " true", M.setEnabled(lista, a, true), () => []];
     case 5: {
         const troca = rnd.um([{ scale: 1 }, { scale: 1.25 }, { scale: 2 }, { transform: 0 }, { transform: 1 }, { transform: 3 }]);
-        return ["resize " + a + " " + JSON.stringify(troca), M.resize(lista, a, troca)];
+        return ["resize " + a + " " + JSON.stringify(troca), M.resize(lista, a, troca), () => []];
     }
-    case 6:
-        return ["unmirror " + a, M.unmirror(lista, a)];
+    case 6: {
+        const out = M.unmirror(lista, a);
+        return ["unmirror " + a, out, () => out.find((m) => m.name === a).mirror ? [a + " continua espelhando"] : []];
+    }
     default: {
         const modo = rnd.um(lista.find((m) => m.name === a).modes);
-        return ["pickMode " + a + " " + modo.w + "x" + modo.h, M.pickMode(lista, a, modo.w, modo.h)];
+        return ["pickMode " + a + " " + modo.w + "x" + modo.h, M.pickMode(lista, a, modo.w, modo.h), () => []];
     }
     }
 }
@@ -594,8 +602,29 @@ t("timing: o que estoura a frequência de linha ou o pixel clock dá null", () =
     // Sem as 25 linhas de intervalo dentro do teto de linha.
     eq(M.timing(1920, 1080, 75, Object.assign({}, FULLHD, { hmax: 82 })), null);
     assert.ok(M.timing(1920, 1080, 74, Object.assign({}, FULLHD, { hmax: 82 })));
-    // Abaixo do piso de linha.
-    eq(M.timing(1920, 1080, 48, Object.assign({}, FULLHD, { hmin: 60 })), null);
+    // Abaixo do piso de linha, e o pixel clock não deixa subir até ele.
+    eq(M.timing(1920, 1080, 48, Object.assign({}, FULLHD, { hmin: 60, clock: 110 })), null);
+    // Nem o teto de linha: piso de 60 kHz com teto de 60 kHz não tem a folga de 0,1 kHz.
+    eq(M.timing(640, 480, 60, { vmin: 50, vmax: 75, hmin: 60, hmax: 60, clock: 100 }), null);
+});
+
+t("timing: com a linha abaixo do piso, o intervalo vertical cresce até alcançá-lo", () => {
+    // 640x480 a 60 Hz: as 505 linhas do CVT dão 30,3 kHz e servem para um piso de 30.
+    const l = { vmin: 50, vmax: 75, hmin: 30, hmax: 80, clock: 100 };
+    eq(M.timing(640, 480, 60, l).vtotal, 505);
+    // Para um piso de 31 kHz são precisas 519 linhas (31,14 kHz: 0,1 kHz de folga, como no teto).
+    const alto = Object.assign({}, l, { hmin: 31 });
+    const tm = M.timing(640, 480, 60, alto);
+    eq(tm.vtotal, 519);
+    vazio(foraDosLimites(tm, 640, 480, 60, alto));
+    // 1920x1080 a 48 Hz num monitor que só desce a 60 kHz: 1253 linhas.
+    const fhd = Object.assign({}, FULLHD, { hmin: 60 });
+    eq(M.timing(1920, 1080, 48, fhd).vtotal, 1253);
+    vazio(foraDosLimites(M.timing(1920, 1080, 48, fhd), 1920, 1080, 48, fhd));
+    // Sem folga para os 0,1 kHz, o piso exato ainda serve.
+    eq(M.timing(640, 480, 60, { vmin: 50, vmax: 75, hmin: 31, hmax: 80, clock: 22.4 }).vtotal, 518);
+    // Quem já está acima do piso não muda.
+    eq(M.timing(1920, 1080, 60, FULLHD).vtotal, 1111);
 });
 
 t("timing: limites ausentes ou incompletos dão null", () => {
@@ -639,10 +668,11 @@ t("timing: algumas centenas de monitores sorteados, nenhum sinal fora dos limite
         nulos++;
         if (r > l.vmax || r < l.vmin)
             continue;
-        // null dentro da faixa: tem de haver um motivo nos limites.
+        // null dentro da faixa: tem de haver um motivo nos limites. Com o
+        // máximo de linhas que o teto de linha e o pixel clock deixam, ou não
+        // sobram as 25 de intervalo, ou a linha não chega ao piso.
         const cabem = Math.min(Math.floor((l.hmax * 1000 - 100) / r), Math.floor(l.clock * 1e6 / ((w + 80) * r)));
-        const cvt = Math.max(Math.ceil(h / (1 - 460e-6 * r)), h + M.minVblank);
-        if (cabem - h >= M.minVblank && Math.min(cabem, cvt) * r >= l.hmin * 1000)
+        if (cabem - h >= M.minVblank && cabem * r >= l.hmin * 1000)
             p.push(w + "x" + h + "@" + r + " com " + JSON.stringify(l) + " cabia (" + cabem + " linhas) e deu null");
     }
     assert.ok(validos > 100 && nulos > 100, validos + " válidos e " + nulos + " nulos: o sorteio não cobre os dois lados");
@@ -966,24 +996,21 @@ t("normalize: um desenho limpo só volta para o canto, em 300 desenhos sorteados
     vazio(p, "desenhos");
 });
 
-t("normalize: telas espalhadas de qualquer jeito ficam sem buraco, no canto, e sem ganhar sobreposição", () => {
+t("normalize: telas espalhadas de qualquer jeito, até por cima uma da outra, ficam limpas e no canto (300 sorteios)", () => {
     const rnd = gerador(13);
     const p = [];
     for (let i = 0; i < 300; i++) {
-        const l = desenho(rnd, rnd.int(2, 5));
+        const l = desenho(rnd, rnd.int(2, 6));
         for (const m of l) {
-            m.x += rnd.int(-2, 2) * 2500;
-            m.y += rnd.int(-2, 2) * 2500;
+            m.x += rnd.int(-2, 2) * rnd.um([2500, 700, 0.4]);
+            m.y += rnd.int(-2, 2) * rnd.um([2500, 700, 0.4]);
         }
         if (rnd() < 0.2)
             rnd.um(l).enabled = false;
         if (rnd() < 0.2)
             rnd.um(l).auto = true;
-        const antes = sobrepostas(l);
         const depois = M.normalize(M.copy(l));
-        p.push(...sempre(depois).map((x) => x + ": " + pos(l) + " -> " + pos(depois)));
-        if (!antes && sobrepostas(depois))
-            p.push("ganhou sobreposição: " + pos(l) + " -> " + pos(depois));
+        p.push(...limpo(depois).map((x) => x + ": " + pos(l) + " -> " + pos(depois)));
         if (pos(M.normalize(M.copy(depois))) !== pos(depois))
             p.push("normalizar de novo mudou: " + pos(depois));
         // Quem não está no desenho não é tocado.
@@ -994,6 +1021,109 @@ t("normalize: telas espalhadas de qualquer jeito ficam sem buraco, no canto, e s
         }
     }
     vazio(p, "desenhos");
+});
+
+// --- o arranjador ---
+
+t("clash: a primeira tela da lista que está por cima desta, ou null", () => {
+    const a = tela("A", 1920, 1080), b = tela("B", 1920, 1080, { x: 1000 }), c = tela("C", 1920, 1080, { x: 1920 });
+    eq(M.clash(a, [c, b]), b);
+    eq(M.clash(a, [c]), null);
+    eq(M.clash(a, [a]), null, "ela mesma não conta");
+    eq(M.clash(a, []), null);
+    eq(M.clash(b, [a, c]), a);
+});
+
+t("islands: os grupos de telas que encostam umas nas outras por um lado", () => {
+    const nomes = (l) => M.islands(l).map((g) => g.map((m) => m.name).join(""));
+    igual(nomes(tres()), ["ABC"]);
+    igual(nomes([tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1920, y: 1080 }), tela("C", 1920, 1080, { x: 3840, y: 1080 })]), ["A", "BC"]);
+    igual(nomes([tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 5000 }), tela("C", 1920, 1080, { y: 1080 })]), ["AC", "B"]);
+    igual(nomes([tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1920, enabled: false }), tela("C", 1920, 1080, { mirror: "A" })]), ["A"]);
+    // Um ponto de distância já é solta, aqui.
+    igual(nomes([tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1921 })]), ["A", "B"]);
+    igual(M.islands([]), []);
+    igual(M.islands(null), []);
+});
+
+t("enter: a tela vai para a direita do desenho, na altura da que vai mais à direita", () => {
+    const l = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1920, y: 400 }), tela("C", 2560, 1440, { x: 77, y: 77 })];
+    M.enter(l, l[2]);
+    igual([l[2].x, l[2].y], [3840, 400]);
+    // Desenho fora do canto (ainda não normalizado) também.
+    const neg = [tela("A", 1920, 1080, { x: -5000, y: -70 }), tela("B", 1920, 1080, { x: 9 })];
+    M.enter(neg, neg[1]);
+    igual([neg[1].x, neg[1].y], [-3080, -70]);
+    // Sozinha, vai para o canto.
+    const so = [tela("A", 1920, 1080, { x: 50, y: 60 }), tela("B", 1920, 1080, { enabled: false })];
+    M.enter(so, so[0]);
+    igual([so[0].x, so[0].y], [0, 0]);
+});
+
+t("arrange: tira uma tela de cima da outra pelo lado mais curto (direita ou abaixo), e encosta as soltas", () => {
+    // B em cima de A, mais para a direita que para baixo: vai para além de A. Aí cai em cima de C,
+    // que estava depois e cede por sua vez: para baixo, que é menos que a largura inteira.
+    const l = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1000 }), tela("C", 1920, 1080, { x: 1920 })];
+    igual(M.arrange(l).map((m) => [m.name, m.x, m.y]), [["A", 0, 0], ["B", 1920, 0], ["C", 1920, 1080]]);
+    // Mais para baixo que para a direita: desce, e C nem é tocada.
+    const b = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 500, y: 900 }), tela("C", 1920, 1080, { x: 1920 })];
+    igual(M.arrange(b).map((m) => [m.name, m.x, m.y]), [["A", 0, 0], ["B", 500, 1080], ["C", 1920, 0]]);
+    // Só pelo canto: a solta encosta pelo caminho mais curto, alinhada.
+    const canto = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1920, y: 1080 })];
+    igual(M.arrange(canto).map((m) => [m.x, m.y]), [[0, 0], [1920, 0]]);
+    // Longe mas na mesma faixa: só chega perto, sem perder o desalinho.
+    const longe = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 5000, y: 300 })];
+    igual(M.arrange(longe).map((m) => [m.x, m.y]), [[0, 0], [1920, 300]]);
+    // Sem `keep`, o grupo maior fica e a tela sozinha é que anda.
+    const grupo = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 5000, y: 0 }), tela("C", 1920, 1080, { x: 5000, y: 1080 })];
+    igual(M.arrange(grupo).map((m) => [m.x, m.y]), [[3080, 0], [5000, 0], [5000, 1080]]);
+    // Um grupo solto anda junto, com o arranjo que tinha.
+    const junto = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 5000, y: 0 }), tela("C", 1920, 1080, { x: 5000, y: 1080 })];
+    igual(M.arrange(junto, ["A"]).map((m) => [m.x, m.y]), [[0, 0], [1920, 0], [1920, 1080]]);
+    // Um ponto de distância (ou de sobreposição) também é fechado.
+    const ponto = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1921 }), tela("C", 1920, 1080, { y: 1079 })];
+    igual(M.arrange(ponto, ["A"]).map((m) => [m.x, m.y]), [[0, 0], [1920, 0], [0, 1080]]);
+});
+
+t("arrange: as telas de `keep` não saem do lugar, e as outras cedem para o lado dado", () => {
+    const l = () => [tela("A", 1920, 1080, { x: 100, y: 50 }), tela("B", 1920, 1080, { x: 600, y: 50 }), tela("C", 1920, 1080, { x: 9000, y: 9000 })];
+    igual(M.arrange(l(), ["B"], "direita").map((m) => [m.name, m.x, m.y]).slice(0, 2), [["A", 2520, 50], ["B", 600, 50]]);
+    igual(M.arrange(l(), ["B"]).map((m) => [m.name, m.x, m.y]).slice(0, 2), [["A", 100, 1130], ["B", 600, 50]]);
+    for (const lado of [undefined].concat(LADOS))
+        assert.ok(!sobrepostas(M.arrange(l(), ["B"], lado)) && !soltas(M.arrange(l(), ["B"], lado)), "com " + lado);
+    igual(M.arrange(l(), ["B"], "esquerda").map((m) => [m.name, m.x, m.y])[0], ["A", -1320, 50]);
+    igual(M.arrange(l(), ["B"], "abaixo").map((m) => [m.name, m.x, m.y])[0], ["A", 100, 1130]);
+    igual(M.arrange(l(), ["B"], "acima").map((m) => [m.name, m.x, m.y])[0], ["A", 100, -1030]);
+    // Não leva o desenho para o canto (isso é do normalize) nem toca em quem não está no desenho.
+    const fora = [tela("A", 1920, 1080, { x: 300, y: 300 }), tela("B", 1920, 1080, { x: 7, y: 7, enabled: false })];
+    igual(M.arrange(M.copy(fora)), fora);
+    igual(M.arrange([]), []);
+});
+
+t("arrange: de qualquer bagunça de uma a seis telas sai um desenho limpo, e arrumar de novo não muda nada (500 sorteios)", () => {
+    const rnd = gerador(73);
+    const p = [];
+    for (let i = 0; i < 500; i++) {
+        const l = desenho(rnd, rnd.int(1, 6));
+        for (const m of l) {
+            m.x = rnd.int(-3, 3) * rnd.um([1, 640, 1000, 1920]);
+            m.y = rnd.int(-3, 3) * rnd.um([1, 540, 1000, 1080]);
+        }
+        const fixas = l.filter(() => rnd() < 0.2).map((m) => m.name).slice(0, 1);
+        const lado = rnd.um([undefined].concat(LADOS));
+        const out = M.arrange(M.copy(l), fixas, lado);
+        const onde = pos(l) + " (fixas: " + fixas + ", lado: " + lado + ") -> " + pos(out);
+        if (sobrepostas(out))
+            p.push("ficou por cima: " + onde);
+        if (soltas(out))
+            p.push("ficou solta: " + onde);
+        for (const n of fixas)
+            if (pos([out.find((m) => m.name === n)]) !== pos([l.find((m) => m.name === n)]))
+                p.push("a fixa " + n + " saiu do lugar: " + onde);
+        if (pos(M.arrange(M.copy(out), fixas, lado)) !== pos(out) || pos(M.arrange(M.copy(out))) !== pos(out))
+            p.push("arrumar de novo mudou: " + onde);
+    }
+    vazio(p, "bagunças");
 });
 
 // --- place ---
@@ -1082,16 +1212,20 @@ t("place: com duas telas, qualquer pedido deixa o desenho limpo e a tela do lado
     vazio(p, "pedidos");
 });
 
-t("place: com três a cinco telas, a tela fica do lado pedido, sem buraco e no canto (300 sorteios)", () => {
+t("place: com três a seis telas, a tela fica do lado pedido e o desenho fica limpo (400 sorteios)", () => {
     const rnd = gerador(19);
     const p = [];
-    for (let i = 0; i < 300; i++) {
-        const l = desenho(rnd, rnd.int(3, 5));
+    for (let i = 0; i < 400; i++) {
+        const l = desenho(rnd, rnd.int(3, 6));
         const a = rnd.um(l).name, b = rnd.um(l.filter((m) => m.name !== a)).name;
         const rel = rnd.um(LADOS);
         const out = M.place(l, a, rel, b);
         const onde = "place " + a + " " + rel + " " + b + ": " + pos(l) + " -> " + pos(out);
-        p.push(...sempre(out).map((x) => x + ": " + onde));
+        p.push(...limpo(out).map((x) => x + ": " + onde));
+        // A referência e a tela movida ficam alinhadas como o pedido as pôs.
+        const ma = out.find((m) => m.name === a), mb = out.find((m) => m.name === b);
+        if (rel === "esquerda" || rel === "direita" ? ma.y !== mb.y : ma.x !== mb.x)
+            p.push("a tela não ficou alinhada com a referência: " + onde);
         if (M.relationTo(out, a, b) !== rel)
             p.push("ficou '" + M.relationTo(out, a, b) + "': " + onde);
         // As outras telas guardam o arranjo que tinham entre si enquanto não sobra buraco.
@@ -1101,10 +1235,54 @@ t("place: com três a cinco telas, a tela fica do lado pedido, sem buraco e no c
     vazio(p, "pedidos");
 });
 
-t("place: pôr uma tela onde já há outra fica por cima, e overlaps avisa (a página pede para escolher um lado)", () => {
-    const out = M.place(tres(), "C", "direita", "A");
-    eq(M.relationTo(out, "C", "A"), "direita");
-    assert.ok(M.overlaps(out), "C foi para cima de B e ninguém avisou: " + pos(out));
+t("place: no lado já ocupado a tela entra ali, e a que estava vai para além dela, em cadeia", () => {
+    // A | B | C, e C vai para a direita de A: A | C | B.
+    igual(M.place(tres(), "C", "direita", "A").map((m) => [m.name, m.x, m.y]), [["A", 0, 0], ["B", 3840, 0], ["C", 1920, 0]]);
+    // A | B | C | D, e D vai para a direita de A: A | D | B | C.
+    const quatro = tres().concat([tela("D", 2560, 1440, { x: 5760 })]);
+    igual(M.place(quatro, "D", "direita", "A").map((m) => [m.name, m.x, m.y]),
+        [["A", 0, 0], ["B", 4480, 0], ["C", 6400, 0], ["D", 1920, 0]]);
+    // Para a esquerda a cadeia vai para a esquerda: A | B | C, A à esquerda de C: B | A | C.
+    igual(M.place(tres(), "A", "esquerda", "C").map((m) => [m.name, m.x, m.y]), [["A", 1920, 0], ["B", 0, 0], ["C", 3840, 0]]);
+    // E na vertical: A sobre B sobre C, C abaixo de A: A, C, B.
+    const pilha = [tela("A", 1920, 1080), tela("B", 1920, 1080, { y: 1080 }), tela("C", 1920, 1080, { y: 2160 })];
+    igual(M.place(pilha, "C", "abaixo", "A").map((m) => [m.name, m.x, m.y]), [["A", 0, 0], ["B", 0, 2160], ["C", 0, 1080]]);
+    igual(M.place(pilha, "A", "acima", "C").map((m) => [m.name, m.x, m.y]), [["A", 0, 1080], ["B", 0, 0], ["C", 0, 2160]]);
+});
+
+t("place: quem não está no caminho não sai do lugar", () => {
+    // A | B com C embaixo de A. Pôr B à direita de A (onde já está) não muda nada.
+    const l = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1920 }), tela("C", 1920, 1080, { y: 1080 })];
+    igual(M.place(l, "B", "direita", "A"), l);
+    // B vai para baixo de C: A e C ficam onde estavam.
+    igual(M.place(l, "B", "abaixo", "C").map((m) => [m.name, m.x, m.y]), [["A", 0, 0], ["B", 0, 2160], ["C", 0, 1080]]);
+    // Pedir o lado em que a tela já está, num desenho limpo, não muda nada (300 sorteios).
+    const rnd = gerador(67);
+    const p = [];
+    for (let i = 0; i < 300; i++) {
+        const d = desenho(rnd, rnd.int(2, 6));
+        for (const a of d)
+            for (const b of d) {
+                const rel = M.relationTo(d, a.name, b.name);
+                const alinhadas = rel === "esquerda" || rel === "direita" ? a.y === b.y : a.x === b.x;
+                if (rel !== "" && alinhadas && pos(M.place(d, a.name, rel, b.name)) !== pos(d))
+                    p.push("place " + a.name + " " + rel + " " + b.name + " mudou " + pos(d) + " para " + pos(M.place(d, a.name, rel, b.name)));
+            }
+    }
+    vazio(p, "pedidos que não deviam mudar nada");
+});
+
+t("place: a tela que saiu do meio não deixa as outras soltas", () => {
+    // A | B | C em fila, B vai para baixo de A: C encosta de novo.
+    const out = M.place(tres(), "B", "abaixo", "A");
+    eq(M.relationTo(out, "B", "A"), "abaixo");
+    vazio(limpo(out).map((x) => x + ": " + pos(out)));
+    // Uma escada: tirar o degrau do meio deixaria as pontas só pelo canto.
+    const escada = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1920, y: 540 }), tela("C", 1920, 1080, { x: 3840, y: 1080 })];
+    vazio(limpo(escada));
+    const sem = M.place(escada, "B", "acima", "A");
+    eq(M.relationTo(sem, "B", "A"), "acima");
+    vazio(limpo(sem).map((x) => x + ": " + pos(sem)));
 });
 
 // --- espelho ---
@@ -1125,6 +1303,31 @@ t("unmirror: a tela ganha lugar próprio à direita de quem espelhava", () => {
     eq(M.relationTo(out, "B", "A"), "direita");
     vazio(limpo(out));
     eq(M.find(l, "B").mirror, "A", "a lista recebida não muda");
+});
+
+t("unmirror: com mais telas, entra à direita do desenho, na altura da que vai mais à direita", () => {
+    // A | C, com C mais baixa; B espelhava A e guardava uma posição velha em cima de C.
+    const l = [tela("A", 1920, 1080), tela("B", 2560, 1440, { mirror: "A", x: 2000, y: 100 }), tela("C", 1920, 1080, { x: 1920, y: 300 })];
+    const out = M.unmirror(l, "B");
+    igual(out.map((m) => [m.name, m.mirror, m.x, m.y]), [["A", "", 0, 0], ["B", "", 3840, 300], ["C", "", 1920, 300]]);
+    vazio(limpo(out));
+});
+
+t("ex-espelho: quando o alvo é desligado ou vira espelho, a tela entra à direita do desenho e não por cima de outra", () => {
+    // B espelha A e guarda a posição velha, bem em cima de C.
+    const l = [tela("A", 1920, 1080), tela("B", 1920, 1080, { mirror: "A", x: 1920, y: 0 }), tela("C", 1920, 1080, { x: 1920 })];
+    const off = M.setEnabled(l, "A", false);
+    igual(off.map((m) => [m.name, m.enabled, m.mirror, m.x, m.y]), [["A", false, "", 0, 0], ["B", true, "", 1920, 0], ["C", true, "", 0, 0]]);
+    vazio(limpo(off));
+    // A vira espelho de C: B, que espelhava A, ganha lugar à direita.
+    const esp = M.place(l, "A", "espelhar", "C");
+    igual(esp.map((m) => [m.name, m.mirror, m.x, m.y]), [["A", "C", 0, 0], ["B", "", 1920, 0], ["C", "", 0, 0]]);
+    vazio(limpo(esp));
+    // Duas que espelhavam a mesma: uma depois da outra.
+    const duas = l.concat([tela("D", 1280, 720, { mirror: "A", x: 5, y: 5 })]);
+    const out = M.setEnabled(duas, "A", false);
+    igual(out.map((m) => [m.name, m.x, m.y]), [["A", 0, 0], ["B", 1920, 0], ["C", 0, 0], ["D", 3840, 0]]);
+    vazio(limpo(out));
 });
 
 t("unmirror: sem modo sabido não há onde encostar, o Hyprland escolhe", () => {
@@ -1240,19 +1443,42 @@ t("setEnabled: religar num desenho limpo deixa o desenho limpo (300 sorteios)", 
     const rnd = gerador(29);
     const p = [];
     for (let i = 0; i < 300; i++) {
-        const l = desenho(rnd, rnd.int(2, 5));
+        const l = desenho(rnd, rnd.int(2, 6));
         const nome = rnd.um(l).name;
         const m = l.find((x) => x.name === nome);
         m.enabled = false;
         m.x = rnd.int(-5000, 5000);
         m.y = rnd.int(-5000, 5000);
         const base = M.normalize(M.copy(l));
-        if (sobrepostas(base) || soltas(base))
-            continue;
+        p.push(...limpo(base).map((x) => "antes de religar, " + x + ": " + pos(base)));
         const out = M.setEnabled(base, nome, true);
+        // As que já estavam não saem do lugar.
+        if (pos(out.filter((x) => x.name !== nome)) !== pos(base.filter((x) => x.name !== nome)))
+            p.push("religar " + nome + " mexeu nas outras: " + pos(base) + " -> " + pos(out));
         p.push(...limpo(out).map((x) => x + ": religar " + nome + ": " + pos(base) + " -> " + pos(out)));
     }
     vazio(p, "religadas");
+});
+
+t("setEnabled: desligar qualquer tela de um desenho limpo deixa o desenho limpo (400 sorteios)", () => {
+    const rnd = gerador(71);
+    const p = [];
+    for (let i = 0; i < 400; i++) {
+        const l = desenho(rnd, rnd.int(2, 6));
+        const nome = rnd.um(l).name;
+        const out = M.setEnabled(l, nome, false);
+        if (out.find((m) => m.name === nome).enabled)
+            p.push("não desligou " + nome);
+        p.push(...limpo(out).map((x) => x + ": desligar " + nome + ": " + pos(l) + " -> " + pos(out)));
+    }
+    vazio(p, "desligadas");
+});
+
+t("setEnabled: tirar o degrau do meio de uma escada não deixa as pontas só pelo canto", () => {
+    const escada = [tela("A", 1920, 1080), tela("B", 1920, 1080, { x: 1920, y: 1080 }), tela("C", 1920, 1080, { x: 0, y: 1080 })];
+    vazio(limpo(escada));
+    const out = M.setEnabled(escada, "C", false);
+    vazio(limpo(out).map((x) => x + ": " + pos(out)));
 });
 
 // --- resize e pickMode ---
@@ -1309,11 +1535,11 @@ t("resize: num desenho em L, a vizinha puxada não vai para cima de uma terceira
     assert.ok(!sobrepostas(out2), "ficou por cima: " + pos(out2));
 });
 
-t("resize e pickMode: num desenho sem sobreposição, nenhuma troca põe uma tela por cima da outra (600 sorteios)", () => {
+t("resize e pickMode: num desenho limpo, qualquer troca deixa o desenho limpo (600 sorteios)", () => {
     const rnd = gerador(31);
     const p = [];
     for (let i = 0; i < 600; i++) {
-        const l = desenho(rnd, rnd.int(2, 5));
+        const l = desenho(rnd, rnd.int(2, 6));
         const nome = rnd.um(l).name;
         let out, feito;
         if (rnd() < 0.3) {
@@ -1327,11 +1553,7 @@ t("resize e pickMode: num desenho sem sobreposição, nenhuma troca põe uma tel
             out = M.resize(l, nome, troca);
         }
         const onde = feito + ": " + pos(l) + " -> " + pos(out);
-        p.push(...sempre(out).map((x) => x + ": " + onde));
-        if (sobrepostas(out))
-            p.push("ficou por cima: " + onde);
-        if (l.length === 2 && soltas(out))
-            p.push("com duas telas, uma ficou solta: " + onde);
+        p.push(...limpo(out).map((x) => x + ": " + onde));
     }
     vazio(p, "trocas");
 });
@@ -1352,19 +1574,19 @@ t("pickMode: trocar a resolução fica na taxa mais perto da atual", () => {
 
 // --- sequências de operações ---
 
-t("depois de qualquer sequência de operações: canto em 0x0, sem buraco, uma tela ligada, espelhos válidos (300 sequências)", () => {
+t("depois de qualquer sequência de operações, de uma a seis telas: nenhuma por cima, nenhuma solta, canto em 0x0, o lado pedido (400 sequências)", () => {
     const rnd = gerador(37);
     const p = [];
     let passos = 0;
-    for (let i = 0; i < 300 && p.length < 30; i++) {
-        let l = desenho(rnd, rnd.int(1, 5));
+    for (let i = 0; i < 400 && p.length < 30; i++) {
+        let l = desenho(rnd, rnd.int(1, 6));
         const historia = [pos(l)];
         for (let k = 0; k < 10; k++) {
             const antes = JSON.stringify(l);
-            const [feito, out] = operacao(rnd, l);
+            const [feito, out, pedido] = operacao(rnd, l);
             historia.push(feito + " -> " + pos(out));
             passos++;
-            const erros = sempre(out);
+            const erros = limpo(out).concat(pedido());
             if (JSON.stringify(l) !== antes)
                 erros.push("a operação mexeu na lista que recebeu");
             if (out.map((m) => m.name).join() !== l.map((m) => m.name).join())
@@ -1373,8 +1595,8 @@ t("depois de qualquer sequência de operações: canto em 0x0, sem buraco, uma t
                 erros.push("overlaps diz " + M.overlaps(out));
             if (M.detached(out) !== soltas(out))
                 erros.push("detached diz " + M.detached(out));
-            if (pos(M.normalize(M.copy(out))) !== pos(out))
-                erros.push("o resultado não está normalizado");
+            if (pos(M.normalize(M.copy(out))) !== pos(out) || pos(M.arrange(M.copy(out))) !== pos(out))
+                erros.push("arrumar de novo muda o resultado");
             if (erros.length > 0) {
                 p.push(erros.join("; ") + "\n    " + historia.join("\n    "));
                 break;
@@ -1382,7 +1604,7 @@ t("depois de qualquer sequência de operações: canto em 0x0, sem buraco, uma t
             l = out;
         }
     }
-    assert.ok(passos > 2000, "só " + passos + " passos");
+    assert.ok(passos > 3000, "só " + passos + " passos");
     vazio(p, "sequências");
 });
 
@@ -1543,13 +1765,13 @@ t("merge: a guardada desligada ou espelhada continua como estava", () => {
     igual(out.slice(1), guardadas.slice(1).map((m) => M.slim(m)));
 });
 
-t("merge: desenho limpo com guardadas limpas não ganha sobreposição (300 sorteios)", () => {
+t("merge: desenho limpo com guardadas limpas dá um desenho limpo, sem mexer nas telas ligadas (300 sorteios)", () => {
     const rnd = gerador(43);
     const p = [];
     for (let i = 0; i < 300; i++) {
         // O que estava guardado: um desenho limpo. Agora algumas telas saíram
         // do cabo e as que ficaram mudaram de tamanho e de arranjo.
-        const guardadas = desenho(rnd, rnd.int(2, 5));
+        const guardadas = desenho(rnd, rnd.int(2, 6));
         const ficam = guardadas.filter(() => rnd() < 0.5);
         let ligadas = M.copy(ficam);
         for (const m of ligadas) {
@@ -1561,6 +1783,8 @@ t("merge: desenho limpo com guardadas limpas não ganha sobreposição (300 sort
         const onde = pos(guardadas) + " com " + (pos(ligadas) || "nenhuma") + " -> " + pos(out);
         if (sobrepostas(out))
             p.push("ficou por cima: " + onde);
+        if (soltas(out))
+            p.push("ficou tela solta: " + onde);
         if (out.map((m) => m.name).sort().join() !== guardadas.map((m) => m.name).sort().join())
             p.push("sumiu ou sobrou tela: " + onde);
         for (const m of ligadas) {

@@ -51,6 +51,13 @@ ColumnLayout {
     // A última resposta do `list`, crua: a lista só é trocada quando muda.
     property string lastList: ""
 
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca na página nem no NetworkManager: são
+    // funções de dado para dado e de dado para texto, testadas fora do shell
+    // com node (tests/js/SettingsVpnPage.test.mjs). `c` é uma conexão do
+    // mare-vpn ({ uuid, name, kind, state, secrets, ... }); `acting` e `verb`
+    // são a ação em curso (a conexão e o verbo).
+    // Uma cópia do mapa com a chave trocada (undefined tira a chave).
     function patch(map, key, value) {
         const next = Object.assign({}, map);
         if (value === undefined)
@@ -59,6 +66,58 @@ ColumnLayout {
             next[key] = value;
         return next;
     }
+
+    function kindName(c) {
+        return c.kind === "wireguard" ? "wireguard" : c.kind === "openvpn" ? "openvpn" : c.kind;
+    }
+
+    // A chave aparece ligada? Durante a ação, já mostra para onde ela vai.
+    function onFor(c, acting, verb) {
+        if (acting === c.uuid && verb === "up")
+            return true;
+        if (acting === c.uuid && (verb === "down" || verb === "delete"))
+            return false;
+        return c.state === "on" || c.state === "connecting";
+    }
+
+    // O estado por extenso. `failed`: o erro por conexão; `asks`: as que
+    // falharam por falta de senha.
+    function stateFor(c, acting, verb, failed, asks) {
+        if (acting === c.uuid && verb === "up" || c.state === "connecting")
+            return "conectando…";
+        if (acting === c.uuid && verb === "down" || c.state === "disconnecting")
+            return "desconectando…";
+        if (acting === c.uuid && verb === "delete")
+            return "esquecendo…";
+        if (c.state === "on")
+            return "conectada";
+        if (failed[c.uuid])
+            return "falhou: " + failed[c.uuid];
+        if (c.secrets || asks[c.uuid])
+            return "pede senha: conecta pelo terminal";
+        return "desligada";
+    }
+
+    // Um arquivo solto chega como URL (file:///home/...%20...).
+    function pathFromUrl(url) {
+        const s = String(url);
+        if (!s.startsWith("file://"))
+            return s;
+        try {
+            return decodeURIComponent(s.slice(7));
+        } catch (e) {
+            return s.slice(7);
+        }
+    }
+
+    // O recado de uma importação que deu certo.
+    function importedNote(name, kind) {
+        return "importada: " + name + " (" + kind + "). "
+            + (kind === "wireguard"
+                ? "o networkmanager a liga ao importar; já foi desligada. ligue na lista acima."
+                : "está desligada; ligue na lista acima.");
+    }
+    // --- puro: fim ---
 
     function run(verb, uuid, extra) {
         if (busy !== "" || actProc.running)
@@ -112,44 +171,12 @@ ColumnLayout {
         Mare.close();
     }
 
-    function kindName(c) {
-        return c.kind === "wireguard" ? "wireguard" : c.kind === "openvpn" ? "openvpn" : c.kind;
-    }
-
     function isOn(c) {
-        if (busy === c.uuid && busyVerb === "up")
-            return true;
-        if (busy === c.uuid && (busyVerb === "down" || busyVerb === "delete"))
-            return false;
-        return c.state === "on" || c.state === "connecting";
+        return onFor(c, busy, busyVerb);
     }
 
     function stateText(c) {
-        if (busy === c.uuid && busyVerb === "up" || c.state === "connecting")
-            return "conectando…";
-        if (busy === c.uuid && busyVerb === "down" || c.state === "disconnecting")
-            return "desconectando…";
-        if (busy === c.uuid && busyVerb === "delete")
-            return "esquecendo…";
-        if (c.state === "on")
-            return "conectada";
-        if (errors[c.uuid])
-            return "falhou: " + errors[c.uuid];
-        if (c.secrets || needsTerminal[c.uuid])
-            return "pede senha: conecta pelo terminal";
-        return "desligada";
-    }
-
-    // Um arquivo solto chega como URL (file:///home/...%20...).
-    function pathFromUrl(url) {
-        const s = String(url);
-        if (!s.startsWith("file://"))
-            return s;
-        try {
-            return decodeURIComponent(s.slice(7));
-        } catch (e) {
-            return s.slice(7);
-        }
+        return stateFor(c, busy, busyVerb, errors, needsTerminal);
     }
 
     function runCheck() {
@@ -291,10 +318,7 @@ ColumnLayout {
                 } catch (e) {}
                 page.importing = false;
                 if (result.ok) {
-                    page.importNote = "importada: " + result.name + " (" + result.kind + "). "
-                        + (result.kind === "wireguard"
-                            ? "o networkmanager a liga ao importar; já foi desligada. ligue na lista acima."
-                            : "está desligada; ligue na lista acima.");
+                    page.importNote = page.importedNote(result.name, result.kind);
                     pathInput.text = "";
                     page.expanded = result.uuid;
                 } else {

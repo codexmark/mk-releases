@@ -75,16 +75,10 @@ Item {
     })
 
     readonly property var results: {
-        const q = query.trim().toLowerCase();
         const all = projectCommands.concat(shellCommands, projects, apps);
-        if (q === "")
-            return all.slice(0, rows);
-        const found = all
-            .map(item => ({ item: item, score: Math.max(score(q, item.title), score(q, item.detail) * 0.5) }))
-            .filter(r => r.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, rows)
-            .map(r => r.item);
+        const found = ranked(query, all, rows);
+        if (query.trim() === "")
+            return found;
         // Uma conta? O resultado vem primeiro; Enter copia.
         const value = Calc.evaluate(query);
         if (value === null)
@@ -117,6 +111,9 @@ Item {
         input.forceActiveFocus();
     }
 
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no Maré nem no Hyprland: é a conta da
+    // busca, testada fora do shell com node (tests/js/LauncherPanel.test.mjs).
     // Prefixo > início de palavra > trecho > letras na ordem.
     function score(q, text) {
         const s = (text || "").toLowerCase();
@@ -132,6 +129,31 @@ Item {
         return j === q.length ? 30 : 0;
     }
 
+    // Os `max` itens ({ title, detail, ... }) que mais combinam com o texto
+    // digitado, do melhor para o pior; o detalhe vale metade do título. Sem
+    // texto, os primeiros da lista.
+    function ranked(typed, all, max) {
+        const q = typed.trim().toLowerCase();
+        if (q === "")
+            return all.slice(0, max);
+        return all
+            .map(item => ({ item: item, score: Math.max(score(q, item.title), score(q, item.detail) * 0.5) }))
+            .filter(r => r.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, max)
+            .map(r => r.item);
+    }
+
+    // O primeiro workspace sem janela (`used`: os ids em uso) e sem projeto
+    // (`bound`: o mapa id -> projeto).
+    function freeWorkspace(used, bound) {
+        let id = 1;
+        while (used.indexOf(id) >= 0 || bound[String(id)])
+            id++;
+        return id;
+    }
+    // --- puro: fim ---
+
     // Projeto já ligado a um workspace: vai até ele. Senão, usa o primeiro
     // workspace livre, liga ao projeto e abre um terminal lá.
     function goToProject(d, ws) {
@@ -139,10 +161,7 @@ Item {
             Hypr.workspace(ws);
             return;
         }
-        const used = Hyprland.workspaces.values.map(w => w.id);
-        let id = 1;
-        while (used.indexOf(id) >= 0 || Projects.bindings[String(id)])
-            id++;
+        const id = freeWorkspace(Hyprland.workspaces.values.map(w => w.id), Projects.bindings);
         Projects.bind(id, d.name, d.dir);
         Hypr.workspace(id);
         Projects.openIn(d.dir, "");

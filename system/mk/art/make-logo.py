@@ -142,6 +142,8 @@ def login_assets(root):
     """O que a tela de entrada precisa para construir a marca em movimento: as
     duas letras em PNG e a geometria (em unidades da fonte) num .js do tema."""
     theme = os.path.join(root, "system/mk/sddm/mk")
+    # O descanso de tela do Maré desenha a mesma construção: recebe cópias.
+    shell_assets = os.path.join(root, "shell/mare/assets")
     for name, ch, ox, color in (("letra-m", "M", 0, BONE), ("letra-k", "k", KX, COPPER)):
         tmp = os.path.join(out, name + ".svg")
         with open(tmp, "w") as f:
@@ -173,6 +175,8 @@ var diags = [{diags}];
 // Nós nas quinas [x, y, cor]: 0 = osso (do M), 1 = cobre (do k).
 var nodes = [{nodes}];
 """)
+    for name in ("letra-m.png", "letra-k.png", "geometria.js"):
+        shutil.copy(os.path.join(theme, name), os.path.join(shell_assets, name))
 
 
 def render(svg_path, png_path, width=None, height=None):
@@ -185,7 +189,7 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["entrada"]:
         # Só as peças da tela de entrada, sem regravar o resto.
         login_assets(os.path.normpath(os.path.join(here, "..", "..", "..")))
-        print("ok: letra-m.png, letra-k.png, geometria.js")
+        print("ok: letra-m.png, letra-k.png, geometria.js (entrada e shell/mare/assets)")
         sys.exit(0)
     for name, bg in (("mk-logo", True), ("mk-logo-transparente", False)):
         path = os.path.join(out, name + ".svg")

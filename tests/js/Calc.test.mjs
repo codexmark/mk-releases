@@ -70,6 +70,100 @@ t("os espaços não importam", () => {
     eq(calc("1\t+\n2"), 3);
 });
 
+t("a potência prende mais que o menos da frente: -2^2 = −4", () => {
+    eq(calc("-2^2"), -4);
+    eq(calc("(-2)^2"), 4);
+    eq(calc("2^-2"), 0.25);
+    eq(calc("-2^-2"), -0.25);
+    eq(calc("- 2 ^ 2"), -4);
+    eq(calc("-2^2+10"), 6);
+    eq(calc("10-2^2"), 6);
+    eq(calc("2*-3^2"), -18);
+    eq(calc("-raiz(16)^2"), -16);
+    eq(calc("--2^2"), 4);
+    // O expoente também é "menos, depois potência": 2^-(3^2).
+    perto(calc("2^-3^2"), Math.pow(2, -9));
+    perto(calc("-pi^2"), -Math.PI * Math.PI);
+});
+
+t("o menos tipográfico (o que o format escreve) vale como menos", () => {
+    eq(calc("5 − 3"), 2);
+    eq(calc("−2^2"), -4);
+});
+
+// --- espaços ---
+
+t("espaço entre dois números não é conta: os algarismos não se juntam", () => {
+    const tortas = ["1 2 + 3", "1 2", "2 2", "1 000 + 1", "1 + 2 3", "12 ,5 * 3", "12, 5 * 3", "1 . 5 + 1",
+        "2 (3)", "(2) 3 + 1", "2 pi + 1", "1 2x3", "linux 6 + 1", "2 ^ 3 4"];
+    vazio(tortas.filter((s) => calc(s) !== null).map((s) => JSON.stringify(s) + " -> " + calc(s)),
+        "deviam dar null");
+});
+
+t("espaço no meio de um nome (raiz, sqrt, pi) não é conta", () => {
+    const tortas = ["ra iz(16)", "r a i z 16", "sq rt(16)", "p i * 2", "2 * p i"];
+    vazio(tortas.filter((s) => calc(s) !== null).map((s) => JSON.stringify(s) + " -> " + calc(s)),
+        "deviam dar null");
+});
+
+t("espaço em volta de operador, parêntese, nome e % continua não importando", () => {
+    eq(calc("3 x 4"), 12);
+    eq(calc("( 2 + 3 ) * 4"), 20);
+    eq(calc("2 ^ - 2"), 0.25);
+    eq(calc("raiz ( 16 ) + 1"), 5);
+    perto(calc("2 * pi"), 2 * Math.PI);
+    perto(calc("200 - 15 %"), 170);
+    eq(calc("\u00a01 +\u00a02\u00a0"), 3);
+});
+
+// --- o que parece conta e não é ---
+
+t("data não é conta: 2024-01-15 e 15/01/2024 dão null", () => {
+    const datas = ["2024-01-15", "15/01/2024", "15-01-2024", "2024/01/15", "2024-11-15", "15/11/2024",
+        "15-11-2024", "2024/11/15", "1/2/2024", "2024-1-2", " 2024-11-15 ", "01/02", "15/01", "2024-01"];
+    vazio(datas.filter((s) => calc(s) !== null).map((s) => JSON.stringify(s) + " -> " + calc(s)),
+        "deviam dar null");
+});
+
+t("o que só lembra uma data continua conta: sem ano de quatro algarismos, ou com espaços", () => {
+    eq(calc("10-4-3"), 3);
+    eq(calc("100/10/2"), 5);
+    eq(calc("2024 - 11 - 15"), 1998);
+    eq(calc("2024-11"), 2013);
+    eq(calc("2024-11-15+1"), 1999);
+    eq(calc("2024-11/15-1"), 2024 - 11 / 15 - 1);
+});
+
+t("zero à esquerda não é número de conta: 007 e 01 dão null", () => {
+    const tortas = ["007+1", "10+01", "00,5+1", "00+1", "1/02", "2^03", "raiz(09)"];
+    vazio(tortas.filter((s) => calc(s) !== null).map((s) => JSON.stringify(s) + " -> " + calc(s)),
+        "deviam dar null");
+    eq(calc("0+1"), 1);
+    eq(calc("0,5+0,5"), 1);
+    eq(calc("0.5*10"), 5);
+    eq(calc("10+0"), 10);
+    eq(calc("100+200"), 300);
+});
+
+t("hexadecimal não é conta: 0x10 dá null, não 0 vezes 10", () => {
+    const hexas = ["0x10", "0X10", "0x10+1", "2+0x10", "0xff", "0x", "(0x10)", "2*0x3", "-0x10", "0x1 + 0x2"];
+    vazio(hexas.filter((s) => calc(s) !== null).map((s) => JSON.stringify(s) + " -> " + calc(s)),
+        "deviam dar null");
+    eq(calc("10x10"), 100);
+    eq(calc("0 x 10"), 0);
+    eq(calc("1,0x10"), 10);
+});
+
+t("um número só com sinal ou entre parênteses não é conta", () => {
+    const sozinhos = ["-5", "+5", "- 5", "(5)", "((5))", "-pi", "--5", "(-5)", "-(5)", "-3,14", "(pi)"];
+    vazio(sozinhos.filter((s) => calc(s) !== null).map((s) => JSON.stringify(s) + " -> " + calc(s)),
+        "deviam dar null");
+    eq(calc("-(2+3)"), -5);
+    eq(calc("-5+0"), -5);
+    perto(calc("-15%"), -0.15);
+    eq(calc("-raiz 16"), -4);
+});
+
 // --- números ---
 
 t("vírgula e ponto valem como separador decimal", () => {
@@ -162,6 +256,12 @@ t("o que não é texto não derruba: null", () => {
     eq(calc({}), null);
     eq(calc([]), null);
     eq(calc(42), null);
+});
+
+t("só texto é conta: uma lista ou um objeto que viraria '1+1' dá null", () => {
+    eq(calc(["1+1"]), null);
+    eq(calc({ toString: () => "1+1" }), null);
+    eq(calc(true), null);
 });
 
 // --- sem eval ---

@@ -140,6 +140,33 @@ run --restart 2>/dev/null
 assenta
 not_called "hyprctl dispatch"
 
+t "--restart: endereço que só começa por 0x (o resto fecharia a expressão Lua) não vira comando"
+for end in '0x55d0\" }) os.execute(\"touch /tmp/x\") --' '0x' '0xZZ' '0x55d0 c0ffee' '0X55D0' ' 0x55d0' '0x55d0\n0x1' '0x55d0}'; do
+  zera
+  printf '{"address":"%s"}\n' "$end" >"$SBX/janela.json"
+  run --restart
+  assenta
+  eq 2 "$(grep -c '^hyprctl activewindow -j$' "$SBX/calls")" "endereço $end"
+  not_called "hyprctl dispatch"
+done
+
+t "--restart: o endereço em hexadecimal minúsculo, do tamanho que for, passa"
+for end in 0x1 0x55d0c0ffee 0x5f3a9b2c41d0; do
+  zera
+  printf '{"address":"%s"}\n' "$end" >"$SBX/janela.json"
+  run --restart
+  assenta
+  eq 2 "$(grep -cF "hyprctl dispatch hl.dsp.focus({ window = \"address:$end\" })" "$SBX/calls")" "endereço $end"
+done
+
+t "ui.scale zero não é um tamanho: escala de fábrica"
+for v in 0 0.0 '"0"' '"0.00"' '"00"' '"000.000"'; do
+  zera
+  ajustes "{\"ui.scale\": $v}"
+  run
+  eq "escala=0.85" "$(escala)" "ui.scale $v"
+done
+
 t "outro argumento qualquer inicia normalmente, sem fechar nada"
 zera
 ok run --bobagem

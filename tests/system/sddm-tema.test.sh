@@ -150,7 +150,8 @@ hasnt "$src" 'Qt.formatTime(now, "HH:mm")'
 hasnt "$src" "root.height * 0.2"
 
 t "os anéis seguem a mesma conta do bloqueio (onde o número acende, as marcas de 5 em 5)"
-for conta in 'Math.max(0, 1 - Math.abs(rel) / 4)' 'index % 5 === 0' '(base + ring.angle) % 360' \
+# (o número do minuto e do segundo exatos aparece ao passar pela pílula, não só de 5 em 5)
+for conta in 'visible: parent.major || parent.spot > 0' 'Math.max(0, 1 - Math.abs(rel) / 4)' 'index % 5 === 0' '(base + ring.angle) % 360' \
   'secTarget = -((d.getSeconds() * 1000 + ms) / 60000) * 360' \
   'minTarget = -((d.getMinutes() * 60000 + d.getSeconds() * 1000 + ms) / 3600000) * 360'; do
   has "$(<"$lock")" "$conta" "o bloqueio mudou a conta"

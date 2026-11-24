@@ -160,8 +160,11 @@ Singleton {
     // reduzido (460 µs), nunca menos que minVblank (numa tela de 768 linhas a
     // 60 Hz os 460 µs são 22), se couber; se não, o maior que os limites
     // deixam: a frequência de linha fica 0,1 kHz abaixo do teto (o EDID o dá
-    // em kHz inteiros) e o pixel clock não passa do máximo. O `WxH@taxa` do
-    // Hyprland usa o CVT de blanking normal, que estoura esses limites.
+    // em kHz inteiros) e o pixel clock não passa do máximo. Se com isso a
+    // linha fica abaixo do piso do monitor (640x480 a 60 Hz com piso de
+    // 31 kHz), o intervalo cresce até 0,1 kHz acima dele, enquanto o teto e
+    // o clock deixarem. O `WxH@taxa` do Hyprland usa o CVT de blanking normal,
+    // que estoura esses limites.
     function timing(w, h, r, limits) {
         const l = limits;
         if (!l || !(w > 0 && h > 0 && r > 0) || !(l.vmax > 0 && l.hmax > 0 && l.clock > 0))
@@ -169,7 +172,8 @@ Singleton {
         if (r > l.vmax || r < (l.vmin || 0))
             return null;
         const htotal = w + 80;
-        const vtotal = Math.min(Math.max(Math.ceil(h / (1 - 460e-6 * r)), h + minVblank),
+        const floor = l.hmin > 0 ? Math.ceil((l.hmin * 1000 + 100) / r) : 0;
+        const vtotal = Math.min(Math.max(Math.ceil(h / (1 - 460e-6 * r)), h + minVblank, floor),
             Math.floor((l.hmax * 1000 - 100) / r),
             Math.floor(l.clock * 1e6 / (htotal * r)));
         if (!(vtotal - h >= minVblank) || vtotal * r < (l.hmin || 0) * 1000)
@@ -290,7 +294,9 @@ Singleton {
 
     // Fecha os buracos do desenho num eixo: uma tela que ficou longe das
     // outras encosta de novo. O cursor não atravessa um buraco entre telas,
-    // então uma tela solta ficaria fora do alcance do mouse.
+    // então uma tela solta ficaria fora do alcance do mouse. Só olha um eixo
+    // (duas telas pelo canto passam por ele): quem arruma o desenho é o
+    // arrange.
     function closeGaps(list, axis, side) {
         const shown = list.filter(placed).sort((a, b) => a[axis] - b[axis]);
         let edge = -Infinity, shift = 0;
@@ -306,10 +312,151 @@ Singleton {
         }
     }
 
-    // Leva o canto de cima à esquerda do desenho para 0x0, sem buracos.
-    function normalize(list) {
-        closeGaps(list, "x", "w");
-        closeGaps(list, "y", "h");
+    // A primeira tela de `others` que está por cima de `m`, ou null.
+    function clash(m, others) {
+        const a = logical(m);
+        for (const o of others) {
+            const b = logical(o);
+            if (o !== m && m.x < o.x + b.w && o.x < m.x + a.w && m.y < o.y + b.h && o.y < m.y + a.h)
+                return o;
+        }
+        return null;
+    }
+
+    // Os grupos de telas do desenho que encostam umas nas outras por um lado
+    // (só pelo canto não é encostar: o mouse não passa). Aqui encostar é sem
+    // folga nenhuma: um ponto de distância conta como solta, para o arrange
+    // fechar (o relationTo e o detached perdoam esse ponto).
+    function islands(list) {
+        const shown = (list || []).filter(placed);
+        const touch = (m, o) => {
+            const a = logical(m), b = logical(o);
+            return ((m.x + a.w === o.x || o.x + b.w === m.x) && m.y < o.y + b.h && o.y < m.y + a.h)
+                || ((m.y + a.h === o.y || o.y + b.h === m.y) && m.x < o.x + b.w && o.x < m.x + a.w);
+        };
+        const groups = [];
+        for (const first of shown) {
+            if (groups.some(g => g.indexOf(first) >= 0))
+                continue;
+            const g = [first];
+            for (let i = 0; i < g.length; i++)
+                for (const o of shown)
+                    if (g.indexOf(o) < 0 && touch(g[i], o))
+                        g.push(o);
+            groups.push(shown.filter(m => g.indexOf(m) >= 0));
+        }
+        return groups;
+    }
+
+    // O arranjador: deixa o desenho sem tela por cima de outra e sem tela
+    // solta, mexendo o mínimo. As telas de `keep` (a que a pessoa moveu e a
+    // referência dela) não saem do lugar; as outras é que cedem.
+    //
+    // 1. Quem está por cima de outra é empurrada para além dela, em cadeia:
+    //    as de `keep` primeiro, e depois cada tela, na ordem em que aparecem
+    //    nesse sentido, vai para depois de todas as já assentadas em que
+    //    bate. Com `side` (o lado de um place) é sempre nesse eixo e nesse
+    //    sentido; sem ele, para a direita ou para baixo, o que for menos.
+    // 2. Cada grupo solto anda inteiro até encostar no desenho por um lado,
+    //    pelo caminho mais curto que não o põe por cima de ninguém: fica com
+    //    o desalinho que tinha se assim encosta, ou alinha pela borda. O
+    //    desenho é o grupo das telas de `keep` (sem `keep`, o maior grupo).
+    //
+    // Arrumar de novo o que já está arrumado não muda nada. Mexe na lista
+    // recebida e a devolve; não leva o desenho para 0x0 (ver normalize).
+    function arrange(list, keep, side) {
+        const shown = (list || []).filter(placed);
+        for (const m of shown) {
+            m.x = Math.round(m.x);
+            m.y = Math.round(m.y);
+        }
+        const fixed = shown.filter(m => (keep || []).indexOf(m.name) >= 0);
+
+        const axis = side === "acima" || side === "abaixo" ? "y" : "x";
+        const span = axis === "x" ? "w" : "h";
+        const back = side === "esquerda" || side === "acima";
+        const front = m => back ? -(m[axis] + logical(m)[span]) : m[axis];
+        const settled = fixed.slice();
+        const rest = shown.filter(m => fixed.indexOf(m) < 0)
+            .sort((a, b) => front(a) - front(b) || shown.indexOf(a) - shown.indexOf(b));
+        for (const m of rest) {
+            for (let hit = clash(m, settled); hit; hit = clash(m, settled)) {
+                const down = !side && hit.y + logical(hit).h - m.y < hit.x + logical(hit).w - m.x;
+                if (down)
+                    m.y = hit.y + logical(hit).h;
+                else
+                    m[axis] = back ? hit[axis] - logical(m)[span] : hit[axis] + logical(hit)[span];
+            }
+            settled.push(m);
+        }
+
+        const groups = islands(shown);
+        let big = null;
+        for (const g of groups)
+            if (!big || g.length > big.length)
+                big = g;
+        let main = [];
+        const loose = [];
+        for (const g of groups) {
+            if (fixed.length > 0 ? g.some(m => fixed.indexOf(m) >= 0) : g === big)
+                main = main.concat(g);
+            else
+                loose.push(g);
+        }
+        while (loose.length > 0) {
+            let best = null;
+            for (const g of loose)
+                for (const c of g)
+                    for (const t of main)
+                        for (const rel of ["direita", "esquerda", "abaixo", "acima"]) {
+                            const a = logical(c), b = logical(t);
+                            const beside = rel === "direita" || rel === "esquerda";
+                            const along = rel === "direita" ? t.x + b.w - c.x : rel === "esquerda" ? t.x - a.w - c.x
+                                : rel === "abaixo" ? t.y + b.h - c.y : t.y - a.h - c.y;
+                            const p = beside ? "y" : "x", q = beside ? "h" : "w";
+                            const slides = [t[p] - c[p], t[p] + b[q] - c[p] - a[q]];
+                            if (c[p] < t[p] + b[q] && t[p] < c[p] + a[q])
+                                slides.unshift(0);
+                            for (const across of slides) {
+                                const dx = beside ? along : across, dy = beside ? across : along;
+                                const cost = Math.abs(dx) + Math.abs(dy);
+                                if (best && cost >= best.cost)
+                                    continue;
+                                if (g.some(m => clash(Object.assign({}, m, { x: m.x + dx, y: m.y + dy }), main)))
+                                    continue;
+                                best = { group: g, dx: dx, dy: dy, cost: cost };
+                            }
+                        }
+            if (!best)
+                break;
+            for (const m of best.group) {
+                m.x += best.dx;
+                m.y += best.dy;
+            }
+            main = main.concat(best.group);
+            loose.splice(loose.indexOf(best.group), 1);
+        }
+        return list;
+    }
+
+    // Põe `m` à direita do desenho, na altura da tela que vai mais à direita,
+    // para encostar nela. É por onde entra uma tela religada ou uma que
+    // deixou de espelhar: a posição que ela guardava era de outro desenho.
+    function enter(list, m) {
+        let right = -Infinity, top = 0;
+        for (const o of list)
+            if (o !== m && placed(o) && o.x + logical(o).w > right) {
+                right = o.x + logical(o).w;
+                top = o.y;
+            }
+        m.x = right === -Infinity ? 0 : right;
+        m.y = top;
+    }
+
+    // Arruma o desenho (ver arrange) e leva o canto de cima à esquerda para
+    // 0x0: sem tela por cima de outra, sem tela solta, sem buracos.
+    function normalize(list, keep, side) {
+        arrange(list, keep, side);
         let minX = Infinity, minY = Infinity;
         for (const m of list)
             if (placed(m)) {
@@ -358,7 +505,7 @@ Singleton {
             return next;
         };
         const pulled = follow(true);
-        return normalize(overlaps(pulled) ? follow(false) : pulled);
+        return normalize(overlaps(pulled) ? follow(false) : pulled, [name]);
     }
 
     function pickMode(list, name, w, h, r) {
@@ -376,7 +523,11 @@ Singleton {
     }
 
     // rel: "esquerda" | "direita" | "acima" | "abaixo" | "espelhar", sempre
-    // em relação à tela `other`.
+    // em relação à tela `other`. É o pedido que manda: a tela fica desse lado
+    // e as outras cedem. Se o lado já tinha uma tela, ela vai para além da
+    // que chegou, no mesmo eixo, em cadeia; e quem ficaria solta encosta de
+    // novo (ver arrange). Quem espelhava a tela que virou espelho ganha lugar
+    // próprio (ver enter).
     function place(list, name, rel, other) {
         const out = copy(list);
         const m = find(out, name);
@@ -388,11 +539,13 @@ Singleton {
         if (o.mirror)
             return out;
         if (rel === "espelhar") {
-            for (const x of out)
-                if (x.mirror === name)
-                    x.mirror = "";
             m.mirror = other;
-            return normalize(out);
+            for (const x of out)
+                if (x.mirror === name) {
+                    x.mirror = "";
+                    enter(out, x);
+                }
+            return normalize(out, [other]);
         }
         if (!placed(o) || !(m.w > 0))
             return out;
@@ -401,7 +554,7 @@ Singleton {
         m.auto = false;
         m.x = rel === "esquerda" ? o.x - a.w : rel === "direita" ? o.x + b.w : o.x;
         m.y = rel === "acima" ? o.y - a.h : rel === "abaixo" ? o.y + b.h : o.y;
-        return normalize(out);
+        return normalize(out, [other, name], rel);
     }
 
     // Quem está espelhando esta tela.
@@ -409,20 +562,23 @@ Singleton {
         return (list || []).filter(m => m.enabled && m.mirror === name).map(m => m.name);
     }
 
-    // Desfaz o espelho de `name`: ela ganha lugar próprio à direita de quem
-    // espelhava.
+    // Desfaz o espelho de `name`: ela ganha lugar próprio à direita do
+    // desenho (com duas telas, à direita de quem espelhava), sem tirar
+    // ninguém do lugar.
     function unmirror(list, name) {
-        const m = find(list, name);
+        const out = copy(list);
+        const m = find(out, name);
         if (!m || !m.mirror)
-            return copy(list);
-        const out = place(list, name, "direita", m.mirror);
-        const now = find(out, name);
-        if (now.mirror) {
+            return out;
+        m.mirror = "";
+        if (!m.enabled || !(m.w > 0 && m.h > 0)) {
             // Sem modo sabido não há onde encostar: o Hyprland escolhe.
-            now.mirror = "";
-            now.auto = true;
+            m.auto = true;
+            return out;
         }
-        return out;
+        m.auto = false;
+        enter(out, m);
+        return normalize(out);
     }
 
     // De que lado de `other` a tela está, ou "" se não encosta nela.
@@ -473,7 +629,9 @@ Singleton {
 
     // Liga ou desliga. A última tela ligada não desliga; uma tela religada
     // entra à direita das outras, na altura da que vai mais à direita, para
-    // encostar nela (ou onde o Hyprland quiser, sem modo sabido).
+    // encostar nela (ou onde o Hyprland quiser, sem modo sabido). Quem
+    // espelhava a tela desligada entra do mesmo jeito, e as que ficariam
+    // soltas sem ela encostam de novo.
     function setEnabled(list, name, on) {
         const out = copy(list);
         const m = find(out, name);
@@ -485,8 +643,10 @@ Singleton {
             m.enabled = false;
             m.mirror = "";
             for (const o of out)
-                if (o.mirror === name)
+                if (o.mirror === name) {
                     o.mirror = "";
+                    enter(out, o);
+                }
             return normalize(out);
         }
         m.enabled = true;
@@ -497,14 +657,7 @@ Singleton {
             return out;
         }
         m.auto = false;
-        let right = 0, top = 0;
-        for (const o of out)
-            if (o !== m && placed(o) && o.x + logical(o).w > right) {
-                right = o.x + logical(o).w;
-                top = o.y;
-            }
-        m.x = right;
-        m.y = top;
+        enter(out, m);
         return normalize(out);
     }
 
@@ -678,7 +831,9 @@ Singleton {
     //
     // A posição guardada de uma tela fora do cabo valia para o desenho de
     // antes. Ela volta para o lado da vizinha que tinha, no lugar em que a
-    // vizinha está agora; sem vizinha no desenho, o Hyprland escolhe.
+    // vizinha está agora; sem vizinha no desenho, o Hyprland escolhe. No
+    // fim o arranjador garante que nenhuma fica solta nem por cima de outra,
+    // sem mexer nas telas ligadas.
     function merge(connected, saved) {
         const out = (connected || []).map(slim);
         const old = (saved || []).filter(m => m && typeof m.name === "string").map(slim);
@@ -709,6 +864,9 @@ Singleton {
                 m.auto = true;
             }
         }
+        // As ligadas ficam onde estão; as de fora do cabo é que se ajeitam.
+        if (room)
+            arrange(out.concat(away), out.filter(placed).map(m => m.name));
         return out.concat(away);
     }
 

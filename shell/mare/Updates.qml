@@ -26,15 +26,7 @@ Singleton {
 
     // A ilha só acende pelo que importa: versão nova do Mk, migração pendente
     // ou pacotes esperando há uma semana. No Arch há pacote novo todo dia.
-    readonly property bool badge: {
-        if (!info)
-            return false;
-        if (mkAvailable || migrations > 0)
-            return true;
-        if (systemCount + aurCount === 0)
-            return false;
-        return !info.applied || info.checked - info.applied >= 7 * 86400;
-    }
+    readonly property bool badge: badgeFor(info)
 
     // O mk-update rodado num terminal qualquer grava o resumo ao terminar:
     // a página e a ilha se atualizam sem esperar a próxima procura.
@@ -57,30 +49,66 @@ Singleton {
         runner.running = true;
     }
 
-    function ago() {
-        if (!info)
-            return "ainda não procurou";
-        const min = Math.round((Date.now() / 1000 - info.checked) / 60);
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no Maré nem no relógio: são contas e
+    // textos sobre o que o mare-updates respondeu, testados fora do shell com
+    // node (tests/js/Updates.test.mjs). `data` é a resposta inteira (o `info`),
+    // `now` um Date e os instantes vêm em segundos desde 1970.
+    // A ilha acende? (veja `badge`)
+    function badgeFor(data) {
+        if (!data)
+            return false;
+        if (data.mk.available || (data.migrations ? data.migrations : 0) > 0)
+            return true;
+        if (data.system.length + data.aur.length === 0)
+            return false;
+        return !data.applied || data.checked - data.applied >= 7 * 86400;
+    }
+
+    // Há quanto tempo foi a procura: "agora há pouco", "há 12 min", "há 3 h".
+    function agoText(checked, nowSeconds) {
+        const min = Math.round((nowSeconds - checked) / 60);
         return min < 1 ? "agora há pouco" : min < 60 ? "há " + min + " min"
             : "há " + Math.round(min / 60) + " h";
     }
 
+    // Quantos dias do calendário separam `epoch` de `now` (a virada é à meia-noite).
+    function daysSince(epoch, now) {
+        const d = new Date(epoch * 1000);
+        return Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate())
+            - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+    }
+
+    // "hoje", "ontem", "há 5 dias"; depois de um mês, vazio (quem chama põe a data).
+    function dayWord(days) {
+        return days <= 0 ? "hoje" : days === 1 ? "ontem" : days < 30 ? "há " + days + " dias" : "";
+    }
+
+    // A linha da última rodada do mk-update. `r` é o resumo que ele deixa
+    // ({ when, ok, step, from, to, log }) e `when`, o dia já escrito.
+    function summary(r, when) {
+        const mk = r.to && r.to !== r.from ? " · mk " + r.to : "";
+        return "última vez: " + when + ", "
+            + (r.ok ? "tudo certo" + mk : "parou em: " + (r.step || "início"));
+    }
+    // --- puro: fim ---
+
+    function ago() {
+        if (!info)
+            return "ainda não procurou";
+        return agoText(info.checked, Date.now() / 1000);
+    }
+
     // "hoje", "ontem", "há 5 dias"; depois de um mês, a data.
     function day(epoch) {
-        const d = new Date(epoch * 1000);
-        const n = new Date();
-        const days = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate())
-            - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
-        return days <= 0 ? "hoje" : days === 1 ? "ontem" : days < 30 ? "há " + days + " dias"
-            : Qt.formatDate(d, "dd/MM/yyyy");
+        const word = dayWord(daysSince(epoch, new Date()));
+        return word !== "" ? word : Qt.formatDate(new Date(epoch * 1000), "dd/MM/yyyy");
     }
 
     function lastText() {
         if (!last)
             return "";
-        const mk = last.to && last.to !== last.from ? " · mk " + last.to : "";
-        return "última vez: " + day(last.when) + ", "
-            + (last.ok ? "tudo certo" + mk : "parou em: " + (last.step || "início"));
+        return summary(last, day(last.when));
     }
 
     // O registro da última rodada, no terminal (no fim, onde parou).

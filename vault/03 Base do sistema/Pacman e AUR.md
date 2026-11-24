@@ -25,7 +25,7 @@ Manter o sistema o mais perto possível de um Arch comum: o que o Mk acrescenta 
 ## Como funciona
 
 - **Instalação**: `pacstrap -K` com as listas oficiais; depois os do AUR, do repositório local da ISO ([[AUR na instalação]]).
-- **Atualização**: o [[mk-update]] roda uma transação só do pacman (`pacman -Syu --needed <apps>` ou, havendo pacotes pedidos por migração, `pacman -Sy` seguido de `pacman -Su --needed <pedidos> <apps>`), depois o AUR com `yay -Sua`.
+- **Atualização**: o [[mk-update]] roda uma transação só do pacman, sem perguntas no meio (`pacman -Sy`, um ensaio com `pacman -Su --print`, e então `pacman -Su --noconfirm` com o sistema, os pacotes pedidos por migração e os apps aceitos), depois o AUR com `yay -Sua --noconfirm`.
 - **Procura sem sudo**: `checkupdates` (do `pacman-contrib`, por isso ele está em `base.packages`) numa base temporária, e `yay -Qua` ([[Atualizações na ilha e nos Ajustes]]).
 - **Trava**: se existe `/var/lib/pacman/db.lck` e não há `pacman`, `yay`, `makepkg` nem `pamac` rodando, o `mk-update` oferece remover a trava.
 - **Gancho do pacman**: `mk-os-release.hook` ([[Nome do sistema (os-release)]]). E o `snap-pac` ([[Snapper e snap-pac]]).

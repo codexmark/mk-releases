@@ -17,7 +17,7 @@ const QT = { SHIFT: 0x02000000, CTRL: 0x04000000, ALT: 0x08000000, SUPER: 0x1000
 
 t("toda função do arquivo tem caso aqui", () => {
     const cobertas = ["normalizeKey", "byId", "parse", "format", "same", "canonical", "clean", "effective",
-        "expand", "conflicts", "conflict", "validate", "keyLabel", "pretty", "fromQt", "modsFromQt", "groups",
+        "expand", "conflicts", "conflict", "validate", "reachableText", "keyLabel", "pretty", "fromQt", "modsFromQt", "groups",
         "entries", "luaTable", "fromLua", "diverged", "lua", "evalCode", "suspendCode", "resumeCode"];
     const funcoes = Object.keys(K).filter((k) => typeof K[k] === "function");
     igual(funcoes.filter((f) => !cobertas.includes(f)), [], "função sem teste: acrescente o caso e ponha na lista");
@@ -341,6 +341,25 @@ t("validate: emergência só vai para onde qualquer teclado alcança", () => {
     assert.match(K.validate(a, ["SHIFT"], "F5").error, /^emergência:/);
 });
 
+t("validate: o erro da emergência lista as teclas de `everywhere`, todas, pelo nome da página", () => {
+    const erro = K.validate(acao("emergency.terminal"), ["SUPER"], "PERIOD").error;
+    eq(erro, "emergência: Super, Ctrl ou Alt com letra, número, F1–F12, Enter, Esc, Espaço, Tab, Backspace ou Delete");
+    for (const e of K.everywhere)
+        assert.ok(erro.includes(K.keyLabel(e)), e + " não está em: " + erro);
+    // A lista é a fonte: uma tecla a mais lá aparece aqui sem ninguém lembrar.
+    const K2 = load("Keybinds.js");
+    K2.everywhere.push("insert");
+    eq(K2.validate(K2.byId("emergency.terminal"), ["SUPER"], "PERIOD").error,
+        "emergência: Super, Ctrl ou Alt com letra, número, F1–F12, Enter, Esc, Espaço, Tab, Backspace, Delete ou Insert");
+    K2.everywhere.length = 1;
+    eq(K2.validate(K2.byId("emergency.terminal"), ["SUPER"], "PERIOD").error,
+        "emergência: Super, Ctrl ou Alt com letra, número, F1–F12 ou Enter");
+});
+
+t("reachableText: letra, número, F1–F12 e as teclas de `everywhere`, com 'ou' antes da última", () => {
+    eq(K.reachableText(), "letra, número, F1–F12, Enter, Esc, Espaço, Tab, Backspace ou Delete");
+});
+
 t("validate: toda tecla de `everywhere` serve para a emergência", () => {
     for (const e of K.everywhere)
         eq(K.validate(acao("emergency.exit"), ["CTRL", "ALT"], e).error, "", e);
@@ -556,6 +575,12 @@ t("keyLabel: toda tecla da lista tem um rótulo em texto, não vazio", () => {
     vazio(ruins, "teclas sem rótulo");
 });
 
+t("keyLabel: um nome que todo objeto tem (constructor, toString) não vira função", () => {
+    for (const k of ["constructor", "toString", "valueOf", "__proto__", "hasOwnProperty"])
+        eq(K.keyLabel(k), k, k);
+    eq(K.pretty(acao("win.close"), "SUPER + constructor"), "Super + constructor");
+});
+
 t("pretty: os exemplos do cabeçalho", () => {
     eq(K.pretty(acao("emergency.terminal"), "SUPER + SHIFT + RETURN"), "Super + Shift + Enter");
     eq(K.pretty(acao("win.focus"), "SUPER"), "Super + setas");
@@ -766,6 +791,23 @@ t("evalCode: o Lua que troca os atalhos na sessão", () => {
 t("suspendCode e resumeCode: os atalhos dormem e voltam", () => {
     eq(K.suspendCode(20), 'require("mare.binds").suspend(20)');
     eq(K.resumeCode(), 'require("mare.binds").resume()');
+});
+
+t("suspendCode: só um número finito de zero para cima entra no Lua", () => {
+    eq(K.suspendCode(8), 'require("mare.binds").suspend(8)');
+    eq(K.suspendCode(0), 'require("mare.binds").suspend(0)');
+    eq(K.suspendCode(0.5), 'require("mare.binds").suspend(0.5)');
+    // O resto não é concatenado: sai a chamada sem argumento, e o binds.lua
+    // usa o tempo dele (os atalhos nunca dormem sem relógio).
+    for (const ruim of ["8", "8) os.execute('rm -rf ~') --", NaN, Infinity, -Infinity, -1, null, undefined, true,
+        [8], {}, { toString: () => "8" }, () => 8])
+        eq(K.suspendCode(ruim), 'require("mare.binds").suspend()', String(ruim));
+    eq(K.suspendCode(), 'require("mare.binds").suspend()');
+});
+
+t("suspendCode: o que sai é sempre a mesma chamada, com um número do Lua ou nada", () => {
+    for (const v of [0, 1, 8, 20, 0.25, 1e21, 1e-7, Number.MAX_VALUE, Number.MIN_VALUE, "x", NaN, -3])
+        assert.match(K.suspendCode(v), /^require\("mare\.binds"\)\.suspend\((\d+(\.\d+)?(e[+-]?\d+)?)?\)$/, String(v));
 });
 
 // --- diverged ---

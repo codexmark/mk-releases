@@ -50,8 +50,14 @@ Singleton {
     // ("apps.terminal", página Apps padrão dos Ajustes). O de fábrica é o
     // ghostty com a config do Mk.
     readonly property var terminals: ["ghostty", "kitty", "foot", "alacritty", "wezterm"]
-    readonly property string terminal: {
-        const t = Settings.get("apps.terminal");
+    readonly property string terminal: knownTerminal(Settings.get("apps.terminal"))
+
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no Maré, no Hyprland nem nos Ajustes:
+    // são funções de texto para texto e de texto para lista, testadas fora do
+    // shell com node (tests/js/Projects.test.mjs).
+    // O terminal pedido, se o Mk sabe abri-lo; senão, o de fábrica.
+    function knownTerminal(t) {
         return terminals.indexOf(t) >= 0 ? t : "ghostty";
     }
 
@@ -62,8 +68,9 @@ Singleton {
 
     // A linha de shell que abre o terminal `name` em `dir`. `cmd` é texto de
     // shell (vazio = só o shell do usuário) e `title`, o título da janela.
-    // Cada terminal tem as suas flags; só o ghostty leva a config do Mk.
-    function terminalLineFor(name, dir, cmd, title) {
+    // Cada terminal tem as suas flags; só o ghostty leva a config do Mk
+    // (`config`, o caminho dela).
+    function lineFor(name, dir, cmd, title, config) {
         const d = shellQuote(dir);
         const t = title ? shellQuote(title) : "";
         switch (name) {
@@ -79,19 +86,37 @@ Singleton {
             // atualizações, acharia que acabou). Não tem flag de título.
             return `wezterm start --always-new-process --cwd ${d}` + (cmd ? ` -- ${cmd}` : "");
         default:
-            return `ghostty --config-default-files=false --config-file=${shellQuote("?" + terminalConfig)} --working-directory=${d}`
+            return `ghostty --config-default-files=false --config-file=${shellQuote("?" + config)} --working-directory=${d}`
                 + (t ? ` --title=${t}` : "") + (cmd ? ` -e ${cmd}` : "");
         }
     }
 
-    // O mesmo, para o terminal escolhido. Se ele foi desinstalado depois da
-    // escolha, abre o ghostty: Super + Enter nunca fica sem terminal.
-    function terminalLine(dir, cmd, title) {
-        const d = dir && dir !== "" ? dir : home;
-        const fallback = terminalLineFor("ghostty", d, cmd, title);
-        if (terminal === "ghostty")
+    // O mesmo, para o terminal escolhido (`chosen`). Se ele foi desinstalado
+    // depois da escolha, abre o ghostty: Super + Enter nunca fica sem terminal.
+    // Sem `dir`, abre em `fallbackDir` (a pasta pessoal).
+    function chosenLine(chosen, dir, cmd, title, config, fallbackDir) {
+        const d = dir && dir !== "" ? dir : fallbackDir;
+        const fallback = lineFor("ghostty", d, cmd, title, config);
+        if (chosen === "ghostty")
             return fallback;
-        return `if command -v ${terminal} >/dev/null 2>&1; then ${terminalLineFor(terminal, d, cmd, title)}; else ${fallback}; fi`;
+        return `if command -v ${chosen} >/dev/null 2>&1; then ${lineFor(chosen, d, cmd, title, config)}; else ${fallback}; fi`;
+    }
+
+    // A saída do find (um caminho por linha) -> [{ name, dir }], por nome.
+    function dirsFrom(text) {
+        return text.split("\n")
+            .filter(s => s.length > 0)
+            .map(d => ({ name: d.substring(d.lastIndexOf("/") + 1), dir: d }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    // --- puro: fim ---
+
+    function terminalLineFor(name, dir, cmd, title) {
+        return lineFor(name, dir, cmd, title, terminalConfig);
+    }
+
+    function terminalLine(dir, cmd, title) {
+        return chosenLine(terminal, dir, cmd, title, terminalConfig, home);
     }
 
     // Abre o terminal no diretório do projeto; `cmd` roda dentro dele (lazygit, lazydocker).
@@ -156,10 +181,7 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 // Só troca a lista se mudou: quem depende dela (a busca) refaz tudo.
-                const next = text.split("\n")
-                    .filter(s => s.length > 0)
-                    .map(d => ({ name: d.substring(d.lastIndexOf("/") + 1), dir: d }))
-                    .sort((a, b) => a.name.localeCompare(b.name));
+                const next = root.dirsFrom(text);
                 if (JSON.stringify(next) !== JSON.stringify(root.dirs))
                     root.dirs = next;
             }

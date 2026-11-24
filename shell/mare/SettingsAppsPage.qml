@@ -39,14 +39,40 @@ ColumnLayout {
     ]
 
     // Algum papel está com um app de terminal (Neovim, Yazi) como padrão?
-    readonly property bool terminalAppChosen: {
-        for (const id in roles) {
-            const r = roles[id];
+    readonly property bool terminalAppChosen: terminalAppIn(roles)
+
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca na página nem nos Ajustes: são funções
+    // de dado para dado sobre o que o mare-default-apps respondeu, testadas
+    // fora do shell com node (tests/js/SettingsAppsPage.test.mjs). Um papel:
+    // { id, current, currentName, apps: [{ id, name, terminal }] }.
+    // A lista de papéis do script -> papéis por id.
+    function rolesById(list) {
+        const next = {};
+        for (const r of list)
+            next[r.id] = r;
+        return next;
+    }
+
+    // Algum papel está com um app de terminal (Neovim, Yazi) como padrão?
+    function terminalAppIn(byId) {
+        for (const id in byId) {
+            const r = byId[id];
             if (r.apps.some(a => a.id === r.current && a.terminal))
                 return true;
         }
         return false;
     }
+
+    // O padrão de hoje quando ele não está entre as escolhas (um app que não
+    // se encaixa no papel, ou que foi desinstalado): mostrado por nome. `r` é
+    // o papel da linha (ou undefined).
+    function strayIn(id, r) {
+        if (id === "terminal" || !r || r.current === "" || r.apps.some(a => a.id === r.current))
+            return "";
+        return r.currentName;
+    }
+    // --- puro: fim ---
 
     // As escolhas de uma linha: [{ v, label }].
     function optionsFor(id) {
@@ -63,13 +89,8 @@ ColumnLayout {
         return roles[id] ? roles[id].current : "";
     }
 
-    // O padrão de hoje quando ele não está entre as escolhas (um app que não
-    // se encaixa no papel, ou que foi desinstalado): mostrado por nome.
     function strayOf(id) {
-        const r = roles[id];
-        if (id === "terminal" || !r || r.current === "" || r.apps.some(a => a.id === r.current))
-            return "";
-        return r.currentName;
+        return strayIn(id, roles[id]);
     }
 
     function pick(id, value) {
@@ -104,10 +125,7 @@ ColumnLayout {
     function take(text) {
         try {
             const data = JSON.parse(text);
-            const next = {};
-            for (const r of data.roles)
-                next[r.id] = r;
-            roles = next;
+            roles = rolesById(data.roles);
             terminals = data.terminals;
             terminalExec = data.terminalExec;
             loaded = true;

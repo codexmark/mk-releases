@@ -6,19 +6,27 @@ import Quickshell
 Item {
     id: panel
 
+    property int year: clock.date.getFullYear()
+    property int month: clock.date.getMonth()
+
+    readonly property var cells: monthCells(year, month, clock.date)
+
+    implicitWidth: 600
+    implicitHeight: 320
+
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no relógio nem no painel: são contas de
+    // data, testadas fora do shell com node (tests/js/CalendarPanel.test.mjs).
+    // `y` é o ano, `m` o mês de 0 a 11 e `today` um Date.
     readonly property var months: ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
         "agosto", "setembro", "outubro", "novembro", "dezembro"]
     readonly property var weekdays: ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"]
 
-    property int year: clock.date.getFullYear()
-    property int month: clock.date.getMonth()
-
     // 42 células (6 semanas): dias do mês anterior e do próximo ficam apagados.
-    readonly property var cells: {
-        const first = new Date(year, month, 1).getDay();
-        const days = new Date(year, month + 1, 0).getDate();
-        const prevDays = new Date(year, month, 0).getDate();
-        const today = clock.date;
+    function monthCells(y, m, today) {
+        const first = new Date(y, m, 1).getDay();
+        const days = new Date(y, m + 1, 0).getDate();
+        const prevDays = new Date(y, m, 0).getDate();
         const out = [];
         for (let i = 0; i < 42; i++) {
             const d = i - first + 1;
@@ -26,20 +34,29 @@ Item {
             out.push({
                 day: inMonth ? d : d < 1 ? prevDays + d : d - days,
                 inMonth: inMonth,
-                today: inMonth && d === today.getDate() && month === today.getMonth() && year === today.getFullYear(),
+                today: inMonth && d === today.getDate() && m === today.getMonth() && y === today.getFullYear(),
                 weekend: i % 7 === 0 || i % 7 === 6
             });
         }
         return out;
     }
 
-    implicitWidth: 600
-    implicitHeight: 320
+    // O mês que fica `delta` meses adiante (ou atrás): { year, month }.
+    function shifted(y, m, delta) {
+        const d = new Date(y, m + delta, 1);
+        return { year: d.getFullYear(), month: d.getMonth() };
+    }
+
+    // "segunda, 23 de novembro".
+    function dayLine(date) {
+        return weekdays[date.getDay()] + ", " + date.getDate() + " de " + months[date.getMonth()];
+    }
+    // --- puro: fim ---
 
     function shift(delta) {
-        const d = new Date(year, month + delta, 1);
-        year = d.getFullYear();
-        month = d.getMonth();
+        const next = shifted(year, month, delta);
+        year = next.year;
+        month = next.month;
     }
 
     SystemClock {
@@ -144,7 +161,7 @@ Item {
             }
 
             Text {
-                text: panel.weekdays[clock.date.getDay()] + ", " + clock.date.getDate() + " de " + panel.months[clock.date.getMonth()]
+                text: panel.dayLine(clock.date)
                 color: Theme.textSoft
                 font.family: Theme.sans
                 font.pixelSize: 14

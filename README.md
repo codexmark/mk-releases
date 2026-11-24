@@ -278,7 +278,7 @@ qualquer opção. O que você muda vale na hora.
 | Dispositivos | Monitores | `monitores` | resolução, taxa, escala, posição e rotação de cada tela |
 | Dispositivos | Som | `som` | saída e microfone |
 | Dispositivos | Teclado e mouse | `entrada` | layout, repetição de teclas, mouse e touchpad |
-| Dispositivos | Energia | `energia` | o que acontece quando você se afasta |
+| Dispositivos | Energia | `energia` | o que acontece quando você se afasta: descanso de tela aos 3 min, bloqueio aos 5, tela desligada aos 30. De fábrica o Mk não dorme; suspender é uma escolha |
 | Dispositivos | Impressoras | `impressoras` | as deste computador e as da rede |
 | Dispositivos | Controle | `controle` | o controle Xbox e o driver xone, para o fone plugado nele |
 | Rede | VPN | `vpn` | WireGuard e OpenVPN, pelo NetworkManager |

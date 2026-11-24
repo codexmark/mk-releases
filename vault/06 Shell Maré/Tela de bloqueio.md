@@ -28,7 +28,7 @@ Proteger a sessão em `Super + L`, na ociosidade e antes de suspender.
 - **Quem chama**: `Super + L`, o `lock_cmd` do hypridle e o `before_sleep_cmd` (via `loginctl lock-session`) chegam todos a `ipc call mare lock`, que fecha o painel aberto e chama `Lock.lock()`.
 - **`LockScreen.qml`**: enquanto `Lock.locked`, cada tela ganha uma `LockSurface` e nada mais recebe teclado ou mouse.
 - **`Lock.qml`**: o estado que todas as telas dividem (a senha digitada, a conversa com o PAM, os números da animação). O `PamContext` usa `config: "hyprlock"`.
-- **O desenho** (`LockSurface.qml`): dois anéis numerados (minutos e segundos) giram em volta de um ponto fora da tela; o número que passa pela pílula acende em cobre; a hora grande em serifa e a data ao lado; embaixo, quem entra e a senha.
+- **O desenho** (`LockSurface.qml`): dois anéis numerados (minutos e segundos) giram em volta de um ponto fora da tela; o número que passa pela pílula acende em cobre, e o minuto e o segundo exatos aparecem ali ao passar; a hora grande em serifa e a data ao lado; embaixo, quem entra e a senha.
 - **Ao desbloquear**: os anéis "dão corda" enquanto o PAM confere; se der certo, um clarão e a tela some; se não, a corda volta e o painel balança.
 - **Extras**: indicador de Caps Lock (lido do LED do teclado, só enquanto bloqueado), layout ativo quando há mais de um, texto para conta travada (o `pam_faillock` avisa pela conversa), e o botão "suspender", que some quando `Settings.sleepMode` é "nada" ([[Energia e suspensão]]).
 

@@ -32,6 +32,7 @@ Esta é a nota a ler antes de confiar no Mk numa máquina que importa.
 - **Discos com menos de 24 GiB.**
 - **Sistemas de arquivos além do btrfs**: os snapshots e a volta atrás dependem dele.
 - **Hibernação**: retirada ([[D05 Hibernação retirada]]).
+- **Dormir, de fábrica**: o Mk não suspende sozinho; no lugar fica o descanso de tela, e a tela apaga aos 30 minutos. Suspender é uma escolha em Ajustes › Energia ([[D16 Descanso de tela no lugar do suspender]]).
 - **Voltar só o Mk para uma versão anterior**: não há; o conserto é outro lançamento.
 - **Regras de monitor por descrição (`desc:`)**: as regras são pelo nome da saída.
 - **Agente de pareamento Bluetooth**: aparelhos que pedem código ou confirmação falham.
@@ -49,6 +50,9 @@ Esta é a nota a ler antes de confiar no Mk numa máquina que importa.
 | importar e conectar uma VPN | [[Rede]] |
 | parear Bluetooth | [[Bluetooth]] |
 | aviso de bateria fraca | [[Notificações e OSD]] |
+| descanso de tela pelo hypridle: a espera real de 3 min, dois monitores e o consumo com ele horas na tela (só foi visto ligar e desligar por IPC, na sessão aninhada) | [[Descanso de tela]] |
+| `mk atualizar` numa atualização em que o pacman precise escolher entre provedores | [[mk-update]] |
+| arranjo de três ou mais telas na página (a lógica é testada com sorteios) | [[Monitores]] |
 | gravação de tela numa máquina com GPU | [[Painéis]] |
 | driver `xone` do controle Xbox | [[Páginas dos Ajustes]] |
 | VS Code, AWS, Wrangler, Vercel instalados numa máquina | [[Ferramentas de desenvolvimento]] |
@@ -60,7 +64,20 @@ Esta é a nota a ler antes de confiar no Mk numa máquina que importa.
 
 ### Defeitos conhecidos de terceiros
 
-- **Suspender na AMD Navi 10** (RX 5600/5700): a placa às vezes não volta. O Mk semeia "não dormir" na instalação nova e avisa nos Ajustes ([[Energia e suspensão]]).
+- **Suspender na AMD Navi 10** (RX 5600/5700): a placa às vezes não volta. Ajustes › Energia avisa quem escolher suspender nessas máquinas ([[Energia e suspensão]]).
+
+### Defeitos e limites conhecidos, ainda abertos
+
+A lista de `docs/limites.md`, onde cada item "tem dono certo: virar um caso que falha em `tests/` e depois a correção":
+
+- **Monitores vindos tortos de fora**: o que o Hyprland já traz torto não é arrumado ao ser lido, só avisado; e o arranjo é guloso, não ótimo ([[Monitores]]).
+- **Ajustes, o painel**: um valor de tipo errado ou fora da faixa posto à mão no `ajustes.json` não chega mais ao Hyprland nem ao `hypridle.conf`, mas o painel ainda mostra o valor cru ([[Ajustes]]).
+- **Calculadora da busca**: `1.000 + 500` dá 501 ([[Busca e calculadora]]).
+- **Atalhos**: um combo com duas teclas (`SUPER + Q + W`) fica só com a última ([[Atalhos do usuário]]).
+- **`mk atualizar`**: parando entre baixar a lista e atualizar, o sistema fica com a lista nova e os pacotes antigos; "Replace X with Y?" é respondido "sim" sozinho, a escolha entre provedores não; a trava contra duas rodadas é por usuário ([[mk-update]]).
+- **`mare-wifi-qr`**: duas conexões salvas com o mesmo nome se confundem, e uma rede WEP por frase-senha gera um QR que o celular pode não aceitar.
+- **`mare-shot`**: duas capturas no mesmo segundo usam o mesmo nome de arquivo.
+- **Descanso de tela**: desliga quando a tela é bloqueada (aos 5 min, de fábrica); com "Bloquear" em 0 fica até a tela apagar ([[Descanso de tela]]).
 
 ### O que os testes automáticos não veem
 

@@ -30,7 +30,7 @@ Uma conta só, com poderes de administrador por senha, e a garantia de que **qua
 |---|---|
 | `.config/mk/{hypr,shell,ghostty,fastfetch,bash}` (com a [[Marca instalado-pelo-mk]]) | `config/hypr`, `shell/mare`, `config/ghostty`, `config/fastfetch`, `config/bash` |
 | `.config/mk/seu.bash` | `config/bash/seu.bash.exemplo` |
-| `.config/mk/ajustes.json` (só com placa de risco) | semeado com `"power.sleep": "nada"` ([[Energia e suspensão]]) |
+| `.config/mk/ajustes.json` (só com placa de risco) | semeado com `"power.sleep": "nada"`, que hoje é também o valor de fábrica ([[Energia e suspensão]]) |
 | `.config/mimeapps.list` | `config/mimeapps.list` |
 | `.config/qt6ct` | `system/mk/look/qt6ct` |
 | `.bashrc` | ganha a linha que carrega o `mk.bash` |

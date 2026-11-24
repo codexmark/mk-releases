@@ -14,11 +14,7 @@ Item {
     property int sel: 0
     property bool armedWipe: false
 
-    readonly property var results: {
-        const q = query.trim().toLowerCase();
-        const list = q === "" ? entries : entries.filter(e => e.text.toLowerCase().indexOf(q) >= 0);
-        return list.slice(0, rows);
-    }
+    readonly property var results: matching(entries, query, rows)
 
     implicitWidth: 620
     implicitHeight: 18 + 46 + 10 + Math.max(1, results.length) * 42 + 10 + 34 + 18
@@ -33,9 +29,13 @@ Item {
         lister.running = true;
     }
 
+    // --- puro: início ---
+    // Daqui até "puro: fim" nada toca no painel nem no cliphist: são funções de
+    // texto para lista e de lista para lista, testadas fora do shell com node
+    // (tests/js/ClipboardPanel.test.mjs).
     // cliphist list: "<id>\t<prévia>"; imagens vêm como [[ binary data ... ]]
-    function parse(text) {
-        entries = text.split("\n").filter(l => l.indexOf("\t") > 0).map(l => {
+    function parsed(text) {
+        return text.split("\n").filter(l => l.indexOf("\t") > 0).map(l => {
             const tab = l.indexOf("\t");
             const raw = l.substring(tab + 1);
             const img = raw.match(/^\[\[ binary data .*?(png|jpe?g|webp|gif|bmp)\s*(\d+x\d+)?/i);
@@ -46,6 +46,18 @@ Item {
                 image: img !== null
             };
         });
+    }
+
+    // Os itens que têm o texto procurado (sem diferenciar maiúsculas), até `max`.
+    function matching(list, wanted, max) {
+        const q = wanted.trim().toLowerCase();
+        const found = q === "" ? list : list.filter(e => e.text.toLowerCase().indexOf(q) >= 0);
+        return found.slice(0, max);
+    }
+    // --- puro: fim ---
+
+    function parse(text) {
+        entries = parsed(text);
     }
 
     function copy(index) {

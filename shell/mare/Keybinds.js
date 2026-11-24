@@ -331,16 +331,24 @@ function validate(action, modList, keyText) {
         return { combo: "", error: "tecla desconhecida: " + String(keyText).trim() };
     // Emergência: só onde qualquer teclado alcança.
     if (action.required && (!strong || !(/^([a-z0-9]|f([1-9]|1[0-2]))$/i.test(key) || everywhere.indexOf(key.toLowerCase()) >= 0)))
-        return { combo: "", error: "emergência: Super, Ctrl ou Alt com letra, número, F1–F12, Enter, Esc, Espaço, Tab ou Delete" };
+        return { combo: "", error: "emergência: Super, Ctrl ou Alt com " + reachableText() };
     // Sem Super, Ctrl ou Alt, só teclas que não escrevem nada.
     if (!strong && !/^(f[0-9]+|print|pause|menu|scroll_lock|xf86.*)$/i.test(key))
         return { combo: "", error: "essa tecla sozinha pararia de digitar: junte Super, Ctrl ou Alt" };
     return { combo: format(modList, key), error: "" };
 }
 
+// Para onde uma ação de emergência pode ir, por extenso. As teclas saem de
+// `everywhere`: a mensagem não tem lista própria para ficar para trás.
+function reachableText() {
+    var names = ["letra", "número", "F1–F12"].concat(everywhere.map(keyLabel));
+    return names.slice(0, -1).join(", ") + " ou " + names[names.length - 1];
+}
+
 function keyLabel(key) {
     var k = String(key).toLowerCase();
-    if (keyLabels[k] !== undefined)
+    // Só o que está escrito na tabela ("constructor" existe em todo objeto).
+    if (Object.prototype.hasOwnProperty.call(keyLabels, k))
         return keyLabels[k];
     if (k.indexOf("xf86") === 0)
         return String(key).slice(4).replace(/([a-z])([A-Z])/g, "$1 $2");
@@ -516,9 +524,13 @@ function evalCode(overrides) {
 }
 
 // Para a captura: os atalhos do Mk dormem por `seconds` (ou até o resume) e a
-// janela dos Ajustes recebe o combo inteiro.
+// janela dos Ajustes recebe o combo inteiro. Só um número finito de zero para
+// cima entra no Lua; qualquer outra coisa sai fora, e o suspend() sem
+// argumento usa o tempo do binds.lua (o relógio que acorda os atalhos existe
+// sempre).
 function suspendCode(seconds) {
-    return "require(\"mare.binds\").suspend(" + seconds + ")";
+    var ok = typeof seconds === "number" && isFinite(seconds) && seconds >= 0;
+    return "require(\"mare.binds\").suspend(" + (ok ? String(seconds) : "") + ")";
 }
 
 function resumeCode() {

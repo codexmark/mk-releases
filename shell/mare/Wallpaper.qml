@@ -15,6 +15,34 @@ Singleton {
     readonly property string bundled: Quickshell.shellPath("wallpapers")
     readonly property string storePath: Quickshell.statePath("wallpaper.json")
 
+    // O papel de parede de fábrica: uma instalação nova nasce com ele. Vale
+    // uma vez só, e nunca por cima de uma escolha. Quem já usava o Mk não o
+    // recebe: a migração de usuário abaixo grava a marca para essa gente. Como
+    // o mk-update reinicia o Maré antes de rodar as migrações, o de fábrica só
+    // é aplicado com a migração já constando como feita (uma instalação nova
+    // nasce com todas marcadas), do mesmo jeito que as boas-vindas.
+    readonly property string factory: bundled + "/00-6-mare.jpg"
+    readonly property string factoryMark: Settings.dir + "/.papel-de-fabrica"
+    readonly property string migration: "20261128-papel-de-fabrica.sh"
+    readonly property string gatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state"))
+        + "/mk/migrations/" + migration
+    property bool storeChecked: false
+    property bool markChecked: false
+    property bool marked: false
+    property bool gateChecked: false
+    property bool fresh: false
+
+    function factoryCheck() {
+        if (!storeChecked || !markChecked || !gateChecked)
+            return;
+        if (fresh && !marked) {
+            marked = true;
+            mark.setText("papel de parede de fábrica aplicado\n");
+            if (current === "")
+                set(factory);
+        }
+    }
+
     property string current: ""
     property string primary: ""
     property var files: []
@@ -93,6 +121,41 @@ Singleton {
                 root.current = s.path || "";
                 root.primary = s.primary || "";
             } catch (e) {}
+            root.storeChecked = true;
+            root.factoryCheck();
+        }
+        onLoadFailed: {
+            root.storeChecked = true;
+            root.factoryCheck();
+        }
+    }
+
+    FileView {
+        id: mark
+        path: root.factoryMark
+        printErrors: false
+        onLoaded: {
+            root.marked = true;
+            root.markChecked = true;
+            root.factoryCheck();
+        }
+        onLoadFailed: {
+            root.markChecked = true;
+            root.factoryCheck();
+        }
+    }
+
+    FileView {
+        path: root.gatePath
+        printErrors: false
+        onLoaded: {
+            root.fresh = true;
+            root.gateChecked = true;
+            root.factoryCheck();
+        }
+        onLoadFailed: {
+            root.gateChecked = true;
+            root.factoryCheck();
         }
     }
 

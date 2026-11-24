@@ -145,6 +145,23 @@ t "mk.version: o VERSION de ~/.config/mk vale sobre o de /usr/share/mk"
 echo "aaaaaaaaaaaa 2025-04-01" >"$cfg/VERSION"
 eq '["aaaaaaaaaaaa","2025-04-01"]' "$(run | jq -c '[.mk.version, .mk.date]')"
 
+t "mk.version: um VERSION vazio em ~/.config/mk não vale: vale o de /usr/share/mk"
+# Visto na VM: a máquina foi desligada à força logo depois de uma atualização
+# e o arquivo ficou com 0 bytes. A versão vinha vazia, e com versão vazia o Mk
+# nunca mais achava versão nova ("em dia ()").
+: >"$cfg/VERSION"
+eq '["0123456789ab","2025-03-01"]' "$(run | jq -c '[.mk.version, .mk.date]')"
+echo "   " >"$cfg/VERSION"
+eq '["0123456789ab","2025-03-01"]' "$(run | jq -c '[.mk.version, .mk.date]')"
+
+t "mk.version: os dois VERSION vazios é o mesmo que não ter versão"
+: >"$cfg/VERSION"
+: >"$root/usr/share/mk/VERSION"
+eq '["",""]' "$(run | jq -c '[.mk.version, .mk.date]')"
+rm -f "$cfg/VERSION"
+echo "0123456789abcdef0123 2025-03-01" >"$root/usr/share/mk/VERSION"
+calls_reset
+
 t "sem canal configurado, o git nem é chamado"
 not_called "git"
 

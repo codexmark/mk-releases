@@ -261,7 +261,9 @@ Confere cada pacote das listas contra os repositórios, sem instalar nada. Os de
 existir em `core`, `extra` ou `multilib` (consulta o `pacman -Si`, então vale a
 base de pacotes sincronizada da sua máquina). Os de `aur` precisam existir no
 AUR (consulta a API do AUR com `curl` e `jq`) e **não** existir nos oficiais.
-Imprime `FALTA` ou `AVISO` para cada problema e sai com 1 se houver algum.
+Imprime `FALTA` ou `AVISO` para cada problema e sai com 1 se houver algum. Sem
+rede (ou com um portal cativo respondendo no lugar do AUR), diz que não
+alcançou o AUR e sai com 1, sem acusar cada pacote como inexistente.
 
 ### `bin/install-packages`
 
