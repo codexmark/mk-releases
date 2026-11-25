@@ -150,7 +150,19 @@ correção.
   som fica preso à saída que era a padrão: plugar um fone não move o áudio
   até desligar e ligar. As teclas de volume passam a mexer no sink do
   equalizador.
-- **MkPorto:** só SSH; máquinas virtuais ficaram para depois. Os dados de
+- **MkPorto, Máquinas:** QEMU direto, sem libvirt: não há rede em ponte (a
+  máquina não ganha IP na rede de casa), o virt-manager não enxerga as
+  máquinas, e não há migração nem repasse de placa de vídeo. A tela é a janela
+  do QEMU: fechá-la desliga na marra. Snapshots só com a máquina desligada.
+  **Visto** com o QEMU de verdade: criar, ligar (UEFI e KVM, o ISO do Mk
+  subiu), pausar, continuar, o uso, desligar pelo ACPI, o ciclo de snapshots,
+  o host SSH e remover; e a área na sessão aninhada com uma máquina ligada.
+  Numa instalação (VM, com o QEMU posto pelo pacman): a tela "falta o QEMU",
+  a nova máquina pelo formulário, ligar abrindo a janela do QEMU com o UEFI, e
+  a área percebendo quando essa janela é fechada. **Não visto:** o 3D, o som
+  da máquina, o botão "instalar" (o comando dele foi rodado à mão) e nada com
+  o mouse.
+- **MkPorto, Hosts:** Os dados de
   cada host são os que o `ssh -G` diz (com `Match` e o config do sistema); se
   ele falhar, valem os do leitor próprio e o detalhe avisa. Salto em cadeia
   (com vírgula) não é sondado. O `ssh -G` roda os `Match exec` do seu config

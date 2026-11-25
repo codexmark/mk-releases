@@ -99,3 +99,31 @@ func FalhaDeCampo(campo, frase string) int {
 	_ = Escreve(map[string]string{"erro": frase, "campo": campo})
 	return Erro
 }
+
+// Maquinas é a pasta das máquinas virtuais (~/.local/share/mk/maquinas, ou
+// MKPORTO_MAQUINAS).
+func Maquinas() string {
+	if v := os.Getenv("MKPORTO_MAQUINAS"); v != "" {
+		return absoluto(v)
+	}
+	return filepath.Join(Home(), ".local", "share", "mk", "maquinas")
+}
+
+// Execucao é a pasta em que cada máquina ligada tem o socket do QMP e o pid
+// ($XDG_RUNTIME_DIR/mkporto/maquinas, ou MKPORTO_EXECUCAO). "" se não há onde.
+func Execucao() string {
+	if v := os.Getenv("MKPORTO_EXECUCAO"); v != "" {
+		return absoluto(v)
+	}
+	if d := os.Getenv("XDG_RUNTIME_DIR"); d != "" {
+		return filepath.Join(absoluto(d), "mkporto", "maquinas")
+	}
+	return ""
+}
+
+func absoluto(caminho string) string {
+	if a, err := filepath.Abs(caminho); err == nil {
+		return a
+	}
+	return filepath.Clean(caminho)
+}

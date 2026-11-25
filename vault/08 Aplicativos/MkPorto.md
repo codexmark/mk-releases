@@ -33,8 +33,20 @@ O catálogo das conexões SSH (`mkporto`), no molde de [[Apps do Mk (motor em Go
 - **Só mexe no que é dele.** Os hosts criados pelo app ficam em `~/.ssh/config.d/mkporto.conf` (600, reescrito inteiro e de forma atômica). Na primeira gravação entra `Include config.d/mkporto.conf` no topo do `~/.ssh/config`; o resto fica byte a byte. Host do config da pessoa aparece, mas editar e remover são recusados.
 - **Validação contra injeção**: nenhum campo aceita quebra de linha, aspas ou começar com `-`, para não virar opção do `ssh` nem linha nova no config.
 
+## Máquinas (QEMU direto)
+
+Decidido em 2026-11-25: **QEMU direto, sem libvirt**. O motor é Go só com a biblioteca padrão e fala QMP por um socket unix; não há daemon, grupo nem senha. O que se perde está em [[Limitações conhecidas]]: rede em ponte, compatibilidade com o virt-manager, migração.
+
+- **Onde moram**: `~/.local/share/mk/maquinas/<nome>/` (`maquina.json`, `disco.qcow2`, `vars.fd` do UEFI). O socket, o pid e o log ficam em `$XDG_RUNTIME_DIR/mkporto/maquinas/<nome>/`.
+- **Ligar**: o motor monta o argv (q35, KVM se `/dev/kvm` abre, OVMF por pflash, disco virtio, rede de usuário com a 22 encaminhada, `-display gtk`), solta o QEMU num grupo próprio e só responde quando o QMP atende. Nunca passa por shell.
+- **Estado**: vem do QMP (`query-status`), não do arquivo de pid. Um pid só conta se a linha de comando dele for o QEMU daquela máquina; ninguém mais é sinalizado.
+- **Desligar** pede pelo ACPI (`system_powerdown`); **forçar** manda o `quit`.
+- **Snapshots**: `qemu-img snapshot`, só com a máquina desligada.
+- **Remover** exige o nome repetido e apaga só as duas pastas da máquina.
+- **Sem QEMU**: a área mostra o que falta e abre um terminal com `sudo pacman -S --needed qemu-desktop edk2-ovmf`.
+
 ## De onde veio
 
-A ideia veio do Ryoport, do Ryoku (SSH, servidores e máquinas virtuais num lugar só). Só a ideia: o código é do Mk. Ficou no SSH; máquinas virtuais dependem de decidir entre libvirt e QEMU direto.
+A ideia veio do Ryoport, do Ryoku (SSH, servidores e máquinas virtuais num lugar só). Só a ideia: o código é do Mk.
 
 Limites: [[Limitações conhecidas]] e `docs/limites.md`.

@@ -3,7 +3,8 @@
 O MkPorto é o gerente de conexões SSH do Mk: um **catálogo com estado** dos
 hosts que a pessoa tem no `~/.ssh/config`, não um cliente. Conectar é sempre
 abrir um terminal com `ssh <apelido>`; quem autentica é o ssh, com o agente ou
-o chaveiro. Só SSH: máquinas virtuais ficam para depois.
+o chaveiro. A área Máquinas cuida de máquinas virtuais com o QEMU direto
+(está mais abaixo, em "Máquinas").
 
 Tem duas metades:
 
@@ -343,11 +344,208 @@ depois de conferir que o apelido existe (ou que a chave ainda não):
   nenhuma.
 - Apelido ou chave que não existe: erro (código 1).
 
+## `mkporto-motor vm <subcomando> …` (Máquinas)
+
+Máquinas virtuais com o **QEMU direto**, na sessão da pessoa: sem libvirt, sem
+daemon e sem privilégio. O Mk não traz o QEMU; sem ele a área funciona vazia e
+diz o que falta. O motor fala com cada máquina ligada por **QMP**, num socket
+unix só dela. A tela da máquina é a própria janela do QEMU (`-display gtk`):
+fechar essa janela desliga a máquina na marra (é do QEMU), e a página diz isso.
+
+Onde as coisas moram:
+
+- `MKPORTO_MAQUINAS` (padrão `~/.local/share/mk/maquinas`): uma pasta por
+  máquina (`700`), com `maquina.json` (`nome`, `memoria_mb`, `cpus`,
+  `disco_gb`, `iso` [caminho, ou `""`], `uefi`, `tres_d`, `porta_ssh`,
+  `criada_em` [segundos]), `disco.qcow2` e, com UEFI, `vars.fd` (a cópia do
+  `OVMF_VARS` dela).
+- `MKPORTO_EXECUCAO` (padrão `$XDG_RUNTIME_DIR/mkporto/maquinas`): por máquina
+  ligada, `qmp.sock`, `pid`, `qemu.log` (o que o QEMU reclamou: é a saída de
+  erro dele) e `qemu-depuracao.log` (o `-D`). Sem `XDG_RUNTIME_DIR` (nem a
+  variável), o motor recusa ligar.
+- Comandos e arquivos: `MKPORTO_QEMU` (`qemu-system-x86_64`),
+  `MKPORTO_QEMU_IMG` (`qemu-img`), `MKPORTO_OVMF` (pasta; padrão
+  `/usr/share/edk2/x64`, com `OVMF_CODE.4m.fd` e `OVMF_VARS.4m.fd`),
+  `MKPORTO_KVM` (`/dev/kvm`), `MKPORTO_PROC` (`/proc`) e
+  `MKPORTO_QEMU_DISPLAY` (`gtk`, ou `none` para ligar sem janela).
+
+O nome de uma máquina é `[a-z0-9][a-z0-9._-]{0,39}`: vira pasta, argumento do
+QEMU e apelido de host. No motor, depois de `--` nada é opção.
+
+### `vm requisitos`
+
+```json
+{
+  "qemu": {"tem": true, "caminho": "/usr/bin/qemu-system-x86_64"},
+  "qemu_img": {"tem": true, "caminho": "/usr/bin/qemu-img"},
+  "ovmf": {"tem": false, "caminho": "/usr/share/edk2/x64"},
+  "kvm": {"tem": true, "caminho": "/dev/kvm"},
+  "pronto": true,
+  "avisos": ["sem o edk2-ovmf não dá para criar máquina com UEFI"],
+  "instalar": {"argv": ["sudo", "pacman", "-S", "--needed", "qemu-desktop", "edk2-ovmf"],
+               "terminal": ["foot", "--title=instalar o QEMU", "--hold", "sudo", "…"], "aviso": null}
+}
+```
+
+- `pronto`: há o QEMU e o `qemu-img` (dá para criar e ligar). `ovmf`: os dois
+  arquivos existem. `kvm`: o arquivo abre para leitura e escrita; sem ele as
+  máquinas ligam, só que lentas (um aviso diz).
+- `instalar`: o que a janela abre num terminal (o mesmo mecanismo do
+  `comando`, com o terminal esperando no fim). O motor **não** roda o `sudo`
+  nem o `pacman`: quem digita a senha é a pessoa, no terminal.
+
+### `vm listar`
+
+```json
+{
+  "pasta": "~/.local/share/mk/maquinas",
+  "maquinas": [
+    {"nome": "oficina", "memoria_mb": 4096, "cpus": 2, "disco_gb": 40, "iso": null, "uefi": true,
+     "tres_d": false, "porta_ssh": 2222, "criada_em": 1795000000,
+     "estado": "ligada", "pid": 4242, "desde": 1795003600, "disco_bytes": 5368709120}
+  ]
+}
+```
+
+- `estado`: `desligada`; `ligada` ou `pausada` (pelo QMP, `query-status`);
+  `travada` (o processo está vivo, mas o QMP não responde). Um arquivo de pid
+  que sobrou de um processo morto (ou de um pid que hoje é de outro programa)
+  é limpo e a máquina é `desligada`.
+- `pid` e `desde` (quando o arquivo de pid nasceu, em segundos): `null` na
+  desligada. `disco_bytes`: quanto o `disco.qcow2` ocupa de verdade no disco.
+- Em ordem de nome. Pasta sem `maquina.json` legível não entra.
+
+### `vm criar`
+
+Lê **um** objeto JSON da entrada padrão:
+
+```json
+{"nome": "oficina", "memoria_mb": 4096, "cpus": 2, "disco_gb": 40,
+ "iso": "/home/voce/Downloads/sistema.iso", "uefi": true, "tres_d": false}
+```
+
+Validação (código 1, com `campo`):
+
+| Campo | Regra |
+|---|---|
+| `nome` | obrigatório; `[a-z0-9][a-z0-9._-]{0,39}`; não pode já existir |
+| `memoria_mb` | inteiro de 512 a 65536 |
+| `cpus` | inteiro de 1 a 32 |
+| `disco_gb` | inteiro de 1 a 2000 |
+| `iso` | vazio, ou caminho absoluto de um arquivo que existe; sem quebra de linha, caractere de controle nem vírgula (a vírgula separa as opções do QEMU) |
+| `uefi` | só com o OVMF instalado (`edk2-ovmf`) |
+
+Cria a pasta (`700`), roda `qemu-img create -f qcow2 <disco> <N>G`, copia o
+`OVMF_VARS.4m.fd` para `vars.fd` se `uefi`, escolhe a `porta_ssh` (a primeira
+livre a partir de 2222: que não é de outra máquina e em que dá para escutar em
+`127.0.0.1`) e grava o `maquina.json` de forma atômica. Se algo falha no meio,
+a pasta que ele criou é apagada. Resposta:
+`{"ok": true, "nome": "oficina", "porta_ssh": 2222, "pasta": "~/…/oficina"}`.
+
+### `vm ligar [--sem-iso] [--] <nome>`
+
+Recusa (código 2) se já está ligada, pausada ou travada, e se não há onde pôr o
+socket. O QEMU nasce num grupo de processos próprio (`setsid`), sem entrada nem
+saída herdadas (a de erro vai para o `qemu.log`), nunca por shell, e o motor
+volta quando o QMP responde `query-status` (até 10 s) ou o processo morre (aí o
+erro traz o fim do `qemu.log`). A linha de comando, na ordem:
+
+```
+qemu-system-x86_64
+  -name <nome>
+  -machine q35
+  -enable-kvm -cpu host            (se /dev/kvm abre para escrita; senão: -cpu max, e um aviso)
+  -smp <cpus>
+  -m <memoria_mb>
+  -drive if=pflash,format=raw,readonly=on,file=<OVMF>/OVMF_CODE.4m.fd     (só com uefi)
+  -drive if=pflash,format=raw,file=<máquina>/vars.fd                      (só com uefi)
+  -drive file=<máquina>/disco.qcow2,if=virtio,format=qcow2
+  -cdrom <iso>                     (se a máquina tem ISO e não veio --sem-iso)
+  -boot order=cd,menu=on           (o disco primeiro, depois o CD; sem ISO: order=c,menu=on)
+  -nic user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:<porta_ssh>-:22
+  -device qemu-xhci -device usb-tablet
+  -audiodev pipewire,id=som -device intel-hda -device hda-duplex,audiodev=som   (não com display none)
+  -vga none
+  -device virtio-vga -display gtk                 (com tres_d: -device virtio-vga-gl -display gtk,gl=on;
+                                                   com MKPORTO_QEMU_DISPLAY=none: -device virtio-vga -display none)
+  -qmp unix:<execução>/qmp.sock,server=on,wait=off
+  -pidfile <execução>/pid
+  -D <execução>/qemu-depuracao.log
+```
+
+Nos valores `file=` e no caminho do socket, uma vírgula do caminho vai dobrada
+(`,,`), que é como o QEMU a lê. Uma ISO que sumiu do lugar é erro: a janela
+oferece ligar sem ela. Resposta:
+
+```json
+{"ok": true, "nome": "oficina", "estado": "ligada", "pid": 4242, "porta_ssh": 2222,
+ "avisos": [], "argv": ["qemu-system-x86_64", "-name", "oficina", "…"]}
+```
+
+### `vm desligar [--forcar] [--] <nome>`
+
+Sem `--forcar`: QMP `system_powerdown` (é apertar o botão de desligar; o
+sistema de dentro decide) e volta logo, `{"ok": true, "nome": …, "pedido":
+true, "forcado": false}`; a janela acompanha pelo `listar`. Com `--forcar`:
+QMP `quit`; se o QMP não responde, `SIGTERM` no pid, **depois de conferir** em
+`/proc/<pid>/cmdline` que aquele processo é o QEMU daquela máquina (tem
+`-name <nome>` e o `-pidfile` dela). Espera o processo sumir (até 5 s), limpa a
+pasta de execução e responde com `"forcado": true`. Máquina desligada: erro.
+
+### `vm pausar [--] <nome>` e `vm continuar [--] <nome>`
+
+QMP `stop` e `cont`. Resposta: `{"ok": true, "nome": …, "estado": "pausada"}`
+(ou `"ligada"`).
+
+### `vm uso [--] <nome>`
+
+```json
+{"nome": "oficina", "pid": 4242, "ticks": 123456, "rss_kb": 2097152, "hz": 100, "agora_ms": 1795003600123}
+```
+
+De `/proc/<pid>/stat` (`utime + stime`) e `/proc/<pid>/status` (`VmRSS`). A
+janela calcula a porcentagem de CPU pela diferença entre duas leituras
+(`Porto.cpuPct`). Máquina desligada: erro.
+
+### `vm snapshot <listar | criar | restaurar | apagar> [--] <nome> [rótulo]`
+
+`qemu-img snapshot -l | -c | -a | -d` no `disco.qcow2`. **Só com a máquina
+desligada** (recusa, código 2, dizendo isso). Rótulo: `[A-Za-z0-9._-]{1,40}`,
+sem começar com `-`.
+
+```json
+{"nome": "oficina", "snapshots": [{"id": "1", "rotulo": "antes-de-atualizar", "data": "2026-11-24 10:00:00", "tamanho": "0 B"}]}
+```
+
+As outras três respondem `{"ok": true, "nome": …, "rotulo": …}`.
+
+### `vm remover --confirmo <nome> [--] <nome>`
+
+Só desligada, e só com o nome repetido. Apaga a pasta da máquina e a de
+execução dela, e nada fora: o caminho resolvido tem de ser um filho direto de
+`MKPORTO_MAQUINAS` (um atalho no lugar da pasta é recusado). Resposta:
+`{"ok": true, "nome": …}`.
+
+### `vm host [--] <nome>`
+
+Cria (ou atualiza) na área Hosts o host `<nome>` → `127.0.0.1`, porta
+`porta_ssh`, pelo mesmo caminho do `guardar` (vai para o `mkporto.conf`; o
+usuário e a chave de um host que já existia ficam). A resposta é a do
+`guardar`.
+
+### QMP
+
+Um cliente mínimo: conecta no socket, lê a saudação (`{"QMP": …}`), manda
+`qmp_capabilities`, manda **um** comando e lê a resposta (`return` ou
+`error`), ignorando os eventos que chegarem no meio. 3 s por comando. Comandos
+usados: `query-status`, `system_powerdown`, `quit`, `stop`, `cont`.
+
 ## Códigos de saída
 
 `0` certo; `1` erro de uso, de validação ou de sistema (com `{"erro": …}`);
-`2` recusado (o host não é do MkPorto, ou o apelido não é seguro para uma
-linha de comando), também com `{"erro": …}`.
+`2` recusado (o host não é do MkPorto, o apelido não é seguro para uma linha
+de comando, a máquina está ligada para o que só se faz desligada, ou o
+contrário), também com `{"erro": …}`.
 
 ## A janela
 
@@ -359,6 +557,18 @@ linha de comando), também com `{"erro": …}`.
   por farol"); o detalhe mostra o `servidor` e se os valores são os do ssh.
 - A área Chaves tem "nova chave" (uma folha com nome e comentário, que abre o
   `comando gerar` num terminal) e "atualizar" (relê as chaves; F5 ali também).
+- A área Máquinas (`Ctrl+3`): lista (nome, bolinha do estado, memória e
+  CPUs), detalhe (configuração, pid, ligada há quanto tempo, CPU % e memória
+  enquanto ligada, porta do SSH, tamanho do disco) e as ações: ligar (Enter),
+  ligar sem a ISO, desligar, forçar (com confirmação), pausar/continuar,
+  snapshots (uma folha; fechada com a máquina ligada, dizendo por quê), criar
+  host SSH e remover (uma folha que pede o nome digitado). "Nova máquina"
+  (`Ctrl+N` ali) valida ao digitar com as regras do `vm criar`. Sem o QEMU: o
+  que falta, "instalar" (o terminal do `vm requisitos`) e "conferir de novo".
+  Só enquanto a área está na frente e a janela visível, um `vm listar` a cada
+  2 s e o `vm uso` da máquina escolhida; com a área escondida, nada roda.
+  Uma linha fixa no detalhe: "A tela da máquina é uma janela do QEMU; fechar
+  essa janela desliga na marra."
 - Título e classe: `MkPorto`. É uma janela de trabalho (não flutua): não há
   regra de flutuar para ela.
 - O lançador (`bin/mkporto`) não recebe argumento; `MKPORTO_RAIZ` diz onde
@@ -367,11 +577,13 @@ linha de comando), também com `{"erro": …}`.
   respostas gravadas (`listar.json`, `sondar.json` — uma lista, uma linha por
   item —, `chaves.json`, `guardar.json`, `remover.json`,
   `comando-conectar.json`, `comando-chave.json`, `comando-gerar.json`,
-  `entrar.json`) em vez do motor; nesse modo
+  `entrar.json`, `vm-requisitos.json`, `vm-listar.json`, `vm-uso.json`,
+  `vm-snapshot-listar.json`, `vm-criar.json` e `vm-acao.json` para as outras
+  ações de máquina) em vez do motor; nesse modo
   ela **não abre terminal nenhum**, só diz o que abriria.
 - Atalhos: `Ctrl+F` busca, `Ctrl+N` novo host, `Enter` conecta, `F5` sonda
   (nas Chaves, relê), `Ctrl+T` testa a entrada, `Ctrl+G` nova chave,
   `Ctrl+E` edita, `Ctrl+K` envia uma chave, `Delete` remove (com a pergunta),
-  `Ctrl+Shift+C` copia o comando, `Ctrl+1`/`Ctrl+2` trocam
-  entre Hosts e Chaves, `↑`/`↓` andam na lista, `Esc` fecha o que estiver
+  `Ctrl+Shift+C` copia o comando, `Ctrl+1`/`Ctrl+2`/`Ctrl+3` trocam
+  entre Hosts, Chaves e Máquinas, `↑`/`↓` andam na lista, `Esc` fecha o que estiver
   aberto, `F1` mostra a folha de atalhos.

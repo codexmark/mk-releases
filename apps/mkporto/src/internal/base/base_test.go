@@ -73,3 +73,26 @@ func TestEscreveEFalha_UmaLinhaDeJSONSemEscaparAcento(t *testing.T) {
 		t.Errorf("FalhaDeCampo: %q", b.String())
 	}
 }
+
+func TestMaquinasEExecucao_PadraoETroca(t *testing.T) {
+	casa := t.TempDir()
+	t.Setenv("HOME", casa)
+	t.Setenv("MKPORTO_MAQUINAS", "")
+	t.Setenv("MKPORTO_EXECUCAO", "")
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	if d := Maquinas(); d != filepath.Join(casa, ".local", "share", "mk", "maquinas") {
+		t.Errorf("máquinas: %q", d)
+	}
+	if d := Execucao(); d != "" {
+		t.Errorf("sem XDG_RUNTIME_DIR não há pasta de execução: %q", d)
+	}
+	t.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
+	if d := Execucao(); d != "/run/user/1000/mkporto/maquinas" {
+		t.Errorf("execução: %q", d)
+	}
+	t.Setenv("MKPORTO_MAQUINAS", "/outra/pasta/")
+	t.Setenv("MKPORTO_EXECUCAO", "/tmp/x/")
+	if Maquinas() != "/outra/pasta" || Execucao() != "/tmp/x" {
+		t.Errorf("trocadas: %q %q", Maquinas(), Execucao())
+	}
+}

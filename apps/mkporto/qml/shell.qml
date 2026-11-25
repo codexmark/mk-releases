@@ -23,7 +23,11 @@ ShellRoot {
         // fica inteira abaixo da ilha, com folga em volta.
         implicitWidth: Math.min(900, (window.screen ? window.screen.width : 900) - 60)
         implicitHeight: Math.min(600, (window.screen ? window.screen.height : 600) - 110)
-        App { anchors.fill: parent }
+        App {
+            anchors.fill: parent
+            // A área Máquinas só se atualiza sozinha com a janela à vista.
+            janelaVisivel: window.visible
+        }
     }
 
     Connections {

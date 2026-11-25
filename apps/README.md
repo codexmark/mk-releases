@@ -125,6 +125,16 @@ autentica é o `ssh`, no terminal. Os hosts criados por ele ficam em
 `Include` no topo do `~/.ssh/config`, e o resto do arquivo fica como estava.
 Os hosts do seu config aparecem, mas só você os edita. `F1` mostra os atalhos.
 
+A terceira área, **Máquinas** (`Ctrl+3`), cuida de máquinas virtuais com o
+QEMU direto, sem libvirt e sem privilégio: criar a partir de um ISO, ligar,
+desligar, pausar, ver CPU e memória, snapshots do disco (com a máquina
+desligada) e remover. O motor fala com cada máquina por um socket (QMP). As
+máquinas moram em `~/.local/share/mk/maquinas`, uma pasta cada. A tela é a
+janela do próprio QEMU. A porta 22 de cada máquina é encaminhada para uma
+porta local, e "criar host ssh" a cadastra na área Hosts. O Mk não traz o
+QEMU: a área diz o que falta e oferece instalar `qemu-desktop` e `edk2-ovmf`
+num terminal.
+
 ## mksom
 
 O som (`mksom`; `mksom microfone` abre na outra área). **Equalizador** da

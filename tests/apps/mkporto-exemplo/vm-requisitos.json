@@ -1,0 +1,13 @@
+{
+  "qemu": {"tem": true, "caminho": "/usr/bin/qemu-system-x86_64"},
+  "qemu_img": {"tem": true, "caminho": "/usr/bin/qemu-img"},
+  "ovmf": {"tem": true, "caminho": "/usr/share/edk2/x64"},
+  "kvm": {"tem": true, "caminho": "/dev/kvm"},
+  "pronto": true,
+  "avisos": [],
+  "instalar": {
+    "argv": ["sudo", "pacman", "-S", "--needed", "qemu-desktop", "edk2-ovmf"],
+    "terminal": ["foot", "--title=instalar o QEMU", "--hold", "sudo", "pacman", "-S", "--needed", "qemu-desktop", "edk2-ovmf"],
+    "aviso": null
+  }
+}

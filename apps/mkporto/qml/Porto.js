@@ -25,6 +25,7 @@ var ATALHOS = [
     ["Ctrl+G", "nova chave (na área Chaves)"],
     ["Ctrl+1", "os hosts"],
     ["Ctrl+2", "as chaves"],
+    ["Ctrl+3", "as máquinas (Enter liga, Ctrl+N cria)"],
     ["Esc", "fechar o que estiver aberto"],
     ["F1", "esta folha"]
 ];
@@ -435,6 +436,24 @@ function arquivoDeExemplo(args) {
     case "comando":
         if (a[1] === "conectar" || a[1] === "chave" || a[1] === "gerar")
             return "comando-" + a[1] + ".json";
+        break;
+    case "vm":
+        switch (a[1]) {
+        case "listar":
+        case "requisitos":
+        case "uso":
+        case "criar":
+            return "vm-" + a[1] + ".json";
+        case "snapshot":
+            return a[2] === "listar" ? "vm-snapshot-listar.json" : "vm-acao.json";
+        case "ligar":
+        case "desligar":
+        case "pausar":
+        case "continuar":
+        case "remover":
+        case "host":
+            return "vm-acao.json";
+        }
     }
     return "nada.json";
 }
@@ -518,4 +537,286 @@ function chaveValida(erros) {
 function argsDaChave(form) {
     var comentario = aparado(form, "comentario");
     return comentario === "" ? [aparado(form, "nome")] : [aparado(form, "nome"), comentario];
+}
+
+// ── as máquinas ────────────────────────────────────────────────────────
+// O que a área Máquinas faz sozinha: os textos, a conta da CPU e a conferência
+// da folha da máquina nova (as mesmas regras do `vm criar` do motor).
+
+// O estado de uma máquina na bolinha dos hosts: cheia se ligada, anel de
+// cobre se pausada, apagada se travada, anel fino se desligada.
+function bolinhaDaMaquina(estado) {
+    return ({ ligada: "responde", pausada: "salto", travada: "nao" })[estado] || "desconhecido";
+}
+
+function haQuanto(desde, agora) {
+    if (typeof desde !== "number" || typeof agora !== "number" || !isFinite(desde) || !isFinite(agora) || agora < desde)
+        return "";
+    var s = agora - desde;
+    if (s < 60)
+        return "há instantes";
+    if (s < 3600)
+        return "há " + Math.floor(s / 60) + " min";
+    if (s < 48 * 3600)
+        return "há " + Math.floor(s / 3600) + " h";
+    return "há " + Math.floor(s / 86400) + " d";
+}
+
+function textoDoEstadoDaMaquina(m, agora) {
+    if (!m)
+        return "";
+    if (m.estado === "ligada") {
+        var ha = haQuanto(m.desde, agora);
+        return ha === "" ? "ligada" : "ligada " + ha;
+    }
+    if (m.estado === "travada")
+        return "travada: o QEMU está de pé, mas não responde";
+    return String(m.estado || "");
+}
+
+function memoria(mb) {
+    if (typeof mb !== "number" || !isFinite(mb) || mb < 0)
+        return "—";
+    if (mb < 1024)
+        return mb + " MB";
+    return (mb % 1024 === 0 ? String(mb / 1024) : (mb / 1024).toFixed(1).replace(".", ",")) + " GB";
+}
+
+function tamanho(bytes) {
+    if (typeof bytes !== "number" || !isFinite(bytes) || bytes < 0)
+        return "—";
+    var unidades = ["B", "KB", "MB", "GB", "TB"], i = 0, v = bytes;
+    while (v >= 1024 && i < unidades.length - 1) {
+        v /= 1024;
+        i++;
+    }
+    if (i === 0)
+        return v + " B";
+    return (v < 10 ? v.toFixed(1).replace(".", ",") : String(Math.round(v))) + " " + unidades[i];
+}
+
+function resumoDaMaquina(m) {
+    if (!m)
+        return "";
+    return memoria(m.memoria_mb) + " · " + plural(m.cpus, "CPU", "CPUs");
+}
+
+function resumoDasMaquinas(maquinas) {
+    var l = maquinas || [], ligadas = 0, pausadas = 0;
+    if (l.length === 0)
+        return "nenhuma máquina";
+    for (var i = 0; i < l.length; i++) {
+        if (l[i].estado === "ligada")
+            ligadas++;
+        else if (l[i].estado === "pausada")
+            pausadas++;
+    }
+    var texto = plural(l.length, "máquina", "máquinas");
+    if (ligadas > 0)
+        texto += " · " + plural(ligadas, "ligada", "ligadas");
+    if (pausadas > 0)
+        texto += " · " + plural(pausadas, "pausada", "pausadas");
+    return texto;
+}
+
+// A porcentagem de CPU entre duas respostas do `vm uso` (100 é uma CPU
+// cheia). null quando não dá para saber: falta uma leitura, o processo é
+// outro (a máquina religou), o relógio não andou ou o contador voltou.
+function cpuPct(antes, agora) {
+    if (!antes || !agora || antes.pid !== agora.pid)
+        return null;
+    var campos = ["ticks", "hz", "agora_ms"];
+    for (var i = 0; i < campos.length; i++)
+        if (typeof antes[campos[i]] !== "number" || typeof agora[campos[i]] !== "number")
+            return null;
+    var ms = agora.agora_ms - antes.agora_ms, ticks = agora.ticks - antes.ticks;
+    if (ms <= 0 || ticks < 0 || agora.hz <= 0)
+        return null;
+    return (ticks / agora.hz) / (ms / 1000) * 100;
+}
+
+function textoDoUso(pct, rssKb) {
+    var cpu = typeof pct === "number" && isFinite(pct) ? Math.round(pct) + "%" : "—";
+    var mem = typeof rssKb === "number" && isFinite(rssKb) && rssKb >= 0 ? tamanho(rssKb * 1024) : "—";
+    return "CPU " + cpu + " · memória " + mem;
+}
+
+function erroDoNomeDaMaquina(valor) {
+    var v = String(valor === null || valor === undefined ? "" : valor);
+    if (v === "")
+        return "falta o nome da máquina";
+    if (v.length > 40)
+        return "o nome é comprido demais (até 40)";
+    if (!/^[a-z0-9][a-z0-9._-]{0,39}$/.test(v) || /[\n\r]/.test(v))
+        return "o nome só pode ter letras minúsculas sem acento, algarismos, ponto, hífen e sublinhado, começando por letra ou algarismo";
+    return "";
+}
+
+// Um inteiro escrito só com algarismos, entre os dois limites.
+function erroDeInteiro(valor, minimo, maximo, frase) {
+    var v = String(valor === null || valor === undefined ? "" : valor).trim();
+    if (!/^[0-9]{1,7}$/.test(v) || parseInt(v, 10) < minimo || parseInt(v, 10) > maximo)
+        return frase;
+    return "";
+}
+
+function erroDaMemoria(valor) {
+    return erroDeInteiro(valor, 512, 65536, "a memória vai de 512 a 65536 MB");
+}
+
+function erroDasCpus(valor) {
+    return erroDeInteiro(valor, 1, 32, "as CPUs vão de 1 a 32");
+}
+
+function erroDoDisco(valor) {
+    return erroDeInteiro(valor, 1, 2000, "o disco vai de 1 a 2000 GB");
+}
+
+// O caminho da ISO, sem olhar o disco (se o arquivo existe, quem diz é o motor).
+function erroDaIso(valor) {
+    var v = String(valor === null || valor === undefined ? "" : valor);
+    if (v === "")
+        return "";
+    for (var i = 0; i < v.length; i++) {
+        var c = v.charCodeAt(i);
+        if (c === 10 || c === 13)
+            return "o caminho da ISO não pode ter quebra de linha";
+        if (c < 32 || c === 127)
+            return "o caminho da ISO não pode ter caractere de controle";
+        if (c === 44)
+            return "o caminho da ISO não pode ter vírgula (o QEMU a lê como separador de opções): renomeie o arquivo";
+    }
+    if (v.charAt(0) !== "/")
+        return "o caminho da ISO tem de ser inteiro, começando por /";
+    if (v.length > 4096)
+        return "o caminho da ISO é comprido demais";
+    return "";
+}
+
+function erroDoRotulo(valor) {
+    var v = String(valor === null || valor === undefined ? "" : valor);
+    if (v === "")
+        return "falta o rótulo";
+    if (!/^[A-Za-z0-9._][A-Za-z0-9._-]{0,39}$/.test(v) || /[\n\r]/.test(v))
+        return "o rótulo só pode ter letras sem acento, algarismos, ponto, hífen e sublinhado (até 40), sem começar com hífen";
+    return "";
+}
+
+function maquinaEscolhida(maquinas, nome) {
+    var l = maquinas || [];
+    for (var i = 0; i < l.length; i++)
+        if (l[i].nome === nome)
+            return l[i];
+    return null;
+}
+
+function maquinaVizinha(maquinas, nome, passo) {
+    return vizinho((maquinas || []).map(function (m) { return { apelido: m.nome }; }), nome, passo);
+}
+
+// Os erros da folha da máquina nova. `requisitos` é a resposta do
+// `vm requisitos` (para o UEFI, que precisa do OVMF).
+function validarMaquina(form, maquinas, requisitos) {
+    var nome = aparado(form, "nome");
+    var erros = {
+        nome: erroDoNomeDaMaquina(nome),
+        memoria_mb: erroDaMemoria(aparado(form, "memoria_mb")),
+        cpus: erroDasCpus(aparado(form, "cpus")),
+        disco_gb: erroDoDisco(aparado(form, "disco_gb")),
+        iso: erroDaIso(aparado(form, "iso")),
+        uefi: ""
+    };
+    if (erros.nome === "" && maquinaEscolhida(maquinas, nome))
+        erros.nome = "já existe uma máquina com esse nome";
+    if (form && form.uefi === true && requisitos && requisitos.ovmf && requisitos.ovmf.tem === false)
+        erros.uefi = "UEFI precisa do OVMF: instale o pacote edk2-ovmf";
+    return erros;
+}
+
+function maquinaValida(erros) {
+    if (!erros)
+        return false;
+    var campos = ["nome", "memoria_mb", "cpus", "disco_gb", "iso", "uefi"];
+    for (var i = 0; i < campos.length; i++)
+        if (erros[campos[i]] !== "")
+            return false;
+    return true;
+}
+
+// A folha em branco: UEFI ligado só se o OVMF está instalado.
+function maquinaVazia(requisitos) {
+    return {
+        nome: "", iso: "", memoria_mb: "4096", cpus: "2", disco_gb: "40",
+        uefi: !!(requisitos && requisitos.ovmf && requisitos.ovmf.tem === true), tres_d: false
+    };
+}
+
+// O objeto que vai (como JSON) para a entrada do `vm criar`.
+function pedidoDeMaquina(form) {
+    var inteiro = function (campo) {
+        var v = aparado(form, campo);
+        return /^[0-9]{1,7}$/.test(v) ? parseInt(v, 10) : 0;
+    };
+    return {
+        nome: aparado(form, "nome"), memoria_mb: inteiro("memoria_mb"), cpus: inteiro("cpus"), disco_gb: inteiro("disco_gb"),
+        iso: aparado(form, "iso"), uefi: !!(form && form.uefi === true), tres_d: !!(form && form.tres_d === true)
+    };
+}
+
+// O que falta instalar, pelo `vm requisitos`.
+function faltas(requisitos) {
+    var l = [];
+    if (!requisitos)
+        return l;
+    if (requisitos.qemu && requisitos.qemu.tem === false)
+        l.push("o QEMU (qemu-system-x86_64)");
+    if (requisitos.qemu_img && requisitos.qemu_img.tem === false)
+        l.push("o qemu-img");
+    return l;
+}
+
+// O que o estado da máquina deixa fazer.
+function podeNaMaquina(m, acao) {
+    if (!m)
+        return false;
+    var e = m.estado;
+    switch (acao) {
+    case "ligar":
+    case "snapshots":
+    case "remover":
+        return e === "desligada";
+    case "desligar":
+        return e === "ligada" || e === "pausada";
+    case "forcar":
+        return e === "ligada" || e === "pausada" || e === "travada";
+    case "pausar":
+        return e === "ligada";
+    case "continuar":
+        return e === "pausada";
+    case "host":
+        return true;
+    }
+    return false;
+}
+
+// Por que os snapshots e o remover estão fechados ("" se não estão).
+function porQueNao(m, acao) {
+    if (!m || podeNaMaquina(m, acao) || (acao !== "snapshots" && acao !== "remover"))
+        return "";
+    return acao + " só com a máquina desligada";
+}
+
+// O seletor de arquivos devolve uma URL (file:///…): aqui vira um caminho.
+// O que não é um arquivo daqui vira "".
+function caminhoDeUrl(url) {
+    var u = String(url === null || url === undefined ? "" : url);
+    if (u.charAt(0) === "/")
+        return u;
+    if (u.indexOf("file://") !== 0)
+        return "";
+    try {
+        return decodeURIComponent(u.slice(7));
+    } catch (e) {
+        return "";
+    }
 }

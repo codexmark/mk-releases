@@ -24,18 +24,18 @@ eq "" "$out"
 eq "" "$(grep -nE 'color: *"[a-z]+"|Qt\.(darker|lighter|hsla|hsva|tint|color)\(' "$qml"/*.qml || true)"
 
 t "o Theme e os componentes pequenos são os mesmos do MkPulso (cada app é uma pasta que se basta)"
-for f in Theme Botao Segmento Rotulo; do
+for f in Theme Botao Segmento Rotulo Chave; do
   ok cmp -s "$qml/$f.qml" "$REPO/apps/mkpulso/qml/$f.qml"
 done
 ok cmp -s "$qml/Cabecalho.qml" "$REPO/apps/mkutil/qml/Cabecalho.qml"
 
 t "todo tipo próprio usado na janela tem o arquivo dele"
 n=0
-for tipo in $(grep -ohE '^\s*(Botao|Campo|Entrada|Segmento|Rotulo|Cabecalho|Bolinha|Fundo|Lista|Detalhe|Formulario|Confirma|Escolha|NovaChave|Chaves|Atalhos|App) \{' "$qml"/*.qml | tr -d ' {' | sort -u); do
+for tipo in $(grep -ohE '^\s*(Botao|Campo|Entrada|Segmento|Rotulo|Cabecalho|Bolinha|Fundo|Lista|Detalhe|Formulario|Confirma|Escolha|NovaChave|Chaves|Chave|Maquinas|NovaMaquina|Snapshots|RemoveMaquina|Pergunta|Atalhos|App) \{' "$qml"/*.qml | tr -d ' {' | sort -u); do
   n=$((n + 1))
   exists "$qml/$tipo.qml"
 done
-eq 17 "$n"
+eq 23 "$n"
 exists "$qml/Motor.qml"
 exists "$qml/Porto.js"
 # E nenhum arquivo sobra sem uso.
@@ -52,11 +52,11 @@ for sub in "${pedidos[@]}"; do
 done
 mapfile -t docontrato < <(grep -oE '^## `mkporto-motor [a-z]+' <<<"$contrato" | awk '{print $3}' | sort -u)
 eq "${docontrato[*]}" "${pedidos[*]}"
-eq 7 "${#pedidos[@]}"
+eq 8 "${#pedidos[@]}"
 
 t "toda chamada ao motor diz o subcomando na hora, e só o App fala com ele"
 eq "" "$(grep -nE 'Motor\.(pedir|tarefa)\(' "$qml"/*.qml | grep -vE 'Motor\.(pedir|tarefa)\(\["[a-z]+"' || true)"
-eq "$qml/App.qml" "$(grep -lE 'Motor\.(pedir|tarefa|abrir)\(' "$qml"/*.qml | tr '\n' ' ' | sed 's/ $//')"
+eq "$qml/App.qml $qml/Maquinas.qml" "$(grep -lE 'Motor\.(pedir|tarefa|abrir)\(' "$qml"/*.qml | tr '\n' ' ' | sed 's/ $//')"
 
 t "o que a pessoa escolheu vai para o motor depois de --, nunca como opção"
 casca=$(<"$qml/App.qml")
@@ -95,7 +95,8 @@ mapfile -t campos_da_chave < <(grep -oE 'rotulo: "[^"]+"' "$qml/NovaChave.qml" |
 eq "nome comentário" "${campos_da_chave[*]}"
 
 t "a sondagem roda ao abrir, no botão e no F5, e depois de guardar: nunca em laço"
-eq "" "$(grep -nE '\bTimer\b|setInterval|setTimeout' "$qml"/*.qml "$qml/Porto.js" || true)"
+# (o único relógio da janela é o da área Máquinas, e só anda com ela na frente: veja abaixo)
+eq "" "$(grep -nE '\bTimer\b|setInterval|setTimeout' "$qml"/*.qml "$qml/Porto.js" | grep -v "^$qml/Maquinas.qml:" || true)"
 has "$casca" 'Component.onCompleted: ler(() => sondar())'
 has "$casca" 'Shortcut { sequences: ["F5"]; enabled: app.livre && app.area === "hosts"; onActivated: app.sondar() }'
 has "$casca" '"sondar de novo"'
@@ -148,13 +149,13 @@ like "$casca" 'function gerarChave\(form\) \{[^}]*Motor\.pedir\(\["comando", "ge
 has "$casca" 'app.recado = Motor.abrir(r) || "gerando a chave num terminal; quando terminar, atualize (F5)";'
 
 t "os atalhos do contrato existem na janela, e a folha (F1) lista os mesmos"
-for tecla in '"Ctrl+F"' '"Ctrl+N"' '"Ctrl+E"' '"Ctrl+T"' '"Ctrl+G"' '"Ctrl+K"' '"Delete"' '"Ctrl+Shift+C"' '"F5"' '"Ctrl+1"' '"Ctrl+2"' '"Up"' '"Down"' '"Return", "Enter"' '"Escape"' '"F1"'; do
+for tecla in '"Ctrl+F"' '"Ctrl+N"' '"Ctrl+E"' '"Ctrl+T"' '"Ctrl+G"' '"Ctrl+K"' '"Delete"' '"Ctrl+Shift+C"' '"F5"' '"Ctrl+1"' '"Ctrl+2"' '"Ctrl+3"' '"Up"' '"Down"' '"Return", "Enter"' '"Escape"' '"F1"'; do
   has "$casca" "Shortcut { sequences: [$tecla]" "falta o atalho $tecla"
 done
 has "$casca" 'Shortcut { sequences: ["Return", "Enter"]; enabled: app.livre && app.area === "hosts"; onActivated: app.conectar() }'
 has "$casca" 'Shortcut { sequences: ["Ctrl+N"]; enabled: app.livre; onActivated: app.abrirFolha("novo") }'
 has "$casca" 'Shortcut { sequences: ["Escape"]; onActivated: app.fechar() }'
-for tecla in Ctrl+F Ctrl+N Ctrl+E Ctrl+T Ctrl+G Ctrl+K Delete Ctrl+Shift+C F5 Ctrl+1 Ctrl+2 Enter Esc F1; do
+for tecla in Ctrl+F Ctrl+N Ctrl+E Ctrl+T Ctrl+G Ctrl+K Delete Ctrl+Shift+C F5 Ctrl+1 Ctrl+2 Ctrl+3 Enter Esc F1; do
   has "$(<"$qml/Porto.js")" "[\"$tecla\", " "a folha de atalhos não tem: $tecla"
   has "$contrato" "\`$tecla\`" "o contrato não tem o atalho: $tecla"
 done
@@ -181,11 +182,12 @@ has "$casca" '"Nenhum host ainda"'
 ok test "$(grep -c 'onAcionado: app.abrirFolha("novo")' "$qml/App.qml")" -ge 2
 
 t "os dados de exemplo são JSON, um por pedido que a janela faz"
-for f in listar sondar entrar chaves guardar remover comando-conectar comando-chave comando-gerar; do
+for f in listar sondar entrar chaves guardar remover comando-conectar comando-chave comando-gerar \
+  vm-requisitos vm-listar vm-uso vm-snapshot-listar vm-criar vm-acao; do
   ok jq -e . "$exemplo/$f.json" >/dev/null
   has "$contrato" "\`$f.json\`" "o contrato não cita o exemplo $f.json"
 done
-eq 9 "$(find "$exemplo" -type f | wc -l)"
+eq 15 "$(find "$exemplo" -type f | wc -l)"
 
 t "os exemplos têm uns 6 hosts de mentira: só domínios .example/.test e IPs de documentação"
 eq 6 "$(jq '.hosts | length' "$exemplo/listar.json")"
@@ -486,3 +488,219 @@ has "$(<"$qml/Campo.qml")" 'Keys.onDeletePressed: event => {'
 has "$(<"$qml/Lista.qml")" 'signal remover()'
 has "$(<"$qml/Lista.qml")" 'onApagarVazio: lista.remover()'
 has "$casca" 'onRemover: app.abrirFolha("remover")'
+
+# --- a área Máquinas --------------------------------------------------------------
+maq=$(<"$qml/Maquinas.qml")
+
+t "Máquinas é a terceira área (Ctrl+3), com o mesmo seletor, que cabe numa coluna apertada"
+has "$casca" 'opcoes: [{ v: "hosts", texto: "Hosts" }, { v: "chaves", texto: "Chaves" }, { v: "maquinas", texto: "Máquinas" }]'
+has "$casca" 'Shortcut { sequences: ["Ctrl+3"]; enabled: app.livre; onActivated: app.area = "maquinas" }'
+has "$casca" 'visible: app.area === "maquinas"'
+# Três rótulos curtos e o botão: com a marca escondida (apertada) cabem em 400.
+ok test "$(grep -oE 'texto: "(Hosts|Chaves|Máquinas)"' "$qml/App.qml" | cut -d'"' -f2 | tr -d '\n' | wc -m)" -le 22
+# As folhas da área contam como folha aberta: os atalhos das outras áreas param.
+has "$casca" 'readonly property bool livre: folha === "" && maquinas.folha === ""'
+like "$casca" 'if \(maquinas\.folha !== "" \|\| app\.area === "maquinas"\) \{[[:space:]]+maquinas\.fechar\(\);'
+like "$casca" 'if \(qual === "novo" && app\.area === "maquinas"\) \{[[:space:]]+maquinas\.abrir\("nova"\);'
+has "$casca" 'Shortcut { sequences: ["Return", "Enter"]; enabled: app.nasMaquinas; onActivated: maquinas.principal() }'
+has "$casca" 'Shortcut { sequences: ["F5"]; enabled: app.nasMaquinas; onActivated: maquinas.conferir() }'
+has "$casca" 'palco: app'
+
+t "a lista das máquinas só se atualiza sozinha com a área na frente e a janela visível: um relógio só, de 2 s"
+eq 1 "$(grep -c '^\s*Timer {' "$qml/Maquinas.qml")"
+like "$maq" 'Timer \{[[:space:]]+interval: 2000[[:space:]]+repeat: true[[:space:]]+triggeredOnStart: true[[:space:]]+running: pagina\.naFrente[[:space:]]+onTriggered: pagina\.pulso\(\)'
+has "$casca" 'naFrente: app.area === "maquinas" && app.janelaVisivel'
+has "$janela" 'janelaVisivel: window.visible'
+# O pulso é a única coisa que roda sozinha, e só lista e lê o uso: nunca age.
+like "$maq" 'function pulso\(\) \{[[:space:]]+if \(pagina\.requisitos === null\) \{[[:space:]]+conferir\(\);[[:space:]]+return;[[:space:]]+\}[[:space:]]+listar\(\);[[:space:]]+lerUso\(\);[[:space:]]+\}'
+eq 1 "$(grep -c 'pulso()' <(grep -v 'function pulso' "$qml/Maquinas.qml"))"
+# Uma leitura de cada vez: uma lista que demora não empilha pedidos.
+like "$maq" 'function listar\(\) \{[[:space:]]+if \(pagina\.listando\)[[:space:]]+return;'
+
+t "a área Máquinas só pede ao motor o que o contrato tem, com o nome depois de --"
+mapfile -t dovm < <(grep -ohE 'Motor\.pedir\(\["vm", "[a-z]+"' "$qml/Maquinas.qml" | cut -d'"' -f4 | sort -u)
+eq "continuar criar desligar host ligar listar pausar remover requisitos snapshot uso" "${dovm[*]}"
+for sub in "${dovm[@]}"; do
+  like "$contrato" "\`vm ${sub}[ \`]" "o contrato não tem: vm $sub"
+done
+eq "" "$(grep -n 'Motor\.pedir(\["vm"' "$qml/Maquinas.qml" | grep -vE '\["vm", "(requisitos|listar|criar)"\]|"--", alvo[],]' || true)"
+has "$maq" 'Motor.pedir(["vm", "ligar", "--sem-iso", "--", alvo]'
+has "$maq" 'Motor.pedir(["vm", "desligar", "--forcar", "--", alvo]'
+has "$maq" 'Motor.pedir(["vm", "remover", "--confirmo", digitado, "--", alvo]'
+has "$maq" 'Motor.pedir(["vm", "snapshot", acao, "--", alvo, rotulo]'
+has "$maq" 'if (["criar", "restaurar", "apagar"].indexOf(acao) < 0 || pagina.ocupado)'
+# A máquina nova vai como JSON pela entrada padrão.
+like "$maq" 'Motor\.pedir\(\["vm", "criar"\], r => \{'
+has "$maq" '}, JSON.stringify(pedido));'
+# A janela não roda o QEMU, o qemu-img, o sudo nem o pacman: o instalar abre o
+# terminal que o motor mandou abrir, pelo mesmo caminho do conectar.
+eq "" "$(grep -nE '"(qemu[a-z0-9_-]*|sudo|pacman|kill)"' "$qml"/*.qml "$qml/Porto.js" || true)"
+has "$maq" 'Motor.abrir(pagina.requisitos.instalar)'
+
+t "as ações do detalhe de uma máquina são as do pedido, e cada uma só abre no estado certo"
+mapfile -t acoes_da_maquina < <(sed -n '/── a lista e o detalhe/,/── as folhas/p' "$qml/Maquinas.qml" | grep -oE 'texto: "[^"]+"' | cut -d'"' -f2)
+eq "‹ voltar|ligar sem a iso|desligar|forçar|snapshots|criar host ssh|remover" "$(IFS='|'; echo "${acoes_da_maquina[*]}")"
+has "$maq" 'texto: pagina.ocupado ? "um instante…" : "ligar"'
+has "$maq" 'texto: Porto.podeNaMaquina(pagina.maquina, "continuar") ? "continuar" : "pausar"'
+for acao in ligar desligar forcar pausar continuar snapshots remover; do
+  has "$maq" "Porto.podeNaMaquina(pagina.maquina, \"$acao\")" "a ação $acao não confere o estado"
+done
+# Forçar passa pela pergunta; remover, pela folha que pede o nome; restaurar e
+# apagar um snapshot, cada um pela sua pergunta.
+has "$maq" 'onAcionado: pagina.abrir("forcar")'
+eq "Shortcut { sequences: [\"Return\", \"Enter\"]; enabled: maquinas.folha === \"forcar\"; onActivated: maquinas.forcar() }|onConfirmado: pagina.forcar()" \
+  "$(grep -hE '(maquinas|pagina)\.forcar\(\)' "$qml/App.qml" "$qml/Maquinas.qml" | sed 's/^ *//' | sort | tr '\n' '|' | sed 's/|$//')"
+eq "onConfirmado: digitado => pagina.remover(digitado)" "$(grep -E 'pagina\.remover\(' "$qml/Maquinas.qml" | sed 's/^ *//')"
+remove=$(<"$qml/RemoveMaquina.qml")
+has "$remove" 'readonly property bool confere: digitado.text === nome && nome !== ""'
+has "$remove" 'ligado: folha.confere && !folha.ocupado'
+has "$maq" 'onRestaurar: rotulo => pagina.perguntarSnapshot("restaurar", rotulo)'
+has "$maq" 'onApagar: rotulo => pagina.perguntarSnapshot("apagar", rotulo)'
+has "$maq" 'onConfirmado: pagina.snapshot(pagina.pedidoDeSnapshot.acao, pagina.pedidoDeSnapshot.rotulo)'
+# Snapshots fechados com a máquina ligada, dizendo por quê.
+has "$maq" 'text: Porto.porQueNao(pagina.maquina, "snapshots")'
+like "$maq" 'if \(\(qual === "snapshots" \|\| qual === "remover"\) && !Porto\.podeNaMaquina\(pagina\.maquina, qual\)\) \{[[:space:]]+pagina\.recado\(Porto\.porQueNao'
+
+t "o detalhe diz que a tela é a janela do QEMU, e mostra a CPU e a memória só da máquina de pé"
+has "$maq" 'text: "A tela da máquina é uma janela do QEMU; fechar essa janela desliga na marra."'
+has "$maq" 'Porto.textoDoUso(Porto.cpuPct(pagina.usoAntes, pagina.usoAgora), pagina.usoAgora.rss_kb)'
+has "$maq" 'visible: pagina.viva && pagina.usoAgora !== null'
+like "$maq" 'function lerUso\(\) \{[[:space:]]+if \(!pagina\.viva\)[[:space:]]+return;'
+for campo in memoria_mb cpus disco_gb disco_bytes iso uefi tres_d porta_ssh pid; do
+  has "$maq" "pagina.maquina.$campo" "o detalhe não mostra: $campo"
+done
+has "$maq" 'texto: "‹ voltar"'
+has "$maq" 'visible: !pagina.estreita || !pagina.detalheAberto'
+
+t "sem o QEMU a área diz o que falta e oferece instalar e conferir de novo; sem o KVM, um aviso discreto"
+has "$maq" 'visible: pagina.requisitos !== null && !pagina.pronto'
+has "$maq" 'text: "Falta o QEMU"'
+has "$maq" 'texto: "instalar"'
+has "$maq" 'texto: "conferir de novo"'
+has "$maq" 'Porto.faltas(pagina.requisitos)'
+has "$maq" 'visible: pagina.requisitos !== null && pagina.requisitos.kvm.tem === false'
+has "$maq" 'text: "Nenhuma máquina ainda"'
+# Sem o QEMU não há máquina nova.
+has "$casca" 'ligado: app.area !== "maquinas" || maquinas.pronto'
+like "$maq" 'if \(qual === "nova" && !pagina\.pronto\)[[:space:]]+return;'
+
+t "a folha da máquina nova tem os campos do pedido, confere com as regras do motor e usa o seletor de arquivos do sistema"
+novam=$(<"$qml/NovaMaquina.qml")
+mapfile -t campos_da_maquina < <(grep -oE 'rotulo: "[^"]+"' "$qml/NovaMaquina.qml" | cut -d'"' -f2)
+eq "nome|iso de instalação|memória (mb)|cpus|disco (gb)" "$(IFS='|'; echo "${campos_da_maquina[*]}")"
+eq 2 "$(grep -c '^\s*Chave {' "$qml/NovaMaquina.qml")"
+has "$novam" 'readonly property var erros: Porto.validarMaquina(form, maquinas, requisitos)'
+has "$novam" 'criar(Porto.pedidoDeMaquina(form));'
+has "$novam" 'import QtQuick.Dialogs'
+has "$novam" 'const caminho = Porto.caminhoDeUrl(selectedFile.toString());'
+has "$(<"$qml/Snapshots.qml")" 'Porto.erroDoRotulo(rotulo.text)'
+
+t "os exemplos das máquinas: três máquinas em estados diferentes, sem dado de ninguém"
+eq 3 "$(jq '.maquinas | length' "$exemplo/vm-listar.json")"
+jeq '["desligada","ligada","pausada"]' "$(jq -c '[.maquinas[].estado] | sort' "$exemplo/vm-listar.json")"
+ok jq -e '[.maquinas[] | (.estado == "desligada") == (.pid == null and .desde == null)] | all' "$exemplo/vm-listar.json" >/dev/null
+jeq "$(jq -c '[.maquinas[].nome]' "$exemplo/vm-listar.json")" "$(jq -c '[.maquinas[].nome] | sort' "$exemplo/vm-listar.json")"
+ok jq -e '[.maquinas[].porta_ssh] | (unique | length) == length' "$exemplo/vm-listar.json" >/dev/null
+ok jq -e '.pronto == true and (.instalar.argv[0:2] == ["sudo", "pacman"])' "$exemplo/vm-requisitos.json" >/dev/null
+ok jq -e '.snapshots | length >= 2' "$exemplo/vm-snapshot-listar.json" >/dev/null
+
+# --- os exemplos das máquinas contra o motor de verdade (sem QEMU nenhum) ----------
+mq=$SBX/maquinas
+exe=$SBX/run/mq
+mkdir -p "$SBX/ovmf" "$exe"
+: >"$SBX/ovmf/OVMF_CODE.4m.fd"
+: >"$SBX/ovmf/OVMF_VARS.4m.fd"
+: >"$SBX/kvm"
+: >"$SBX/sistema.iso"
+# shellcheck disable=SC2016 # o $4 é do dublê, não daqui
+stub qemu-img 'case "$1 $2" in
+  "create -f") : >"$4" ;;
+  "snapshot -l") printf "Snapshot list:\nID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT\n1         antes                 0 B 2026-11-24 10:00:00 00:00:00.000          0\n" ;;
+esac'
+vmresponde() {
+  MKPORTO_SSH_DIR=$ssh MKPORTO_TERMINAL=foot MKPORTO_MAQUINAS=$mq MKPORTO_EXECUCAO=$exe MKPORTO_OVMF=$SBX/ovmf MKPORTO_KVM=$SBX/kvm \
+    MKPORTO_PROC=$SBX/proc "$motor" vm "$@"
+}
+
+t "exemplos: vm requisitos, criar, listar e snapshot listar têm exatamente os campos que o motor responde"
+mesmos_campos vm-requisitos "$(vmresponde requisitos)"
+mesmos_campos vm-criar "$(vmresponde criar <<<"{\"nome\":\"oficina\",\"memoria_mb\":2048,\"cpus\":2,\"disco_gb\":20,\"iso\":\"$SBX/sistema.iso\",\"uefi\":true,\"tres_d\":false}")"
+mesmos_campos vm-listar "$(vmresponde listar)"
+mesmos_campos vm-snapshot-listar "$(vmresponde snapshot listar -- oficina)"
+jeq '[{"id":"1","rotulo":"antes","data":"2026-11-24 10:00:00","tamanho":"0 B"}]' "$(vmresponde snapshot listar -- oficina | jq -c .snapshots)"
+
+t "exemplos: o vm uso também (com um /proc de mentira: nenhum QEMU roda aqui)"
+# Um "QEMU" que só existe no /proc de mentira: o pid, a linha de comando da
+# máquina e os números. O QMP não atende (a máquina aparece travada).
+mkdir -p "$exe/oficina" "$SBX/proc/4242"
+echo 4242 >"$exe/oficina/pid"
+printf 'qemu-system-x86_64\0-name\0oficina\0-pidfile\0%s\0' "$exe/oficina/pid" >"$SBX/proc/4242/cmdline"
+echo '4242 (qemu-system-x86) S 1 4242 4242 0 -1 4194560 100 0 0 0 1500 700 0 0 20 0 5 0 12345 8000000000 524288 18446744073709551615 1 1 0 0 0 0 0 0 0 0 0 0 17 3 0 0 0 0 0' >"$SBX/proc/4242/stat"
+printf 'Name:\tqemu\nVmRSS:\t 2097152 kB\n' >"$SBX/proc/4242/status"
+veio=$(vmresponde uso -- oficina)
+mesmos_campos vm-uso "$veio"
+jeq '{"nome":"oficina","pid":4242,"ticks":2200,"rss_kb":2097152,"hz":100}' "$(jq -c 'del(.agora_ms)' <<<"$veio")"
+jeq '["travada",4242]' "$(vmresponde listar | jq -c '.maquinas[0] | [.estado, .pid]')"
+# De pé, não aceita snapshot nem remoção.
+vmresponde snapshot criar -- oficina antes >/dev/null
+eq 2 $?
+vmresponde remover --confirmo oficina -- oficina >/dev/null
+eq 2 $?
+rm -f "$exe/oficina/pid"
+not_called "qemu-img snapshot -c"
+not_called "foot"
+
+t "a folha da máquina nova recusa o mesmo que o motor: as regras do Porto.js são o espelho das do vm criar"
+cat >"$SBX/espelho-maquina.mjs" <<MJS
+import { load, REPO } from "$TESTS/js/load.mjs";
+const P = load(REPO + "/apps/mkporto/qml/Porto.js");
+const f = JSON.parse(process.argv[2]);
+const erros = { nome: P.erroDoNomeDaMaquina(f.nome ?? ""), memoria_mb: P.erroDaMemoria(String(f.memoria_mb ?? "")),
+    cpus: P.erroDasCpus(String(f.cpus ?? "")), disco_gb: P.erroDoDisco(String(f.disco_gb ?? "")), iso: P.erroDaIso(f.iso ?? "") };
+const campo = ["nome", "memoria_mb", "cpus", "disco_gb", "iso"].find((c) => erros[c] !== "") || "";
+console.log(campo + "|" + (campo ? erros[campo] : ""));
+MJS
+n=0
+while IFS= read -r pedido; do
+  n=$((n + 1))
+  veio=$(MKPORTO_MAQUINAS=$SBX/espelho-maquina-$n MKPORTO_OVMF=$SBX/ovmf "$motor" vm criar <<<"$pedido")
+  do_motor="$(jq -r '.campo // ""' <<<"$veio")|$(jq -r 'if .campo then .erro else "" end' <<<"$veio")"
+  da_janela=$(node "$SBX/espelho-maquina.mjs" "$pedido")
+  eq "$do_motor" "$da_janela" "o motor e a janela discordam em: $pedido"
+done <<'PEDIDOS'
+{"nome":"oficina","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"win-11_teste.2","memoria_mb":512,"cpus":1,"disco_gb":1,"iso":"","uefi":true,"tres_d":true}
+{"nome":"a","memoria_mb":65536,"cpus":32,"disco_gb":2000,"iso":"","uefi":false,"tres_d":false}
+{"nome":"","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"-enable-kvm","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":".oculta","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"Oficina","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a b","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"../fora","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a,b","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"máquina","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a\nb","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":511,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":65537,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":0,"cpus":2,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":0,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":33,"disco_gb":40,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":0,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":2001,"iso":"","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"relativo.iso","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"/isos/a,b.iso","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"/isos/a.iso,readonly=off","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"/isos/a\n-device x","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"/isos/a\u0007.iso","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"-cdrom","uefi":false,"tres_d":false}
+{"nome":"a","memoria_mb":4096,"cpus":2,"disco_gb":40,"iso":"a,\nb","uefi":false,"tres_d":false}
+{"nome":"-x","memoria_mb":1,"cpus":99,"disco_gb":0,"iso":"x,y","uefi":false,"tres_d":false}
+PEDIDOS
+ok test "$n" -ge 28
+
+t "Enter nas Máquinas faz o que a tela pede: sem o QEMU instala, sem máquina abre a nova, senão liga"
+maq=$(<"$qml/Maquinas.qml")
+has "$maq" 'function principal()'
+has "$casca" 'Shortcut { sequences: ["Return", "Enter"]; enabled: app.nasMaquinas; onActivated: maquinas.principal() }'
+like "$maq" 'function principal\(\) \{[^}]*!pagina\.pronto[^}]*pagina\.instalar\(\)'

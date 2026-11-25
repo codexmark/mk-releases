@@ -27,7 +27,11 @@ t("toda função do arquivo tem caso aqui", () => {
         "aplicaSonda", "encerraSonda", "estado", "textoDoEstado", "latencia", "resumo", "origem", "editavel", "erroDoApelido", "erroDoHost",
         "erroDoUsuario", "erroDaPorta", "erroDaChave", "erroDoSalto", "validar", "valido", "formularioVazio", "formularioDe",
         "pedido", "estreita", "apertada", "arquivoDeExemplo", "tipoEBits", "abriria", "sugestaoDeChave", "aparado", "compara", "copia", "erroDePalavra",
-        "textoDaEntrada", "fonteDosValores", "erroDoNomeDaChave", "erroDoComentario", "validarChave", "chaveValida", "argsDaChave"];
+        "textoDaEntrada", "fonteDosValores", "erroDoNomeDaChave", "erroDoComentario", "validarChave", "chaveValida", "argsDaChave",
+        "bolinhaDaMaquina", "haQuanto", "textoDoEstadoDaMaquina", "memoria", "tamanho", "resumoDaMaquina", "cpuPct", "textoDoUso",
+        "erroDoNomeDaMaquina", "erroDeInteiro", "erroDaMemoria", "erroDasCpus", "erroDoDisco", "erroDaIso", "erroDoRotulo", "validarMaquina",
+        "maquinaValida", "maquinaVazia", "pedidoDeMaquina", "maquinaEscolhida", "maquinaVizinha", "faltas", "podeNaMaquina",
+        "porQueNao", "caminhoDeUrl", "resumoDasMaquinas"];
     const funcoes = Object.keys(P).filter((k) => typeof P[k] === "function");
     igual(funcoes.filter((f) => !cobertas.includes(f)).sort(), [], "função sem teste");
     igual(cobertas.filter((f) => !funcoes.includes(f)), [], "função que sumiu");
@@ -468,4 +472,227 @@ t("abriria também serve para a chave nova, e os atalhos novos estão na folha",
     const teclas = P.ATALHOS.map((a) => a[0]);
     for (const tecla of ["Ctrl+T", "Ctrl+G"])
         eq(teclas.includes(tecla), true, tecla);
+});
+
+// ── a terceira rodada: as máquinas ──────────────────────────────────────
+
+const maquina = (nome, extra) => Object.assign({
+    nome, memoria_mb: 2048, cpus: 2, disco_gb: 20, iso: null, uefi: false, tres_d: false, porta_ssh: 2222, criada_em: 1795000000,
+    estado: "desligada", pid: null, desde: null, disco_bytes: 196616
+}, extra || {});
+const maquinas = [
+    maquina("oficina", { estado: "ligada", pid: 4242, desde: 1795003600, memoria_mb: 4096 }),
+    maquina("antiga", { estado: "pausada", pid: 77, desde: 1795000000 }),
+    maquina("teste")
+];
+
+t("bolinhaDaMaquina: o estado da máquina na mesma bolinha dos hosts", () => {
+    eq(P.bolinhaDaMaquina("ligada"), "responde");
+    eq(P.bolinhaDaMaquina("pausada"), "salto");
+    eq(P.bolinhaDaMaquina("travada"), "nao");
+    eq(P.bolinhaDaMaquina("desligada"), "desconhecido");
+    eq(P.bolinhaDaMaquina(undefined), "desconhecido");
+});
+
+t("haQuanto: há quanto tempo a máquina está ligada", () => {
+    eq(P.haQuanto(1000, 1030), "há instantes");
+    eq(P.haQuanto(1000, 1060), "há 1 min");
+    eq(P.haQuanto(1000, 1000 + 59 * 60), "há 59 min");
+    eq(P.haQuanto(1000, 1000 + 3600), "há 1 h");
+    eq(P.haQuanto(1000, 1000 + 5 * 3600 + 120), "há 5 h");
+    eq(P.haQuanto(1000, 1000 + 49 * 3600), "há 2 d");
+    // Relógio torto ou dado que falta: nada, em vez de um número inventado.
+    for (const [a, b] of [[null, 1000], [1000, null], [2000, 1000], ["x", 1000], [NaN, 1000]])
+        eq(P.haQuanto(a, b), "", a + " " + b);
+});
+
+t("textoDoEstadoDaMaquina", () => {
+    eq(P.textoDoEstadoDaMaquina(maquinas[0], 1795003600 + 180), "ligada há 3 min");
+    eq(P.textoDoEstadoDaMaquina(maquinas[0], null), "ligada");
+    eq(P.textoDoEstadoDaMaquina(maquinas[1], 1795003600), "pausada");
+    eq(P.textoDoEstadoDaMaquina(maquinas[2], 1795003600), "desligada");
+    eq(P.textoDoEstadoDaMaquina(maquina("x", { estado: "travada" }), 1), "travada: o QEMU está de pé, mas não responde");
+    eq(P.textoDoEstadoDaMaquina(null, 1), "");
+});
+
+t("memoria e tamanho: o que o motor não soube vira um traço", () => {
+    eq(P.memoria(512), "512 MB");
+    eq(P.memoria(1024), "1 GB");
+    eq(P.memoria(4096), "4 GB");
+    eq(P.memoria(1536), "1,5 GB");
+    eq(P.tamanho(0), "0 B");
+    eq(P.tamanho(196616), "192 KB");
+    eq(P.tamanho(5368709120), "5,0 GB");
+    eq(P.tamanho(21474836480), "20 GB");
+    for (const v of [null, undefined, NaN, -1, "3"]) {
+        eq(P.memoria(v), "—", String(v));
+        eq(P.tamanho(v), "—", String(v));
+    }
+});
+
+t("resumoDaMaquina e resumoDasMaquinas", () => {
+    eq(P.resumoDaMaquina(maquinas[0]), "4 GB · 2 CPUs");
+    eq(P.resumoDaMaquina(maquina("x", { cpus: 1 })), "2 GB · 1 CPU");
+    eq(P.resumoDaMaquina(null), "");
+    eq(P.resumoDasMaquinas(maquinas), "3 máquinas · 1 ligada · 1 pausada");
+    eq(P.resumoDasMaquinas([maquinas[2]]), "1 máquina");
+    eq(P.resumoDasMaquinas([maquinas[0], maquinas[0]]), "2 máquinas · 2 ligadas");
+    eq(P.resumoDasMaquinas([]), "nenhuma máquina");
+    eq(P.resumoDasMaquinas(null), "nenhuma máquina");
+});
+
+t("cpuPct: a porcentagem de CPU pela diferença entre duas leituras do vm uso", () => {
+    const antes = { pid: 4242, ticks: 1000, hz: 100, agora_ms: 10000 };
+    // 100 ticks a 100 Hz = 1 s de CPU em 2 s de relógio = 50%.
+    eq(P.cpuPct(antes, { pid: 4242, ticks: 1100, hz: 100, agora_ms: 12000 }), 50);
+    // Duas CPUs cheias: 200%.
+    eq(P.cpuPct(antes, { pid: 4242, ticks: 1400, hz: 100, agora_ms: 12000 }), 200);
+    eq(P.cpuPct(antes, { pid: 4242, ticks: 1000, hz: 100, agora_ms: 12000 }), 0);
+    // Não dá para saber: primeira leitura, outro processo (a máquina religou),
+    // relógio que não andou, contador que voltou, dado torto.
+    eq(P.cpuPct(null, antes), null);
+    eq(P.cpuPct(antes, null), null);
+    eq(P.cpuPct(antes, { pid: 99, ticks: 1100, hz: 100, agora_ms: 12000 }), null);
+    eq(P.cpuPct(antes, { pid: 4242, ticks: 1100, hz: 100, agora_ms: 10000 }), null);
+    eq(P.cpuPct(antes, { pid: 4242, ticks: 900, hz: 100, agora_ms: 12000 }), null);
+    eq(P.cpuPct(antes, { pid: 4242, ticks: 1100, hz: 0, agora_ms: 12000 }), null);
+    eq(P.cpuPct(antes, { pid: 4242, ticks: "x", hz: 100, agora_ms: 12000 }), null);
+});
+
+t("textoDoUso", () => {
+    eq(P.textoDoUso(50, 2097152), "CPU 50% · memória 2,0 GB");
+    eq(P.textoDoUso(12.34, 524288), "CPU 12% · memória 512 MB");
+    eq(P.textoDoUso(null, 524288), "CPU — · memória 512 MB");
+    eq(P.textoDoUso(null, null), "CPU — · memória —");
+});
+
+t("erroDoNomeDaMaquina: vira pasta, argumento do QEMU e apelido de host", () => {
+    for (const bom of ["a", "oficina", "win-11", "teste_2.novo", "0", "a".repeat(40)])
+        eq(P.erroDoNomeDaMaquina(bom), "", bom);
+    for (const ruim of ["", "-x", ".x", "_x", "Oficina", "a b", "a/b", "..", "máquina", "a\nb", "a,b", "a".repeat(41)])
+        eq(P.erroDoNomeDaMaquina(ruim) !== "", true, JSON.stringify(ruim));
+    eq(P.erroDoNomeDaMaquina(""), "falta o nome da máquina");
+    eq(P.erroDoNomeDaMaquina("a".repeat(41)), "o nome é comprido demais (até 40)");
+});
+
+t("erroDaMemoria, erroDasCpus e erroDoDisco: inteiros dentro dos limites do motor", () => {
+    for (const boa of ["512", "65536", "4096", " 2048 ", 2048])
+        eq(P.erroDaMemoria(boa), "", String(boa));
+    for (const ruim of ["", "511", "65537", "2.5", "2e3", "dois", "-1", "0x800"])
+        eq(P.erroDaMemoria(ruim), "a memória vai de 512 a 65536 MB", ruim);
+    for (const boa of ["1", "32", "4"])
+        eq(P.erroDasCpus(boa), "", boa);
+    for (const ruim of ["", "0", "33", "1.5"])
+        eq(P.erroDasCpus(ruim), "as CPUs vão de 1 a 32", ruim);
+    for (const bom of ["1", "2000", "40"])
+        eq(P.erroDoDisco(bom), "", bom);
+    for (const ruim of ["", "0", "2001", "20G"])
+        eq(P.erroDoDisco(ruim), "o disco vai de 1 a 2000 GB", ruim);
+    eq(P.erroDeInteiro("7", 1, 10, "x"), "");
+    eq(P.erroDeInteiro("11", 1, 10, "x"), "x");
+    eq(P.erroDeInteiro("99999999999", 1, 10, "x"), "x");
+});
+
+t("erroDaIso: um caminho inteiro, sem vírgula (o QEMU a lê como separador)", () => {
+    for (const boa of ["", "/isos/sistema.iso", "/isos/um sistema (novo).iso"])
+        eq(P.erroDaIso(boa), "", boa);
+    for (const ruim of ["relativo.iso", "~/x.iso", "/isos/a,b.iso", "/isos/a.iso,readonly=off", "/isos/a\n.iso", "/a\u0007.iso", "-cdrom"])
+        eq(P.erroDaIso(ruim) !== "", true, JSON.stringify(ruim));
+    eq(P.erroDaIso("/a,b.iso").indexOf("vírgula") >= 0, true);
+    eq(P.erroDaIso("x.iso"), "o caminho da ISO tem de ser inteiro, começando por /");
+});
+
+t("erroDoRotulo: o rótulo de um snapshot", () => {
+    for (const bom of ["antes", "Antes-de-atualizar_2.0", "1", "a".repeat(40)])
+        eq(P.erroDoRotulo(bom), "", bom);
+    for (const ruim of ["", "-a", "a b", "a/b", "ação", "a\nb", "a".repeat(41)])
+        eq(P.erroDoRotulo(ruim) !== "", true, JSON.stringify(ruim));
+    eq(P.erroDoRotulo(""), "falta o rótulo");
+});
+
+t("validarMaquina, maquinaValida, maquinaVazia e pedidoDeMaquina: a folha da máquina nova", () => {
+    const vazia = P.maquinaVazia({ ovmf: { tem: true } });
+    igual(vazia, { nome: "", iso: "", memoria_mb: "4096", cpus: "2", disco_gb: "40", uefi: true, tres_d: false });
+    eq(P.maquinaVazia({ ovmf: { tem: false } }).uefi, false);
+    eq(P.maquinaVazia(null).uefi, false);
+
+    const f = Object.assign({}, vazia, { nome: "nova" });
+    igual(P.validarMaquina(f, maquinas, { ovmf: { tem: true } }), { nome: "", memoria_mb: "", cpus: "", disco_gb: "", iso: "", uefi: "" });
+    eq(P.maquinaValida(P.validarMaquina(f, maquinas, { ovmf: { tem: true } })), true);
+    eq(P.validarMaquina(Object.assign({}, f, { nome: "oficina" }), maquinas, null).nome, "já existe uma máquina com esse nome");
+    eq(P.validarMaquina(Object.assign({}, f, { nome: " oficina " }), maquinas, null).nome, "já existe uma máquina com esse nome");
+    // UEFI sem o OVMF: a folha já diz, antes de o motor recusar.
+    eq(P.validarMaquina(f, maquinas, { ovmf: { tem: false } }).uefi, "UEFI precisa do OVMF: instale o pacote edk2-ovmf");
+    eq(P.validarMaquina(Object.assign({}, f, { uefi: false }), maquinas, { ovmf: { tem: false } }).uefi, "");
+    const ruim = P.validarMaquina({ nome: "-x", iso: "x.iso", memoria_mb: "1", cpus: "99", disco_gb: "", uefi: false }, maquinas, null);
+    for (const campo of ["nome", "memoria_mb", "cpus", "disco_gb", "iso"])
+        eq(ruim[campo] !== "", true, campo);
+    eq(P.maquinaValida(ruim), false);
+    eq(P.maquinaValida(P.validarMaquina({}, null, null)), false);
+    eq(P.maquinaValida(null), false);
+
+    igual(P.pedidoDeMaquina({ nome: " nova ", iso: " /isos/a b.iso ", memoria_mb: " 4096 ", cpus: "2", disco_gb: "40", uefi: true, tres_d: false }),
+        { nome: "nova", memoria_mb: 4096, cpus: 2, disco_gb: 40, iso: "/isos/a b.iso", uefi: true, tres_d: false });
+    igual(P.pedidoDeMaquina({ nome: "x" }), { nome: "x", memoria_mb: 0, cpus: 0, disco_gb: 0, iso: "", uefi: false, tres_d: false });
+});
+
+t("maquinaEscolhida e maquinaVizinha: a lista anda pelas setas", () => {
+    eq(P.maquinaEscolhida(maquinas, "antiga").pid, 77);
+    eq(P.maquinaEscolhida(maquinas, "fantasma"), null);
+    eq(P.maquinaEscolhida(null, "x"), null);
+    eq(P.maquinaVizinha(maquinas, "oficina", 1), "antiga");
+    eq(P.maquinaVizinha(maquinas, "oficina", -1), "oficina");
+    eq(P.maquinaVizinha(maquinas, "teste", 1), "teste");
+    eq(P.maquinaVizinha(maquinas, "", 1), "oficina");
+    eq(P.maquinaVizinha(maquinas, "fantasma", -1), "teste");
+    eq(P.maquinaVizinha([], "x", 1), "");
+});
+
+t("faltas: o que falta para ter máquinas, do vm requisitos", () => {
+    igual(P.faltas({ qemu: { tem: true }, qemu_img: { tem: true }, pronto: true }), []);
+    igual(P.faltas({ qemu: { tem: false }, qemu_img: { tem: true }, pronto: false }), ["o QEMU (qemu-system-x86_64)"]);
+    igual(P.faltas({ qemu: { tem: false }, qemu_img: { tem: false }, pronto: false }), ["o QEMU (qemu-system-x86_64)", "o qemu-img"]);
+    igual(P.faltas(null), []);
+});
+
+t("podeNaMaquina e porQueNao: o que cada estado deixa fazer", () => {
+    const [ligada, pausada, desligada] = maquinas;
+    const travada = maquina("x", { estado: "travada" });
+    const tabela = {
+        ligar: [false, false, true, false], desligar: [true, true, false, false], forcar: [true, true, false, true],
+        pausar: [true, false, false, false], continuar: [false, true, false, false], snapshots: [false, false, true, false],
+        remover: [false, false, true, false], host: [true, true, true, true]
+    };
+    for (const acao in tabela)
+        igual([ligada, pausada, desligada, travada].map((m) => P.podeNaMaquina(m, acao)), tabela[acao], acao);
+    eq(P.podeNaMaquina(null, "ligar"), false);
+    eq(P.podeNaMaquina(desligada, "inventada"), false);
+    eq(P.porQueNao(ligada, "snapshots"), "snapshots só com a máquina desligada");
+    eq(P.porQueNao(ligada, "remover"), "remover só com a máquina desligada");
+    eq(P.porQueNao(desligada, "snapshots"), "");
+    eq(P.porQueNao(null, "snapshots"), "");
+});
+
+t("caminhoDeUrl: o que o seletor de arquivos devolve vira um caminho", () => {
+    eq(P.caminhoDeUrl("file:///isos/um%20sistema%20(novo).iso"), "/isos/um sistema (novo).iso");
+    eq(P.caminhoDeUrl("file:///isos/a%C3%A7%C3%A3o.iso"), "/isos/ação.iso");
+    eq(P.caminhoDeUrl("/isos/a.iso"), "/isos/a.iso");
+    eq(P.caminhoDeUrl("https://isos.example/a.iso"), "");
+    eq(P.caminhoDeUrl("file:///isos/%E0%A4%A.iso"), "");
+    eq(P.caminhoDeUrl(""), "");
+    eq(P.caminhoDeUrl(null), "");
+});
+
+t("arquivoDeExemplo conhece as máquinas, e nada da pessoa entra no nome", () => {
+    eq(P.arquivoDeExemplo(["vm", "listar"]), "vm-listar.json");
+    eq(P.arquivoDeExemplo(["vm", "requisitos"]), "vm-requisitos.json");
+    eq(P.arquivoDeExemplo(["vm", "uso", "--", "oficina"]), "vm-uso.json");
+    eq(P.arquivoDeExemplo(["vm", "criar"]), "vm-criar.json");
+    eq(P.arquivoDeExemplo(["vm", "snapshot", "listar", "--", "oficina"]), "vm-snapshot-listar.json");
+    for (const acao of [["ligar", "--", "x"], ["desligar", "--forcar", "--", "x"], ["pausar"], ["continuar"], ["remover"], ["host"],
+        ["snapshot", "criar", "--", "x", "y"], ["snapshot", "apagar"]])
+        eq(P.arquivoDeExemplo(["vm"].concat(acao)), "vm-acao.json", acao.join(" "));
+    eq(P.arquivoDeExemplo(["vm", "../x"]), "nada.json");
+    eq(P.arquivoDeExemplo(["vm"]), "nada.json");
+    eq(P.ATALHOS.map((a) => a[0]).includes("Ctrl+3"), true);
 });

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import "Porto.js" as Porto
 
-// A janela inteira: no alto, as duas áreas (Hosts e Chaves) e as ações; no
+// A janela inteira: no alto, as três áreas (Hosts, Chaves e Máquinas) e as ações; no
 // meio, a lista de hosts com o detalhe ao lado (ou, numa janela estreita, um
 // de cada vez, com um "voltar"); por cima, as folhas (formulário, confirmação,
 // escolha de chave, atalhos). Tudo o que aparece vem do motor.
@@ -18,7 +18,7 @@ Rectangle {
     property bool pronto: false
     property string erro: ""
     property string apelido: ""
-    // "hosts" | "chaves"
+    // "hosts" | "chaves" | "maquinas"
     property string area: "hosts"
     // Numa janela estreita: se o detalhe está na frente da lista.
     property bool detalheAberto: false
@@ -27,6 +27,9 @@ Rectangle {
     property string erroDaFolha: ""
     property bool ocupado: false
     property string recado: ""
+    // Se a janela está à vista (quem diz é o shell.qml): a área Máquinas só se
+    // atualiza sozinha com ela visível.
+    property bool janelaVisivel: true
     // O teste de entrada: { apelido, testando } e depois a resposta do `entrar`.
     // É de um host só: some ao trocar de host.
     property var entrada: null
@@ -36,7 +39,9 @@ Rectangle {
     readonly property bool apertada: Porto.apertada(width)
     readonly property var visiveis: Porto.visiveis(hosts, lista.busca)
     readonly property var host: Porto.escolhido(hosts, apelido)
-    readonly property bool livre: folha === ""
+    // Nenhuma folha aberta, nem as da área Máquinas (que cuida das dela).
+    readonly property bool livre: folha === "" && maquinas.folha === ""
+    readonly property bool nasMaquinas: livre && area === "maquinas"
 
     // ── o motor ────────────────────────────────────────────────────────
 
@@ -196,6 +201,11 @@ Rectangle {
     }
 
     function abrirFolha(qual) {
+        // Na área Máquinas, "novo" é a máquina nova.
+        if (qual === "novo" && app.area === "maquinas") {
+            maquinas.abrir("nova");
+            return;
+        }
         if (qual === "editar" || qual === "remover") {
             if (!Porto.editavel(app.host)) {
                 app.recado = app.host ? "este host é do seu ~/.ssh/config: o MkPorto não edita nem remove" : "";
@@ -217,6 +227,10 @@ Rectangle {
     function fechar() {
         if (app.folha !== "") {
             app.folha = "";
+            return;
+        }
+        if (maquinas.folha !== "" || app.area === "maquinas") {
+            maquinas.fechar();
             return;
         }
         if (app.estreita && app.detalheAberto) {
@@ -252,6 +266,15 @@ Rectangle {
     Shortcut { sequences: ["F5"]; enabled: app.livre && app.area === "chaves"; onActivated: app.lerChaves() }
     Shortcut { sequences: ["Ctrl+1"]; enabled: app.livre; onActivated: app.area = "hosts" }
     Shortcut { sequences: ["Ctrl+2"]; enabled: app.livre; onActivated: app.area = "chaves" }
+    Shortcut { sequences: ["Ctrl+3"]; enabled: app.livre; onActivated: app.area = "maquinas" }
+    // Na área Máquinas: Enter liga, as setas andam, F5 confere de novo, Delete
+    // abre a folha de remover; com a pergunta do forçar na tela, Enter confirma.
+    Shortcut { sequences: ["Return", "Enter"]; enabled: app.nasMaquinas; onActivated: maquinas.principal() }
+    Shortcut { sequences: ["Up"]; enabled: app.nasMaquinas; onActivated: maquinas.andar(-1) }
+    Shortcut { sequences: ["Down"]; enabled: app.nasMaquinas; onActivated: maquinas.andar(1) }
+    Shortcut { sequences: ["F5"]; enabled: app.nasMaquinas; onActivated: maquinas.conferir() }
+    Shortcut { sequences: ["Delete"]; enabled: app.nasMaquinas; onActivated: maquinas.abrir("remover") }
+    Shortcut { sequences: ["Return", "Enter"]; enabled: maquinas.folha === "forcar"; onActivated: maquinas.forcar() }
     Shortcut { sequences: ["Up"]; enabled: app.livre && app.area === "hosts"; onActivated: app.andar(-1) }
     Shortcut { sequences: ["Down"]; enabled: app.livre && app.area === "hosts"; onActivated: app.andar(1) }
     // Enter conecta; com a pergunta do remover na tela, confirma.
@@ -303,7 +326,7 @@ Rectangle {
             }
             Segmento {
                 Layout.leftMargin: app.apertada ? 0 : 8
-                opcoes: [{ v: "hosts", texto: "Hosts" }, { v: "chaves", texto: "Chaves" }]
+                opcoes: [{ v: "hosts", texto: "Hosts" }, { v: "chaves", texto: "Chaves" }, { v: "maquinas", texto: "Máquinas" }]
                 valor: app.area
                 onEscolhido: v => app.area = v
             }
@@ -315,8 +338,9 @@ Rectangle {
                 onAcionado: app.sondar()
             }
             Botao {
-                texto: app.estreita ? "novo" : "novo host"
+                texto: app.area === "maquinas" ? (app.estreita ? "nova" : "nova máquina") : app.estreita ? "novo" : "novo host"
                 forte: true
+                ligado: app.area !== "maquinas" || maquinas.pronto
                 onAcionado: app.abrirFolha("novo")
             }
         }
@@ -335,7 +359,7 @@ Rectangle {
                 width: parent.width - 60
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                visible: !app.pronto
+                visible: !app.pronto && app.area !== "maquinas"
                 text: app.erro !== "" ? app.erro : "lendo o seu ~/.ssh/config…"
                 color: app.erro !== "" ? Theme.copper : Theme.textFaint
                 font.family: Theme.serif
@@ -435,6 +459,20 @@ Rectangle {
                 onNovaChave: app.abrirFolha("gerar")
                 onAtualizar: app.lerChaves()
             }
+
+            // As máquinas virtuais: a área cuida do seu estado e das suas folhas
+            // (que se abrem por cima da janela inteira), e só se atualiza
+            // sozinha enquanto está na frente e a janela visível.
+            Maquinas {
+                id: maquinas
+                anchors.fill: parent
+                visible: app.area === "maquinas"
+                palco: app
+                naFrente: app.area === "maquinas" && app.janelaVisivel
+                estreita: app.estreita
+                onRecado: texto => app.recado = texto
+                onHostCriado: app.ler()
+            }
         }
 
         // ── o pé ───────────────────────────────────────────────────────
@@ -445,7 +483,8 @@ Rectangle {
             Text {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
-                text: app.recado !== "" ? app.recado : app.pronto ? Porto.resumo(app.hosts, app.sondas) : ""
+                text: app.recado !== "" ? app.recado : app.area === "maquinas" ? Porto.resumoDasMaquinas(maquinas.maquinas)
+                    : app.pronto ? Porto.resumo(app.hosts, app.sondas) : ""
                 color: app.recado !== "" ? Theme.textSoft : Theme.textFaint
                 font.family: Theme.mono
                 font.pixelSize: 10

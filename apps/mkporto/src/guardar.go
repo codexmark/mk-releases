@@ -63,6 +63,12 @@ func guardar(args []string) int {
 	if !ok {
 		return base.Falha(base.Erro, "o pedido não é o JSON que o guardar espera")
 	}
+	return gravaHost(p)
+}
+
+// gravaHost confere e grava um host no arquivo do app: é o caminho único de
+// quem cria ou muda um host (o `guardar` da janela e o `vm host`).
+func gravaHost(p *pedidoDeGuardar) int {
 	nova := sshcfg.Entrada{Apelido: p.Apelido, Host: p.Host, Usuario: p.Usuario, Porta: 22, Chave: p.Chave, Salto: p.Salto}
 	if p.Porta != nil {
 		nova.Porta = *p.Porta

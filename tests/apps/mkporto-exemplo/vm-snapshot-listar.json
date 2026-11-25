@@ -1,0 +1,7 @@
+{
+  "nome": "teste-de-instalacao",
+  "snapshots": [
+    {"id": "1", "rotulo": "recem-instalado", "data": "2026-11-20 09:15:00", "tamanho": "0 B"},
+    {"id": "2", "rotulo": "antes-de-atualizar", "data": "2026-11-24 10:00:00", "tamanho": "0 B"}
+  ]
+}

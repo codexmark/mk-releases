@@ -1,0 +1,11 @@
+{
+  "pasta": "~/.local/share/mk/maquinas",
+  "maquinas": [
+    {"nome": "antiga", "memoria_mb": 1024, "cpus": 1, "disco_gb": 10, "iso": null, "uefi": false, "tres_d": false,
+     "porta_ssh": 2223, "criada_em": 1790000000, "estado": "pausada", "pid": 3101, "desde": 1795000000, "disco_bytes": 3221225472},
+    {"nome": "oficina", "memoria_mb": 4096, "cpus": 2, "disco_gb": 40, "iso": null, "uefi": true, "tres_d": true,
+     "porta_ssh": 2222, "criada_em": 1794000000, "estado": "ligada", "pid": 4242, "desde": 1795003600, "disco_bytes": 9126805504},
+    {"nome": "teste-de-instalacao", "memoria_mb": 2048, "cpus": 2, "disco_gb": 20, "iso": "/srv/isos/sistema-exemplo.iso", "uefi": true, "tres_d": false,
+     "porta_ssh": 2224, "criada_em": 1795002000, "estado": "desligada", "pid": null, "desde": null, "disco_bytes": 196616}
+  ]
+}

@@ -1,3 +1,2 @@
-Limites: o que a VM mostrou dos modos, do DNS e do MkSom
-DNS: o NetworkManager recarrega em duas chamadas; MkSom: o medidor pede PCM cru
-Modos apresentação e jogo, DNS nos Ajustes, MkSom, e o lint de QML que não reprovava
+MkPorto, Máquinas: o Enter faz o que a tela pede
+MkPorto: a área Máquinas, com o QEMU direto
