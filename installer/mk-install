@@ -598,6 +598,9 @@ install_desktop() {
 
   install -Dm755 "$src/bin/mk-session" "$target/usr/bin/mk-session"
   install -Dm755 "$src/bin/mk-update" "$target/usr/bin/mk-update"
+  # O ajudante do DNS dos Ajustes roda como root (pelo pkexec): mora numa
+  # pasta do root, fora do /usr/share/mk que o mk-update troca.
+  install -Dm755 "$src/system/mk/mk-dns" "$target/usr/lib/mk/mk-dns"
   # O MkTunes (apps/mktunes): comando, atalho no menu e ícone.
   bash "$src/system/mk/mktunes-links" "$target"
   # O MkPulso (apps/mkpulso), o monitor de sistema: idem.

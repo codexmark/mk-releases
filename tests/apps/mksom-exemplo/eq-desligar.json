@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "ligado": false,
+  "na_saida": false,
+  "saida_anterior": {
+    "nome": "alsa_output.exemplo.analog-stereo",
+    "descricao": "Alto-falantes",
+    "existe": true
+  },
+  "aviso": null
+}

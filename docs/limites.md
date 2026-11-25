@@ -30,6 +30,9 @@ conferidos:
 | Placa NVIDIA | `installer/mk-install` (drivers, parâmetros do kernel) | uma máquina com NVIDIA |
 | Impressoras de verdade | `shell/mare/scripts/mare-printers`, Ajustes › Impressoras | achar, instalar e imprimir numa impressora de rede e numa USB |
 | VPN de verdade | `shell/mare/scripts/mare-vpn`, Ajustes › VPN | importar um `.ovpn` e um WireGuard e conectar |
+| Troca de DNS pela página | Ajustes › DNS | clicar numa opção da página (a troca em si foi vista na VM, pelo `mare-dns`: a janela de senha, o arquivo, o `resolv.conf` trocando para o Quad9 e voltando), a folha reabrindo depois da senha, e o que acontece com uma VPN ligada |
+| Modo jogo com perfil de energia | `shell/mare/Modes.qml` | uma máquina que ofereça o perfil "desempenho" (a VM não oferece): pôr e devolver o perfil |
+| MkSom com som de verdade | `apps/mksom` | ouvir o equalizador (na VM foi visto o sink, as ligações e os ganhos no nó, não o som), trocar de fone com ele ligado, e o mouse nos controles |
 | Wi-Fi: esquecer rede, rede oculta, QR | `shell/mare/scripts/mare-wifi`, `mare-wifi-qr` | uma placa Wi-Fi (a VM só tem cabo) |
 | Bluetooth: parear com código | `shell/mare/BluetoothPair.qml` | um adaptador e um aparelho |
 | Aviso de bateria fraca | `shell/mare/BatteryWatch.qml` | um notebook descarregando até 20% e 8% |
@@ -56,6 +59,13 @@ conferidos:
 - **Suspender na AMD Navi 10** (RX 5600/5700). A placa às vezes não volta: a
   tela fica preta e só reiniciando. É um defeito do driver, não do Mk.
   Ajustes › Energia avisa quem escolher suspender nessas máquinas.
+- **DNS cifrado (DoT/DoH).** Ajustes › DNS troca o servidor de nomes, mas a
+  consulta vai sem cifra: o NetworkManager sozinho não faz DNS sobre TLS nem
+  sobre HTTPS; precisaria do systemd-resolved, que o Mk não usa. Uma VPN ligada
+  pode impor o DNS dela enquanto durar. E, com um DNS escolhido, nomes que só o
+  roteador conhece (uma intranet, o portal de um Wi-Fi de hotel) podem deixar
+  de abrir: aí é voltar para "da rede". A glibc só consulta os três primeiros
+  servidores do `/etc/resolv.conf`; o quarto de cada provedor fica de reserva.
 - **BIOS antiga (sem UEFI)**: o instalador não instala.
 - **Sistemas de arquivos além do btrfs**: os snapshots e a volta atrás pelo
   menu de boot dependem dele.
@@ -130,6 +140,16 @@ correção.
 - **MkEscrita:** não imprime (exporte HTML e imprima pelo navegador); cada
   marcação aplicada por atalho conta como dois passos de desfazer; arquivo
   que não é UTF-8 ou passa de 4 MB é recusado.
+- **Modos apresentação e jogo:** vistos na VM pelos atalhos: o jogo desliga
+  as animações e segura a ociosidade, trocar para apresentação religa as
+  animações, sair solta tudo. Se o Maré reiniciar com o modo jogo ligado, as
+  anotações se perdem: as animações ficam desligadas até um novo login.
+- **MkSom:** visto na VM, contra o PipeWire 1.6: ligar e desligar (a saída
+  padrão vai e volta), predefinição aplicada ao vivo (o valor conferido no
+  nó), a janela pelo teclado, o medidor e o gravar e ouvir. Com ele ligado o
+  som fica preso à saída que era a padrão: plugar um fone não move o áudio
+  até desligar e ligar. As teclas de volume passam a mexer no sink do
+  equalizador.
 - **MkPorto:** só SSH; máquinas virtuais ficaram para depois. Os dados de
   cada host são os que o `ssh -G` diz (com `Match` e o config do sistema); se
   ele falhar, valem os do leitor próprio e o detalhe avisa. Salto em cadeia

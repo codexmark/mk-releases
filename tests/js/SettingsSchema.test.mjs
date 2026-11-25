@@ -590,6 +590,15 @@ t("search: acha a página pelo nome, pelo grupo e pela frase de abertura", () =>
     assert.ok(S.search("dispositivos").some((x) => x.page === "monitores" && x.where === "página"));
 });
 
+t("a página DNS fica no grupo REDE, logo depois da VPN, e a busca a acha", () => {
+    const rede = S.groups.find((g) => g.name === "REDE");
+    igual(rede.items.map((p) => p.key), ["vpn", "dns"]);
+    igual(S.pageName("dns"), { key: "dns", name: "DNS", num: "14" });
+    igual(S.search("dns")[0], { page: "dns", key: "", label: "DNS", where: "página" });
+    for (const q of ["servidor de nomes", "cloudflare", "quad9", "adguard"])
+        assert.ok(S.search(q).some((x) => x.page === "dns" && x.where === "página"), q);
+});
+
 t("search: acha pelas palavras de busca (kw) e pela descrição", () => {
     assert.ok(S.search("wallpaper").some((x) => x.key === "backdrop.dim"));
     assert.ok(S.search("hidpi").some((x) => x.key === "hypr.scale"));

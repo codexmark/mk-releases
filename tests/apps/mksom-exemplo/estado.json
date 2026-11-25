@@ -1,0 +1,193 @@
+{
+  "som": {
+    "responde": true,
+    "erro": null
+  },
+  "eq": {
+    "ligado": true,
+    "na_saida": true,
+    "bandas": [
+      31,
+      62,
+      125,
+      250,
+      500,
+      1000,
+      2000,
+      4000,
+      8000,
+      16000
+    ],
+    "ganhos": [
+      4,
+      3.5,
+      2.5,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "pre": -5,
+    "predefinicao": "graves",
+    "saida_anterior": {
+      "nome": "alsa_output.exemplo.analog-stereo",
+      "descricao": "Alto-falantes",
+      "existe": true
+    },
+    "predefinicoes": [
+      {
+        "nome": "plano",
+        "fabrica": true,
+        "ganhos": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "pre": 0
+      },
+      {
+        "nome": "graves",
+        "fabrica": true,
+        "ganhos": [
+          4,
+          3.5,
+          2.5,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "pre": -5
+      },
+      {
+        "nome": "agudos",
+        "fabrica": true,
+        "ganhos": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          2.5,
+          3.5,
+          4
+        ],
+        "pre": -4.5
+      },
+      {
+        "nome": "voz",
+        "fabrica": true,
+        "ganhos": [
+          -4,
+          -3,
+          -1,
+          0,
+          1,
+          2.5,
+          3,
+          2,
+          0,
+          -1
+        ],
+        "pre": -4.5
+      },
+      {
+        "nome": "noite",
+        "fabrica": true,
+        "ganhos": [
+          -6,
+          -4,
+          -2,
+          0,
+          0,
+          0,
+          0,
+          -1,
+          -3,
+          -5
+        ],
+        "pre": 0
+      },
+      {
+        "nome": "fone pequeno",
+        "fabrica": true,
+        "ganhos": [
+          4,
+          3.5,
+          2.5,
+          1,
+          0,
+          0,
+          0,
+          1,
+          1.5,
+          1.5
+        ],
+        "pre": -5
+      },
+      {
+        "nome": "Fone do trabalho",
+        "fabrica": false,
+        "ganhos": [
+          -4,
+          -3,
+          -1,
+          0,
+          1,
+          2.5,
+          3,
+          2,
+          0,
+          -1
+        ],
+        "pre": -4.5
+      }
+    ]
+  },
+  "saida_padrao": {
+    "id": 71,
+    "nome": "mksom.eq",
+    "descricao": "Mk Equalizador"
+  },
+  "entradas": [
+    {
+      "id": 52,
+      "nome": "alsa_input.exemplo.analog-stereo",
+      "descricao": "Microfone interno",
+      "padrao": true,
+      "volume": 74,
+      "mudo": false
+    },
+    {
+      "id": 53,
+      "nome": "alsa_input.usb-exemplo.mono",
+      "descricao": "Microfone USB",
+      "padrao": false,
+      "volume": 100,
+      "mudo": true
+    },
+    {
+      "id": 57,
+      "nome": "bluez_input.exemplo.0",
+      "descricao": "Fone sem fio",
+      "padrao": false,
+      "volume": 60,
+      "mudo": false
+    }
+  ]
+}

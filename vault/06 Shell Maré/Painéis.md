@@ -34,7 +34,7 @@ Cada painel é uma função do sistema ao alcance de um clique na ilha, de um at
 | `volume` | `VolumePanel.qml` | volume da saída padrão e de cada app que está tocando ([[Áudio]]) |
 | `media` | `MediaPanel.qml` | tocando agora: capa, faixa, progresso, controles; troca entre players |
 | `power` | `PowerPanel.qml` | bateria (saúde, ciclos, limite de carga) e perfil de energia |
-| `network` | `NetworkPanel.qml` | conexão, IP/gateway/DNS, tráfego, ping, escolha de DNS, QR do Wi-Fi, redes ao redor ([[Rede]]) |
+| `network` | `NetworkPanel.qml` | conexão, IP/gateway/DNS, tráfego, ping, o DNS em vigor (a troca fica em Ajustes › DNS), QR do Wi-Fi, redes ao redor ([[Rede]]) |
 | `bluetooth` | `BluetoothPanel.qml` | adaptador, aparelhos, pareamento ([[Bluetooth]]) |
 | `calendar` | `CalendarPanel.qml` | o mês (semana começando no domingo) e o clima |
 | `notifications` | `NotificationsPanel.qml` | histórico e não perturbe ([[Notificações e OSD]]) |

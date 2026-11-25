@@ -31,7 +31,7 @@ Mostrar o essencial (onde estou, que horas são, o que está tocando, o que pede
 - **Opacidade**: translúcida em repouso (`island.restOpacity`, padrão 82%), sólida com um painel aberto.
 - **Clique**: um `IslandItem` chama `Mare.openAt(painel, x)`, e o painel desce embaixo do item clicado.
 - **A onda**: a borda de baixo ondula com o espectro do que está tocando (graves à esquerda, agudos à direita), lido do `cava` pelo `Sound.qml`. Em silêncio, ou com um painel aberto, volta a ser a borda reta. Liga e desliga em Ajustes › Ilha.
-- **Indicadores que só aparecem quando importam**: sistema, rede, Bluetooth, notificações, mídia, gravação em andamento (com o tempo), VPN, atualizações.
+- **Indicadores que só aparecem quando importam**: sistema, rede, Bluetooth, notificações, mídia, gravação em andamento (com o tempo), modo apresentação ou jogo ligado (o ícone do modo, em cobre; um clique desliga), VPN, atualizações.
 - A ilha expõe `islandX`/`islandW` (para onde ela vai) e recebe `sheetW` (de que largura o painel precisa); quem liga os dois é o [[Monitor por tela]].
 
 ## Por quê assim

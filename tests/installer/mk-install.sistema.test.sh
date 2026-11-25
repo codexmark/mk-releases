@@ -223,6 +223,10 @@ eq 644 "$(modo "$target/etc/os-release")"
 t "install_desktop: o gancho do pacman que repõe o nome a cada atualização do filesystem"
 eq "$(<"$REPO/system/mk/mk-os-release.hook")" "$(<"$target/etc/pacman.d/hooks/mk-os-release.hook")"
 
+t "install_desktop: o ajudante do DNS dos Ajustes fica em /usr/lib/mk, executável"
+ok cmp -s "$REPO/system/mk/mk-dns" "$target/usr/lib/mk/mk-dns"
+eq 755 "$(modo "$target/usr/lib/mk/mk-dns")"
+
 t "install_desktop: a sessão: mk-session, mk-update e mk.desktop"
 eq 755 "$(modo "$target/usr/bin/mk-session")"
 eq 755 "$(modo "$target/usr/bin/mk-update")"

@@ -44,6 +44,8 @@ qs -p ~/.config/mk/shell ipc call mare <função> [argumentos]
 | `volume` | `change` | `+5`, `-5` (em %) ou `mute` |
 | `brightness` | `change` | `+5` ou `-5` (em %) |
 | `dnd` | | liga ou desliga o não perturbe; devolve o novo valor |
+| `present` | | liga ou desliga o modo apresentação (não perturbe e sem ociosidade enquanto durar); devolve se ficou ligado |
+| `game` | | liga ou desliga o modo jogo (o mesmo, mais perfil de desempenho e o Hyprland sem animações, desfoque e sombra); devolve se ficou ligado |
 | `saver` | `state` | o [[Descanso de tela]]: `on`, `off` ou `toggle`; devolve `ligado` ou `desligado` |
 
 Há um segundo alvo, `wallpaper` (em `Wallpaper.qml`): `set <caminho>`, `random` e `get`.

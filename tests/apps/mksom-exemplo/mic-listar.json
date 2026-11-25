@@ -1,0 +1,28 @@
+{
+  "entradas": [
+    {
+      "id": 52,
+      "nome": "alsa_input.exemplo.analog-stereo",
+      "descricao": "Microfone interno",
+      "padrao": true,
+      "volume": 74,
+      "mudo": false
+    },
+    {
+      "id": 53,
+      "nome": "alsa_input.usb-exemplo.mono",
+      "descricao": "Microfone USB",
+      "padrao": false,
+      "volume": 100,
+      "mudo": true
+    },
+    {
+      "id": 57,
+      "nome": "bluez_input.exemplo.0",
+      "descricao": "Fone sem fio",
+      "padrao": false,
+      "volume": 60,
+      "mudo": false
+    }
+  ]
+}

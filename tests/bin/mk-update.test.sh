@@ -23,6 +23,7 @@ monta_mk() { # monta_mk <pasta> <"commit data">
   cp "$REPO/bin/mk-update" "$d/bin/mk-update"
   for p in mk-session mk-hibernate; do printf '#!/bin/bash\n# %s de %s\n' "$p" "$2" >"$d/bin/$p"; done
   echo "gancho de $2" >"$d/system/mk/mk-os-release.hook"
+  printf '#!/bin/bash\n# ajudante do DNS de %s\n' "$2" >"$d/system/mk/mk-dns"
   echo "canal-de-teste" >"$d/system/mk/channel"
   for p in config/hypr config/ghostty config/fastfetch config/bash shell/mare; do
     mkdir -p "$d/$p"
@@ -244,6 +245,11 @@ has "$(cat "$R/usr/bin/mk-hibernate")" "mk-hibernate de $nova"
 ok cmp -s "$R/usr/bin/mk-update" "$SBX/canal/bin/mk-update"
 ok test -x "$R/usr/bin/mk-update"
 eq "gancho de $nova" "$(cat "$R/etc/pacman.d/hooks/mk-os-release.hook")"
+
+t "Mk novo: o ajudante do DNS vai para /usr/lib/mk, fora da pasta que a troca deixa no nome de quem atualiza"
+has "$(cat "$R/usr/lib/mk/mk-dns")" "ajudante do DNS de $nova"
+eq 755 "$(stat -c %a "$R/usr/lib/mk/mk-dns")"
+called "install -Dm755 $R/usr/share/mk/system/mk/mk-dns $R/usr/lib/mk/mk-dns"
 
 t "Mk novo: troca as pastas de ~/.config/mk e grava o VERSION"
 for d in hypr shell ghostty fastfetch bash; do

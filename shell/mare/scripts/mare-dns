@@ -1,35 +1,374 @@
 #!/usr/bin/env bash
-# Troca o DNS da conexão em uso, sem sudo e sem derrubar a conexão.
-# Uso: mare-dns auto | cloudflare | google
+# O DNS de todas as redes de uma vez, para a página "DNS" dos Ajustes
+# (SettingsDnsPage.qml, com a lógica em Dns.js).
 #
-# Diferente do omarchy-dns (que grava uma config global com root), aqui só a
-# conexão atual muda, pelo NetworkManager, e `nmcli dev reapply` aplica na
-# hora. "auto" volta ao DNS que o roteador oferece.
-set -euo pipefail
+#   mare-dns estado
+#       JSON: { "opcao", "arquivo": [..], "servidores": [..], "valendo",
+#               "ajudante", "conexao", "pending", "last" }
+#       "opcao": rede (o que o roteador entrega; não há arquivo do Mk), o id
+#       de um provedor (cloudflare, cloudflare-familia, quad9, google,
+#       adguard) ou outro; "arquivo": os servidores gravados pelo Mk;
+#       "servidores": os que o sistema usa agora (/etc/resolv.conf);
+#       "valendo": o que está gravado é o que o sistema usa (uma VPN pode
+#       impor o dela); "ajudante": o ajudante que escreve em /etc está
+#       instalado; "conexao": o nome da conexão em uso, se ela tem um DNS fixo
+#       próprio (ignora o do roteador), senão vazio; "pending": a troca em
+#       curso (aplicar|limpar, ou vazio); "last": o resultado da última troca,
+#       se tem menos de 60 s (ou null). Não pede privilégio.
+#   mare-dns aplicar <id do provedor>
+#   mare-dns aplicar outro <ip> [ip...]     de um a quatro, IPv4 ou IPv6
+#   mare-dns limpar                         volta para o da rede
+#       Respondem, na última linha, o JSON de `estado` mais o resultado:
+#       "acao", "ok", "error" (vazio se deu certo), "message" (a frase para
+#       mostrar), "resolve" (depois da troca um nome foi resolvido: true,
+#       false, ou null se a troca não aconteceu) e "at" (quando, em ms). Antes
+#       dela vem a linha {"elevating":true}: a janela de senha vai aparecer.
+#   mare-dns testar
+#       Resolve um nome (getent hosts archlinux.org, 5 s no máximo).
+#       JSON: { "resolve", "nome" }
+#   mare-dns soltar
+#       Tira o DNS fixo da conexão em uso (ipv4/ipv6.dns vazios, volta a
+#       aceitar o do roteador) e reaplica, sem derrubar a conexão. É para a
+#       conexão que ficou com DNS fixo de um Mk antigo, que trocava o DNS por
+#       conexão. JSON de `estado` mais "ok", "error" e "message".
+#
+# Como aplica: o DNS global do NetworkManager, num arquivo só,
+# /etc/NetworkManager/conf.d/90-mk-dns.conf ([global-dns-domain-*], servers=).
+# Vale para todas as conexões e não mexe em nenhuma; "da rede" apaga o
+# arquivo. Quem escreve em /etc é o ajudante /usr/lib/mk/mk-dns (a fonte é
+# system/mk/mk-dns; o instalador, o mk-update e uma migração o põem lá),
+# chamado pelo pkexec: quem pede a senha é o agente de polkit (o Maré), numa
+# janela. O ajudante só recebe endereços IP já conferidos aqui (e confere de
+# novo); é do root, e este script recusa um que não seja.
+#
+# DNS cifrado (DoT/DoH) não entra: o NetworkManager sozinho não faz.
+#
+# A troca não depende da página: quem a faz é um processo à parte, em outra
+# sessão. Os Ajustes são uma folha por cima de tudo, e a janela de senha
+# ficaria atrás dela; por isso a página fecha a folha ao ler "elevating" (e o
+# processo dela morre junto). A troca segue, grava o resultado na pasta de
+# estado ($XDG_RUNTIME_DIR/mare-dns) e, no fim, reabre a folha na página (com
+# MARE_DNS_SHELL=<pasta do shell>) ou manda um aviso.
+#
+# Teste: MARE_DNS_ROOT=<pasta> põe outra raiz na frente de /etc e de
+# /usr/lib/mk (e dispensa o ajudante de ser do root).
+set -uo pipefail
+export LC_ALL=C
 
-mode=${1:-}
-case $mode in
-  auto)
-    v4=""; v6=""; ignore=no ;;
-  cloudflare)
-    v4="1.1.1.1 1.0.0.1"; v6="2606:4700:4700::1111 2606:4700:4700::1001"; ignore=yes ;;
-  google)
-    v4="8.8.8.8 8.8.4.4"; v6="2001:4860:4860::8888 2001:4860:4860::8844"; ignore=yes ;;
-  *)
-    echo "uso: mare-dns auto | cloudflare | google" >&2
-    exit 2 ;;
+root=${MARE_DNS_ROOT:-}
+conf=$root/etc/NetworkManager/conf.d/90-mk-dns.conf
+resolv=$root/etc/resolv.conf
+helper=$root/usr/lib/mk/mk-dns
+sd=${MARE_DNS_STATE:-${XDG_RUNTIME_DIR:-/tmp}/mare-dns}
+name=archlinux.org
+max=4
+
+usage() {
+  echo "uso: mare-dns estado | aplicar <provedor> | aplicar outro <ip>... | limpar | testar | soltar" >&2
+  exit 2
+}
+
+# Os endereços de cada provedor. A mesma tabela do shell/mare/Dns.js
+# (tests/js/Dns.test.mjs confere).
+provedor() {
+  case $1 in
+    cloudflare) echo "1.1.1.1 1.0.0.1 2606:4700:4700::1111 2606:4700:4700::1001" ;;
+    cloudflare-familia) echo "1.1.1.3 1.0.0.3 2606:4700:4700::1113 2606:4700:4700::1003" ;;
+    quad9) echo "9.9.9.9 149.112.112.112 2620:fe::fe 2620:fe::9" ;;
+    google) echo "8.8.8.8 8.8.4.4 2001:4860:4860::8888 2001:4860:4860::8844" ;;
+    adguard) echo "94.140.14.14 94.140.15.15 2a10:50c0::ad1:ff 2a10:50c0::ad2:ff" ;;
+    *) return 1 ;;
+  esac
+}
+
+nome_de() {
+  case $1 in
+    cloudflare) echo "Cloudflare" ;;
+    cloudflare-familia) echo "Cloudflare família" ;;
+    quad9) echo "Quad9" ;;
+    google) echo "Google" ;;
+    adguard) echo "AdGuard" ;;
+    *) echo "outro" ;;
+  esac
+}
+
+# As mesmas regras do Dns.js e do ajudante: veja system/mk/mk-dns.
+ipv4() {
+  local o='(0|[1-9][0-9]{0,2})'
+  [[ $1 =~ ^$o\.$o\.$o\.$o$ ]] || return 1
+  ((BASH_REMATCH[1] >= 1 && BASH_REMATCH[1] <= 223 && BASH_REMATCH[2] <= 255 && BASH_REMATCH[3] <= 255 && BASH_REMATCH[4] <= 255))
+}
+grupos() {
+  local part=$1 g
+  ngrupos=0
+  [[ -n $part ]] || return 0
+  [[ $part != :* && $part != *: ]] || return 1
+  local IFS=:
+  for g in $part; do
+    [[ $g =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+    ngrupos=$((ngrupos + 1))
+  done
+}
+ipv6() {
+  local s=$1 resto n
+  [[ ${#s} -ge 3 && ${#s} -le 39 && $s =~ ^[0-9A-Fa-f:]+$ ]] || return 1
+  resto=${s#*::}
+  [[ $resto != *::* ]] || return 1
+  if [[ $s == *::* ]]; then
+    grupos "${s%%::*}" || return 1
+    n=$ngrupos
+    grupos "$resto" || return 1
+    n=$((n + ngrupos))
+    ((n >= 1 && n <= 7)) || return 1
+  else
+    grupos "$s" || return 1
+    ((ngrupos == 8)) || return 1
+  fi
+  [[ ! $s =~ ^[fF][fF][0-9A-Fa-f]{2}(:|$) ]]
+}
+endereco() { ipv4 "$1" || ipv6 "$1"; }
+
+# Os servidores do arquivo do Mk, um por linha (só o que é endereço).
+do_arquivo() {
+  local line a
+  [[ -f $conf ]] || return 0
+  line=$(sed -n 's/^servers=//p' "$conf" | head -n1)
+  local IFS=,
+  for a in $line; do
+    endereco "$a" && echo "$a"
+  done
+  return 0
+}
+
+# Os que o sistema usa agora: as linhas "nameserver" do resolv.conf (sem a
+# zona de um endereço de enlace, "%wlan0").
+do_sistema() {
+  local a
+  [[ -r $resolv ]] || return 0
+  while read -r a; do
+    a=${a%%%*}
+    endereco "$a" && echo "$a"
+  done < <(awk '$1 == "nameserver" { print $2 }' "$resolv")
+  return 0
+}
+
+# A interface por onde sai a internet e a conexão do NetworkManager nela.
+# Sem rota o `ip` sai com 2; o "|| true" deixa quem chama decidir.
+em_uso() {
+  dev="" conn=""
+  command -v ip >/dev/null && command -v nmcli >/dev/null || return 1
+  dev=$(timeout 5 ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }') || true
+  [[ -n $dev ]] || return 1
+  # "-e no": o -g escapa ":" e "\" (uma rede "Casa: 5G" viria "Casa\: 5G"), e
+  # o nome vai inteiro para o `con mod`.
+  conn=$(timeout 5 nmcli -e no -g GENERAL.CONNECTION dev show "$dev" 2>/dev/null) || true
+  [[ -n $conn ]]
+}
+
+# A conexão em uso tem DNS fixo próprio? Imprime o nome dela, ou nada.
+fixa() {
+  em_uso || return 0
+  timeout 5 nmcli -g ipv4.ignore-auto-dns,ipv6.ignore-auto-dns con show "$conn" 2>/dev/null | grep -qx yes && echo "$conn"
+  return 0
+}
+
+pending() {
+  local pid acao
+  [[ -f $sd/pid ]] || return 0
+  read -r pid acao <"$sd/pid" 2>/dev/null || return 0
+  [[ $pid =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && echo "$acao"
+  return 0
+}
+
+# O ajudante serve: existe, roda e é do root (fora do teste), sem escrita
+# para o grupo nem para os outros.
+ajudante() {
+  [[ -f $helper && -x $helper && ! -L $helper ]] || return 1
+  [[ -n $root ]] && return 0
+  [[ $(stat -c '%u' "$helper" 2>/dev/null) == 0 && -z $(find "$helper" -perm /022 2>/dev/null) ]]
+}
+
+estado() {
+  local arq sis opcao=rede valendo=true last=null tem=false a
+  arq=$(do_arquivo)
+  sis=$(do_sistema)
+  if [[ -e $conf ]]; then
+    opcao=outro
+    for a in cloudflare cloudflare-familia quad9 google adguard; do
+      [[ $(provedor "$a") == "$(tr '\n' ' ' <<<"$arq" | sed 's/ $//')" ]] && opcao=$a
+    done
+    # Valendo: o sistema usa algum servidor, e todos são dos gravados.
+    [[ -n $sis && -n $arq ]] || valendo=false
+    while read -r a; do
+      [[ -z $a ]] || grep -qxF -- "$a" <<<"$arq" || valendo=false
+    done <<<"$sis"
+  fi
+  ajudante && tem=true
+  if [[ -f $sd/ultimo.json ]] && (($(date +%s) - $(stat -c %Y "$sd/ultimo.json" 2>/dev/null || echo 0) < 60)); then
+    last=$(jq -c . "$sd/ultimo.json" 2>/dev/null) || last=null
+    [[ -n $last ]] || last=null
+  fi
+  jq -cn --arg opcao "$opcao" --arg arq "$arq" --arg sis "$sis" --argjson valendo "$valendo" \
+    --argjson ajudante "$tem" --arg conexao "$(fixa)" --arg pending "$(pending)" --argjson last "$last" '
+    def linhas(s): s | split("\n") | map(select(length > 0));
+    { opcao: $opcao, arquivo: linhas($arq), servidores: linhas($sis), valendo: $valendo,
+      ajudante: $ajudante, conexao: $conexao, pending: $pending, last: $last }'
+}
+
+# Um nome resolve? (Sem cache no caminho: o Mk não roda nscd nem resolved.)
+resolve() {
+  timeout 5 getent hosts "$name" >/dev/null 2>&1
+}
+
+# O estado mais um resultado que não passou pelo worker.
+responde() { # responde <acao> <ok> <frase>
+  local error=""
+  [[ $2 == true ]] || error=$3
+  estado | jq -c --arg acao "$1" --argjson ok "$2" --arg error "$error" --arg message "$3" --argjson at "$(date +%s%3N)" \
+    '. + { acao: $acao, ok: $ok, error: $error, message: $message, resolve: null, at: $at }'
+}
+
+# Conta o resultado a quem não está mais olhando: a folha dos Ajustes fechou
+# para a janela de senha aparecer. Depois da senha a folha volta na página, se
+# nada mais abriu no lugar; senão, um aviso. Com a folha aberta (a página
+# está lá, e lê o resultado no `estado`), não faz nada.
+tell() {
+  local text=$1 state=""
+  if [[ -n ${MARE_DNS_SHELL:-} ]] && command -v qs >/dev/null; then
+    state=$(timeout 5 qs -p "$MARE_DNS_SHELL" ipc call mare state 2>/dev/null | tail -n1)
+    [[ $state == settings ]] && return 0
+    if [[ $state == rest ]]; then
+      timeout 5 qs -p "$MARE_DNS_SHELL" ipc call mare settings dns >/dev/null 2>&1 && return 0
+    fi
+  fi
+  notify-send -a "DNS" -i network-server "DNS" "$text" 2>/dev/null || true
+}
+
+# Quem faz a troca de verdade, numa sessão à parte:
+#   __worker aplicar <id> <ip>...  |  __worker limpar
+worker() {
+  local acao=$1 id=${2:-} ok=true err="" text rc=0 res=null out
+  echo "$$ $acao" >"$sd/pid"
+  trap 'rm -f "$sd/pid" "$sd/elevando"' EXIT
+  : >"$sd/elevando"
+  if [[ $acao == aplicar ]]; then
+    shift 2
+    out=$(timeout 180 pkexec "$helper" aplicar "$@" 2>&1 </dev/null) || rc=$?
+  else
+    out=$(timeout 180 pkexec "$helper" limpar 2>&1 </dev/null) || rc=$?
+  fi
+  case $rc in
+    0) ;;
+    126) err="a senha não foi dada: nada mudou" ;;
+    127) err="a autorização falhou: nada mudou" ;;
+    124) err="a janela de senha ficou sem resposta: nada mudou" ;;
+    2) err="o ajudante recusou os endereços: nada mudou" ;;
+    3) err="não deu para gravar em /etc/NetworkManager: nada mudou" ;;
+    4) err="o arquivo mudou, mas o NetworkManager não recarregou: vale quando a rede reconectar" ;;
+    *) err="o ajudante falhou ($(tail -n1 <<<"$out" | cut -c1-120))" ;;
+  esac
+  if [[ -n $err ]]; then
+    ok=false
+    text=$err
+  else
+    if [[ $acao == aplicar ]]; then text="DNS trocado: $(nome_de "$id")"; else text="voltou para o DNS da rede"; fi
+    if resolve; then res=true; else res=false; fi
+  fi
+  jq -cn --arg acao "$acao" --argjson ok "$ok" --arg error "$err" --arg message "$text" \
+    --argjson resolve "$res" --argjson at "$(date +%s%3N)" \
+    '{ acao: $acao, ok: $ok, error: $error, message: $message, resolve: $resolve, at: $at }' >"$sd/ultimo.json.novo" &&
+    mv "$sd/ultimo.json.novo" "$sd/ultimo.json"
+  rm -f "$sd/pid" "$sd/elevando"
+  tell "$text"
+}
+
+# Uma troca pedida pela página: solta o worker e espera por ele, avisando da
+# janela de senha. Se a página fechar no meio, só esta espera morre.
+troca() {
+  local acao=$1 wpid told=0
+  mkdir -p "$sd" && chmod 700 "$sd" || { responde "$acao" false "não deu para criar $sd"; return 1; }
+  if [[ -n $(pending) ]]; then
+    responde "$acao" false "outra troca ainda está em curso"
+    return 1
+  fi
+  if ! ajudante; then
+    responde "$acao" false "falta o ajudante do Mk (/usr/lib/mk/mk-dns): rode o mk-update"
+    return 1
+  fi
+  if ! command -v pkexec >/dev/null; then
+    responde "$acao" false "não há pkexec para pedir a senha"
+    return 1
+  fi
+  rm -f "$sd/ultimo.json" "$sd/elevando"
+  setsid bash "$0" __worker "$@" </dev/null >/dev/null 2>&1 &
+  wpid=$!
+  while kill -0 "$wpid" 2>/dev/null; do
+    if [[ $told == 0 && -e $sd/elevando ]]; then
+      echo '{"elevating":true}'
+      told=1
+    fi
+    sleep 0.15
+  done
+  [[ $told == 1 ]] || echo '{"elevating":true}'
+  estado | jq -c --arg acao "$acao" '. + (.last // { acao: $acao, ok: false, error: "a troca não terminou",
+    message: "a troca não terminou", resolve: null, at: 0 })'
+  [[ $(jq -r '.ok' "$sd/ultimo.json" 2>/dev/null) == true ]]
+}
+
+aplicar() {
+  local id=${1:-} a servers=()
+  [[ -n $id ]] || usage
+  shift
+  if [[ $id == outro ]]; then
+    (($# >= 1)) || { responde aplicar false "escreva ao menos um endereço"; return 2; }
+    for a in "$@"; do
+      endereco "$a" || { responde aplicar false "não é um endereço IP: $(tr -d '[:cntrl:]' <<<"${a:0:40}")"; return 2; }
+      a=${a,,}
+      [[ " ${servers[*]} " == *" $a "* ]] || servers+=("$a")
+    done
+    ((${#servers[@]} <= max)) || { responde aplicar false "no máximo $max endereços"; return 2; }
+  else
+    (($# == 0)) && a=$(provedor "$id") || { responde aplicar false "provedor desconhecido"; return 2; }
+    read -ra servers <<<"$a"
+  fi
+  troca aplicar "$id" "${servers[@]}"
+}
+
+limpar() {
+  (($# == 0)) || usage
+  # Sem arquivo do Mk não há o que desfazer (nem senha a pedir).
+  if [[ ! -e $conf && ! -L $conf ]]; then
+    responde limpar true "já está no DNS da rede"
+    return 0
+  fi
+  troca limpar
+}
+
+soltar() {
+  local out
+  if ! em_uso; then
+    if [[ -z $dev ]]; then out="sem conexão ativa"; else out="$dev não está ligado a uma conexão do NetworkManager"; fi
+    responde soltar false "$out"
+    return 1
+  fi
+  if ! out=$(nmcli con mod "$conn" ipv4.dns "" ipv4.ignore-auto-dns no ipv6.dns "" ipv6.ignore-auto-dns no 2>&1) ||
+    ! out=$(nmcli dev reapply "$dev" 2>&1); then
+    responde soltar false "o NetworkManager recusou: $(tail -n1 <<<"$out" | cut -c1-160)"
+    return 1
+  fi
+  responde soltar true "$conn voltou a usar o DNS da rede"
+}
+
+case ${1:-} in
+  estado) (($# == 1)) || usage; estado ;;
+  aplicar) shift; aplicar "$@" ;;
+  limpar) shift; limpar "$@" ;;
+  testar)
+    (($# == 1)) || usage
+    if resolve; then r=true; else r=false; fi
+    jq -cn --argjson resolve "$r" --arg nome "$name" '{ resolve: $resolve, nome: $nome }'
+    ;;
+  soltar) (($# == 1)) || usage; soltar ;;
+  __worker) shift; worker "$@" ;;
+  *) usage ;;
 esac
-
-# Sem rota o `ip` sai com 2; o "|| true" deixa o aviso abaixo falar.
-dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }') || true
-[[ -n $dev ]] || { echo "sem conexão ativa" >&2; exit 1; }
-# "-e no": o -g escapa ":" e "\" (uma rede "Casa: 5G" viria "Casa\: 5G"), e
-# o nome vai inteiro para o `con mod`.
-conn=$(nmcli -e no -g GENERAL.CONNECTION dev show "$dev")
-[[ -n $conn ]] || { echo "$dev não está ligado a uma conexão do NetworkManager" >&2; exit 1; }
-
-nmcli con mod "$conn" \
-  ipv4.dns "$v4" ipv4.ignore-auto-dns "$ignore" \
-  ipv6.dns "$v6" ipv6.ignore-auto-dns "$ignore"
-nmcli dev reapply "$dev" >/dev/null
-echo "$conn: dns $mode"

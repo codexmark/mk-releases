@@ -282,6 +282,7 @@ qualquer opção. O que você muda vale na hora.
 | Dispositivos | Impressoras | `impressoras` | as deste computador e as da rede |
 | Dispositivos | Controle | `controle` | o controle Xbox e o driver xone, para o fone plugado nele |
 | Rede | VPN | `vpn` | WireGuard e OpenVPN, pelo NetworkManager |
+| Rede | DNS | `dns` | o servidor de nomes de todas as redes de uma vez: o da rede, Cloudflare, Quad9, Google, AdGuard ou outro. Sem cifra (DoT/DoH ficam de fora) |
 | Sistema | Apps padrão | `apps` | que app abre cada tipo de coisa, e o terminal |
 | Sistema | Atualizações | `atualizacoes` | o Mk, o Arch e o AUR |
 | Sistema | Atalhos | `atalhos` | trocar a tecla de cada atalho |
@@ -420,7 +421,7 @@ Hyprland do Mk.
 | `config/ghostty/`, `config/fastfetch/` | terminal e a ficha que ele mostra ao abrir |
 | `config/mimeapps.list` | os apps padrão de fábrica |
 | `tests/` | os testes automáticos (`tests/run`) e o gancho de `git push` |
-| `apps/` | os apps que vêm com o Mk: o MkTunes (player de música, gerado no repositório dele) e, com o código aqui, em Go por trás e Quickshell na frente: o MkPulso (monitor de sistema), o MkPacotes (gerenciador de pacotes), o MkInstalar, o MkComprimir, o MkCalc (calculadora), o MkCorte (cortes de vídeo), o MkEscrita (Markdown) e o MkPorto (conexões SSH) |
+| `apps/` | os apps que vêm com o Mk: o MkTunes (player de música, gerado no repositório dele) e, com o código aqui, em Go por trás e Quickshell na frente: o MkPulso (monitor de sistema), o MkPacotes (gerenciador de pacotes), o MkInstalar, o MkComprimir, o MkCalc (calculadora), o MkCorte (cortes de vídeo), o MkEscrita (Markdown), o MkPorto (conexões SSH) e o MkSom (equalizador e microfone) |
 | `vault/` | o Mk explicado por camadas, do kernel aos aplicativos, com os porquês: uma vault do Obsidian (abra a pasta nele e comece por `00 Início`) |
 | `shell/mare/` | o Maré: QML numa pasta só, mais `scripts/` (o que ele roda por fora) |
 | `installer/` | `mk-install` e um arquivo de respostas de exemplo, para testes |

@@ -22,7 +22,7 @@ Num gerenciador em mosaico, um diálogo pequeno que entra no mosaico empurra tod
 |---|---|---|
 | `float-utilities` | classe `pavucontrol`, `nm-connection-editor`, `blueman-manager`, `xdg-desktop-portal-gtk`, `org.gnome.Calculator` | flutua e centraliza |
 | `float-file-dialogs` | título "Open File", "Save File", "Save As", "Choose Files", "Open Folder", "Abrir arquivo", "Salvar arquivo" | flutua e centraliza |
-| `float-mkpulso` | título exatamente `MkPulso`, `MkPacotes`, `MkInstalar`, `MkComprimir` ou `MkCalc` (o MkCorte e o MkEscrita são janelas de trabalho e entram lado a lado) | flutua e centraliza |
+| `float-mkpulso` | título exatamente `MkPulso`, `MkPacotes`, `MkInstalar`, `MkComprimir`, `MkCalc` ou `MkSom` (o MkCorte e o MkEscrita são janelas de trabalho e entram lado a lado) | flutua e centraliza |
 | `no-maximize-requests` | qualquer classe | `suppress_event = "maximize"` |
 
 São chamadas a `hl.window_rule({ name, match, … })`.

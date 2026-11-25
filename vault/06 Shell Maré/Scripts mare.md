@@ -13,6 +13,8 @@ fontes:
   - "shell/mare/scripts/mare-monitors"
   - "shell/mare/scripts/mare-printers"
   - "shell/mare/scripts/mare-vpn"
+  - "shell/mare/scripts/mare-dns"
+  - "system/mk/mk-dns"
   - "shell/mare/scripts/mare-default-apps"
 ---
 
@@ -39,7 +41,8 @@ Manter no QML só desenho e estado, e no bash tudo o que é leitura do sistema o
 | `mare-cava` | o espectro do som | `Sound.qml` |
 | `mare-palette` | a cor principal de uma imagem (matugen) | `Wallpaper.qml` |
 | `mare-battery` | ciclos, saúde, limite de carga | `PowerPanel.qml` |
-| `mare-net`, `mare-dns`, `mare-wifi`, `mare-wifi-qr` | a conexão, o DNS, as redes guardadas, o QR | `NetworkPanel.qml` |
+| `mare-net`, `mare-wifi`, `mare-wifi-qr` | a conexão, as redes guardadas, o QR | `NetworkPanel.qml` |
+| `mare-dns` | o DNS de todas as redes: `estado`, `aplicar`, `limpar`, `testar`, `soltar` | `SettingsDnsPage.qml`; `NetworkPanel.qml` (`estado`) |
 | `mare-vpn` | VPNs do NetworkManager | `Vpn.qml`, `SettingsVpnPage.qml` |
 | `mare-shot` | captura de tela | `Capture.qml` |
 | `mare-emoji` | `pick`, `tem-wtype`, `gerar` | `EmojiPanel.qml` |
@@ -54,9 +57,10 @@ Do QML, a chamada é sempre `bash` + `Quickshell.shellPath("scripts/mare-...")`.
 
 ## Por quê assim
 
-- **Nenhum usa sudo.** Só o `mare-printers` pede a senha de administrador, pelo `pkexec`, quando o CUPS recusa uma ação. O shell roda como o usuário e não deve ter um caminho silencioso para root.
+- **Nenhum usa sudo.** Dois pedem a senha de administrador, pelo `pkexec`: o `mare-printers`, quando o CUPS recusa uma ação, e o `mare-dns`, para gravar o DNS em `/etc`. O shell roda como o usuário e não deve ter um caminho silencioso para root.
+- **O que roda como root não mora na pasta do shell.** O `mare-dns` não escreve em `/etc`: chama o ajudante `/usr/lib/mk/mk-dns` (fonte em `system/mk/mk-dns`), que é do root, só aceita endereços IP e grava um arquivo só. O `mare-dns` recusa um ajudante que não seja do root ([[Rede]], [[Polkit]]).
 - **JSON na saída**: o QML faz `JSON.parse` e pronto; o script pode ser testado sozinho, comparando texto.
-- **Raízes trocáveis para teste**: `PROC`, `SYS`, `ETC`, `MK_ROOT` (no `mare-updates`), `AJUSTES`, `MARE_HYPRCTL`, `MARE_DRM`, `MARE_VPN_FIXTURES`, `MARE_PRINTERS_FIXTURES`, `--dry-run` no `mare-default-apps`. Um script que lê `/proc` ou `/sys` recebe a raiz por variável; "é a emenda mínima que o deixa testável" ([[Testes e TDD]]).
+- **Raízes trocáveis para teste**: `PROC`, `SYS`, `ETC`, `MK_ROOT` (no `mare-updates`), `AJUSTES`, `MARE_HYPRCTL`, `MARE_DRM`, `MARE_VPN_FIXTURES`, `MARE_PRINTERS_FIXTURES`, `MARE_DNS_ROOT`, `--dry-run` no `mare-default-apps`. Um script que lê `/proc` ou `/sys` recebe a raiz por variável; "é a emenda mínima que o deixa testável" ([[Testes e TDD]]).
 - **Clima sem conta e sem chave** (Open-Meteo); a cidade vem de `~/.config/mare/city` ou do fuso horário do sistema.
 - **Segredos em `$XDG_RUNTIME_DIR`**, só para o dono: o QR do Wi-Fi e o arquivo que o `mare-vpn` importa ([[Convenções]]).
 - **`mare-updates` nunca pede senha**: o clone do canal roda com `GIT_TERMINAL_PROMPT=0` e `credential.interactive=never`; num canal sem acesso, só avisa.

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Abre o MkSom, o equalizador da saída de som e o teste de microfone do Mk. Se
+# a janela já está aberta, só a traz para a frente.
+#   mksom              abre no Equalizador
+#   mksom microfone    abre direto no teste de microfone
+#   MKSOM_RAIZ   onde estão bin/ e qml/ (padrão: a pasta acima deste script)
+# Não mexe no som: quem liga, ajusta e mede é a janela, pelo motor.
+set -euo pipefail
+raiz=${MKSOM_RAIZ:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
+titulo=MkSom
+
+# Falta algo: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
+missing() {
+  local text="O $titulo precisa $1. Rode mk atualizar."
+  notify-send -a "$titulo" "$titulo" "$text" 2>/dev/null || true
+  echo "${0##*/}: $text" >&2
+  exit 1
+}
+
+area=equalizador
+case ${1:-} in
+  "" | equalizador) ;;
+  microfone) area=microfone ;;
+  *)
+    echo "uso: mksom [equalizador|microfone]" >&2
+    exit 2
+    ;;
+esac
+if (($# > 1)); then
+  echo "uso: mksom [equalizador|microfone]" >&2
+  exit 2
+fi
+command -v qs >/dev/null || missing "do Quickshell"
+command -v jq >/dev/null || missing "do jq"
+[[ -x $raiz/bin/mksom-motor ]] || missing "do motor (bin/mksom-motor)"
+
+# Uma janela só: se já há uma, foca. O título tem de ser exatamente o do app.
+if qs list --all 2>/dev/null | grep -qF "Config path: $raiz/qml/shell.qml"; then
+  addr=$(hyprctl clients -j 2>/dev/null | jq -r --arg t "$titulo" 'first(.[] | select(.title == $t) | .address) // empty' 2>/dev/null || true)
+  if [[ $addr =~ ^0x[0-9a-f]+$ ]]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 || true
+    exit 0
+  fi
+fi
+MKSOM_AREA=$area exec qs -p "$raiz/qml"

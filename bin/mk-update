@@ -307,8 +307,8 @@ if [[ $mode != --after-mk ]]; then
 fi
 applying=1
 
-# O que o Mk põe fora de /usr/share/mk: os comandos e o gancho do pacman. Só
-# copia o que mudou. Roda na troca e de novo quando a versão nova assume
+# O que o Mk põe fora de /usr/share/mk: os comandos, o gancho do pacman e o
+# ajudante do DNS. Só copia o que mudou. Roda na troca e de novo quando a versão nova assume
 # (--after-mk): quem fez a troca foi o mk-update de antes, que só conhece a
 # lista dele; um comando que a versão nova acrescentou chega na mesma rodada.
 install_bins() {
@@ -320,6 +320,10 @@ install_bins() {
   done
   src=$share/system/mk/mk-os-release.hook dst=$root/etc/pacman.d/hooks/mk-os-release.hook
   cmp -s "$src" "$dst" || sudo install -Dm644 "$src" "$dst"
+  # O ajudante do DNS dos Ajustes (roda como root, pelo pkexec): numa pasta
+  # do root, porque a troca acima deixa o /usr/share/mk no nome de quem atualiza.
+  src=$share/system/mk/mk-dns dst=$root/usr/lib/mk/mk-dns
+  if [[ -f $src ]]; then cmp -s "$src" "$dst" || sudo install -Dm755 "$src" "$dst"; fi
 }
 if [[ $mode == --after-mk ]]; then install_bins; fi
 

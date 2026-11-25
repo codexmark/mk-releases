@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Compila o motor do MkSom e deixa o binário em
+# bin/mksom-motor, que vai junto com o Mk (uma máquina instalada não compila
+# nada). Rode depois de mexer em src/ e faça o commit do binário com a mudança.
+#   apps/mksom/pack          testa (go vet, go test) e compila
+#   apps/mksom/pack --rapido só compila
+# O binário é estático (CGO desligado), sem caminhos desta máquina (-trimpath)
+# e sem símbolos de depuração, para sair igual em qualquer lugar.
+set -euo pipefail
+here=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+command -v go >/dev/null || { echo "pack: falta o go (pacman -S go)" >&2; exit 1; }
+
+cd "$here/src"
+if [[ ${1:-} != --rapido ]]; then
+  fora=$(gofmt -l .)
+  [[ -z $fora ]] || { echo "pack: gofmt pede mudança em:" >&2; echo "$fora" >&2; exit 1; }
+  go vet ./...
+  go test ./...
+fi
+CGO_ENABLED=0 GOFLAGS=-mod=mod go build -trimpath -buildvcs=false -ldflags="-s -w" -o "$here/bin/mksom-motor" .
+# De que código este binário saiu: os testes do Mk conferem que ainda é o de
+# src/ (um binário velho com código novo não passa).
+{
+  "$here/assinatura"
+  go version
+} >"$here/bin/mksom-motor.de"
+echo "ok: $here/bin/mksom-motor ($(du -h "$here/bin/mksom-motor" | cut -f1))"

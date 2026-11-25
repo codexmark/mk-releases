@@ -19,7 +19,7 @@ hl.window_rule({
 -- entram lado a lado como qualquer outra.
 hl.window_rule({
     name = "float-mkpulso",
-    match = { title = "^(MkPulso|MkPacotes|MkInstalar|MkComprimir|MkCalc)$" },
+    match = { title = "^(MkPulso|MkPacotes|MkInstalar|MkComprimir|MkCalc|MkSom)$" },
     float = true,
     center = true,
 })

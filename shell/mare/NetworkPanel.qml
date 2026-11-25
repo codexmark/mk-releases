@@ -3,10 +3,12 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Networking
+import "Dns.js" as Dns
 
 // Rede: o que está conectado e como está indo. Detalhes da conexão (IP,
 // gateway, DNS), tráfego ao vivo, ping até o roteador e até a internet,
-// escolha de DNS, QR code para o celular entrar no Wi-Fi e as redes ao redor.
+// o DNS em vigor (a troca fica em Ajustes › DNS), QR code para o celular
+// entrar no Wi-Fi e as redes ao redor.
 // Ideias vindas da barra do Omarchy, refeitas no estilo do Maré.
 Item {
     id: panel
@@ -175,7 +177,8 @@ Item {
     readonly property real internetMs: last(internetPings)
     readonly property int loss: lossOf(internetPings)
 
-    property string dnsBusy: ""
+    // O que o `mare-dns estado` contou (veja Dns.js).
+    property var dnsState: Dns.stateOf(null)
     property bool showQr: false
     property string qrSsid: ""
     property string qrError: ""
@@ -243,14 +246,6 @@ Item {
             + (status.ip !== "" ? "  ·  " + status.ip : "");
     }
     // --- puro: fim ---
-
-    function setDns(mode) {
-        if (dnsBusy !== "" || mode === net.dnsMode)
-            return;
-        dnsBusy = mode;
-        dnsProc.command = ["bash", Quickshell.shellPath("scripts/mare-dns"), mode];
-        dnsProc.running = true;
-    }
 
     function toggleQr() {
         showQr = !showQr;
@@ -335,11 +330,18 @@ Item {
         }
     }
 
+    // O DNS em vigor (a opção dos Ajustes e os servidores que o sistema usa).
+    // Quem lê é o script da página DNS; aqui é só leitura.
     Process {
         id: dnsProc
-        onExited: {
-            panel.dnsBusy = "";
-            netProc.running = true;
+        running: true
+        command: ["bash", Quickshell.shellPath("scripts/mare-dns"), "estado"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    panel.dnsState = Dns.stateOf(JSON.parse(text));
+                } catch (e) {}
+            }
         }
     }
 
@@ -479,7 +481,10 @@ Item {
             InfoPair { label: "rede"; value: panel.net.conn }
             InfoPair { label: "ip"; value: panel.net.ip }
             InfoPair { label: "gateway"; value: panel.net.gateway }
-            InfoPair { label: "dns"; value: panel.net.dns.join(" · ") }
+            InfoPair {
+                label: "dns"
+                value: panel.dnsState.servidores.length > 0 ? Dns.serversLine(panel.dnsState.servidores) : panel.net.dns.join(" · ")
+            }
             InfoPair { label: "recebendo"; value: "↓ " + Stats.rate(Stats.rxRate) }
             InfoPair { label: "enviando"; value: "↑ " + Stats.rate(Stats.txRate) }
         }
@@ -510,11 +515,12 @@ Item {
             color: Theme.hairline
         }
 
-        // DNS: o do roteador (automático), Cloudflare ou Google.
+        // DNS: a opção em vigor, numa linha. A troca (de todas as redes de uma
+        // vez) mora nos Ajustes.
         RowLayout {
             visible: panel.connected
             Layout.fillWidth: true
-            spacing: 6
+            spacing: 8
 
             Text {
                 text: "dns"
@@ -526,19 +532,21 @@ Item {
                 Layout.rightMargin: 8
             }
 
-            Repeater {
-                model: [
-                    { mode: "auto", label: "automático" },
-                    { mode: "cloudflare", label: "cloudflare" },
-                    { mode: "google", label: "google" }
-                ]
+            Text {
+                Layout.fillWidth: true
+                text: Dns.summary(panel.dnsState)
+                color: panel.dnsState.opcao !== "rede" && panel.dnsState.valendo ? Theme.text : Theme.textDim
+                font.family: Theme.mono
+                font.pixelSize: 12
+                elide: Text.ElideRight
+            }
 
-                PillButton {
-                    required property var modelData
-                    Layout.fillWidth: true
-                    text: panel.dnsBusy === modelData.mode ? "aplicando…" : modelData.label
-                    selected: panel.net.dnsMode === modelData.mode
-                    onClicked: panel.setDns(modelData.mode)
+            PillButton {
+                implicitHeight: 28
+                text: "ajustes"
+                onClicked: {
+                    Mare.settingsPage = "dns";
+                    Mare.open("settings");
                 }
             }
         }

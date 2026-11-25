@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# O ajudante do DNS dos Ajustes: a única parte que roda como root. Quem o
+# chama é o shell/mare/scripts/mare-dns, pelo pkexec (a janela de senha é do
+# Maré, o agente de polkit da sessão), sempre pelo caminho instalado,
+# /usr/lib/mk/mk-dns, que é do root.
+#
+#   mk-dns aplicar <ip> [ip...]   de um a quatro endereços IPv4 ou IPv6
+#   mk-dns limpar                 volta ao DNS que a rede entrega
+#
+# Grava (ou apaga) um arquivo só, /etc/NetworkManager/conf.d/90-mk-dns.conf,
+# com o DNS global do NetworkManager: vale para todas as conexões e não mexe
+# em nenhuma. Depois manda o NetworkManager reler a configuração e reescrever
+# o /etc/resolv.conf: `nmcli general reload conf` e depois `nmcli general
+# reload dns-rc`, em duas chamadas (o nmcli recusa as duas juntas, e só o
+# "dns-rc" não relê o arquivo).
+#
+# Não aceita texto livre. Cada argumento é conferido de novo aqui, do lado do
+# root, mesmo já tendo passado pela página e pelo mare-dns: só entra o que é
+# endereço IP de verdade (nada de nome, espaço, quebra de linha, "=", "[",
+# vírgula ou URI). Não há opção, caminho nem nome de arquivo para escolher.
+#
+# Saída: 0 feito; 2 argumento recusado (nada mudou); 3 não deu para gravar
+# (nada mudou); 4 o arquivo mudou, mas o NetworkManager não recarregou.
+set -euo pipefail
+export LC_ALL=C
+R=${MK_ROOT:-} # outra raiz no lugar de /: só os testes trocam
+
+dir=$R/etc/NetworkManager/conf.d
+conf=$dir/90-mk-dns.conf
+max=4
+
+recusa() {
+  echo "mk-dns: $1" >&2
+  exit 2
+}
+
+# Quatro números de 0 a 255, sem zero à esquerda; fora 0.x, multicast e
+# broadcast (o primeiro vai de 1 a 223). A mesma regra do shell/mare/Dns.js.
+ipv4() {
+  local o='(0|[1-9][0-9]{0,2})' a b c d
+  [[ $1 =~ ^$o\.$o\.$o\.$o$ ]] || return 1
+  a=${BASH_REMATCH[1]} b=${BASH_REMATCH[2]} c=${BASH_REMATCH[3]} d=${BASH_REMATCH[4]}
+  ((a >= 1 && a <= 223 && b <= 255 && c <= 255 && d <= 255))
+}
+
+# Oito grupos de até quatro dígitos hexadecimais, com um "::" no máximo. Fora
+# a forma com IPv4 no fim, a zona (%wlan0), o "::" sozinho e o multicast.
+ipv6() {
+  local s=$1 resto n=0
+  [[ ${#s} -ge 3 && ${#s} -le 39 && $s =~ ^[0-9A-Fa-f:]+$ ]] || return 1
+  # Mais de um "::" (e o ":::").
+  resto=${s#*::}
+  [[ $resto != *::* ]] || return 1
+  if [[ $s == *::* ]]; then
+    count_groups "${s%%::*}" || return 1
+    n=$groups
+    count_groups "$resto" || return 1
+    n=$((n + groups))
+    ((n >= 1 && n <= 7)) || return 1
+  else
+    count_groups "$s" || return 1
+    ((groups == 8)) || return 1
+  fi
+  # ff00::/8: o primeiro grupo tem quatro dígitos e começa com ff.
+  [[ ! $s =~ ^[fF][fF][0-9A-Fa-f]{2}(:|$) ]]
+}
+
+# Conta os grupos de uma metade ("" = nenhum) em $groups; falha se algum não
+# tiver de um a quatro dígitos (":1", "1:", "1::::2").
+count_groups() {
+  local part=$1 g
+  groups=0
+  [[ -n $part ]] || return 0
+  [[ $part != :* && $part != *: ]] || return 1
+  local IFS=:
+  for g in $part; do
+    [[ $g =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+    groups=$((groups + 1))
+  done
+}
+
+recarrega() {
+  if ! command -v nmcli >/dev/null; then
+    echo "mk-dns: falta o nmcli para recarregar o NetworkManager" >&2
+    exit 4
+  fi
+  if ! nmcli --wait 10 general reload conf >&2 || ! nmcli --wait 10 general reload dns-rc >&2; then
+    echo "mk-dns: o NetworkManager não recarregou" >&2
+    exit 4
+  fi
+}
+
+case ${1:-} in
+  aplicar)
+    shift
+    (($# >= 1)) || recusa "falta o endereço"
+    servers=()
+    for a in "$@"; do
+      ipv4 "$a" || ipv6 "$a" || recusa "não é um endereço IP"
+      a=${a,,}
+      [[ " ${servers[*]} " == *" $a "* ]] || servers+=("$a")
+    done
+    ((${#servers[@]} <= max)) || recusa "no máximo $max endereços"
+    lista=$(IFS=,; echo "${servers[*]}")
+    # Escrita atômica: um temporário na mesma pasta, trocado de uma vez. O mv
+    # troca também um link que alguém tenha posto no lugar, sem segui-lo.
+    mkdir -p "$dir" 2>/dev/null || { echo "mk-dns: não deu para criar $dir" >&2; exit 3; }
+    tmp=$(mktemp "$dir/.90-mk-dns.XXXXXX" 2>/dev/null) || { echo "mk-dns: não deu para gravar em $dir" >&2; exit 3; }
+    trap 'rm -f "$tmp"' EXIT
+    {
+      echo "# Gerado pelo Mk (Ajustes > DNS). Não edite: a página regrava o arquivo inteiro."
+      echo "# É o DNS global do NetworkManager: vale para todas as conexões, sem mexer em nenhuma."
+      echo "# Para desfazer: Ajustes > DNS > \"da rede\". Ou, à mão, apague este arquivo e rode"
+      echo "#   nmcli general reload conf && nmcli general reload dns-rc"
+      echo "[global-dns-domain-*]"
+      echo "servers=$lista"
+    } >"$tmp"
+    chmod 644 "$tmp"
+    mv -fT "$tmp" "$conf" || { echo "mk-dns: não deu para gravar $conf" >&2; exit 3; }
+    trap - EXIT
+    recarrega
+    ;;
+  limpar)
+    (($# == 1)) || recusa "limpar não recebe argumento"
+    if [[ -e $conf || -L $conf ]]; then
+      rm -f "$conf" || { echo "mk-dns: não deu para apagar $conf" >&2; exit 3; }
+    fi
+    recarrega
+    ;;
+  *)
+    recusa "uso: mk-dns aplicar <ip> [ip...] | limpar"
+    ;;
+esac

@@ -12,6 +12,8 @@ fontes:
   - "shell/mare/Theme.qml"
   - "shell/mare/Motion.qml"
   - "shell/mare/Notifs.qml"
+  - "shell/mare/Caffeine.qml"
+  - "shell/mare/Modes.qml"
   - "shell/mare/Projects.qml"
 ---
 
@@ -34,6 +36,8 @@ Painéis são criados e destruídos ao abrir e fechar; o que precisa durar mais 
 | `Hypr` | nenhum estado: é o único ponto que manda `dispatch` ao Hyprland |
 | `Projects` | a ligação workspace → projeto, os repositórios em `~/Work`, o estado do projeto em foco |
 | `Notifs` | o servidor de notificações: a lista, o não perturbe, o aviso na tela |
+| `Caffeine` | a cafeína: enquanto ligada, um inibidor de ociosidade do systemd segura o descanso de tela, o bloqueio e a tela apagada |
+| `Modes` | o modo apresentação ou jogo ligado e o que ele mudou (não perturbe, cafeína, perfil de energia), para devolver na saída; a conta está no `Modes.js` |
 | `Lock` | a tela de bloqueio: `locked`, a senha, a conversa com o PAM, a animação |
 | `Welcome` | as boas-vindas: `shown`, `step`, `paused`, o "já vi" |
 | `Wallpaper` | o papel de parede em uso, a cor tirada dele, a lista de imagens; tem um IPC próprio |

@@ -22,9 +22,11 @@ for peca in "Stats.cpu" "Networking.wifiEnabled" "Bluetooth.defaultAdapter" "Pow
   has "$src" "$peca" "falta no painel"
 done
 
-t "sem modo jogo"
-hasnt "${src,,}" "jogo"
-hasnt "${src,,}" "game"
+t "os modos (apresentação e jogo) são do singleton Modes: o painel só alterna (veja modos.test.sh)"
+has "$src" 'Modes.toggle("present")'
+has "$src" 'Modes.toggle("game")'
+hasnt "$src" "systemd-inhibit"
+hasnt "$src" "hyprctl"
 
 t "cada bloco some quando a máquina não tem (brilho, bateria, Bluetooth, perfis de energia)"
 has "$src" "Display.hasBacklight"
@@ -32,7 +34,7 @@ has "$src" "UPower.displayDevice"
 ok grep -q 'visible: panel.adapter !== null' "$mare/ControlsPanel.qml"
 
 t "os blocos ligam e desligam em Ajustes › Ilha, e o painel obedece"
-for chave in controls.showStats controls.showRadios controls.showPower controls.showLevels; do
+for chave in controls.showStats controls.showRadios controls.showPower controls.showModes controls.showLevels; do
   has "$(<"$mare/SettingsSchema.js")" "key: \"$chave\""
   has "$src" "Settings.get(\"$chave\")"
 done

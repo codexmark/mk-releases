@@ -78,7 +78,7 @@ T.t("rules: o MkPulso flutua no centro, no tamanho dele (lado a lado ele não ca
     local r = rule(T.session({ only = "mare.rules" }), "float-mkpulso")
     T.eq(true, r.float)
     T.eq(true, r.center)
-    for _, app in ipairs({ "MkPulso", "MkPacotes", "MkInstalar", "MkComprimir", "MkCalc" }) do
+    for _, app in ipairs({ "MkPulso", "MkPacotes", "MkInstalar", "MkComprimir", "MkCalc", "MkSom" }) do
         T.has(r.match.title, app)
     end
 end)

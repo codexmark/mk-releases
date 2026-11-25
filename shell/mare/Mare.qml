@@ -282,5 +282,15 @@ Singleton {
             Notifs.dnd = !Notifs.dnd;
             return Notifs.dnd;
         }
+
+        // Modo apresentação e modo jogo (Modes.qml): alternam e devolvem se
+        // ficaram ligados. Ligar um desliga o outro.
+        function present(): bool {
+            return Modes.toggle("present");
+        }
+
+        function game(): bool {
+            return Modes.toggle("game");
+        }
     }
 }

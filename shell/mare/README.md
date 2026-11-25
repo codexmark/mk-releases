@@ -96,7 +96,7 @@ Cada nome de `Mare.panels` é um arquivo, carregado pelo `Tide` quando o
 | `project` | `ProjectPanel.qml` | O projeto em foco: branch, mudanças, containers, portas e atalhos. |
 | `volume` | `VolumePanel.qml` | Volume da saída padrão: arrastar na barra, clicar no ícone silencia. |
 | `power` | `PowerPanel.qml` | Bateria e perfil de energia (power-profiles-daemon). |
-| `network` | `NetworkPanel.qml` | Rede: o que está conectado, as redes Wi-Fi, detalhes da conexão. |
+| `network` | `NetworkPanel.qml` | Rede: o que está conectado, as redes Wi-Fi, detalhes da conexão e o DNS em vigor (a troca fica em Ajustes › DNS). |
 | `calendar` | `CalendarPanel.qml` | O mês, com a semana começando no domingo. |
 | `picker` | `PickerPanel.qml` | Escolher um projeto de `~/Work` para o workspace. Só abre quando chamado (`toggle picker`); fecha sozinho se o workspace ganhar janela. |
 | `launcher` | `LauncherPanel.qml` | A busca: comandos do projeto, projetos, aplicativos, ajustes e a calculadora (`Calc.js`). |
@@ -111,15 +111,17 @@ Cada nome de `Mare.panels` é um arquivo, carregado pelo `Tide` quando o
 | `wallpaper` | `WallpaperPanel.qml` | Os papéis de parede, 12 por página. |
 | `capture` | `CapturePanel.qml` | Capturar uma área, a janela, a tela, ler o texto ou o QR de uma área, ou gravar um vídeo. |
 | `emoji` | `EmojiPanel.qml` | Procurar um emoji (português ou inglês) e digitá-lo na janela em foco. |
-| `controls` | `ControlsPanel.qml` | Os controles rápidos (Super + Esc): leituras da máquina, Wi-Fi e Bluetooth, perfil de energia, volume e brilho, a sessão e os alternadores (luz noturna, cafeína, não perturbe, microfone). Cada bloco usa o singleton do painel dele e o título leva ao painel inteiro; os blocos ligam e desligam em Ajustes › Ilha. A lista de ações de sessão é a do `SessionActions.js`, a mesma do painel Sessão; a cafeína é o singleton `Caffeine` (um inibidor de ociosidade do systemd). |
+| `controls` | `ControlsPanel.qml` | Os controles rápidos (Super + Esc): leituras da máquina, Wi-Fi e Bluetooth, perfil de energia, os modos (apresentação e jogo), volume e brilho, a sessão e os alternadores (luz noturna, cafeína, não perturbe, microfone). Cada bloco usa o singleton do painel dele e o título leva ao painel inteiro; os blocos ligam e desligam em Ajustes › Ilha. A lista de ações de sessão é a do `SessionActions.js`, a mesma do painel Sessão; a cafeína é o singleton `Caffeine` (um inibidor de ociosidade do systemd); os modos são do singleton `Modes`. |
 
 Dois modos passageiros não são painéis e não aceitam `toggle`: `toast`
 (`ToastView.qml`, a pílula cresce com uma notificação) e `osd` (`OsdView.qml`,
 a pílula vira barra de nível quando o volume ou o brilho mudam).
 
 Pedaços de páginas dos Ajustes com arquivo próprio: `SettingsMonitorsPage.qml`
-(a página Monitores), `SettingsSleepBlock.qml` (os avisos no fim de Energia) e
-`SettingsUpdatesLast.qml` (como foi a última atualização).
+(a página Monitores), `SettingsSleepBlock.qml` (os avisos no fim de Energia),
+`SettingsUpdatesLast.qml` (como foi a última atualização) e
+`SettingsDnsPage.qml` (a página DNS; as opções, a validação dos endereços e os
+textos dela ficam no `Dns.js`, veja "A página DNS").
 
 ### Registrar um painel novo
 
@@ -160,6 +162,8 @@ Cada arquivo com `pragma Singleton` é dono de um pedaço do estado.
 | `Hypr` | Nenhum estado: é o único ponto que manda `dispatch` ao Hyprland (`exec`, `workspace`, `focusWindow`), no formato Lua ou no antigo conforme a sessão. |
 | `Projects` | A ligação workspace → projeto (`bindings`, gravada no `workspaces.json` do estado do Quickshell), os repositórios em `~/Work` e o estado do projeto em foco (`info`). |
 | `Notifs` | O servidor de notificações: a lista, o não perturbe (`dnd`) e o aviso na tela (`toastItem`). |
+| `Caffeine` | A cafeína (`on`): enquanto ligada, um `systemd-inhibit --what=idle` segura o descanso de tela, o bloqueio e a tela apagada. Não é guardada. |
+| `Modes` | O modo ligado (`mode`: `""`, `"present"` ou `"game"`) e o que ele mudou (`ledger`), para devolver na saída. Veja "Modos". Não é guardado. |
 | `Lock` | A tela de bloqueio: `locked`, a senha digitada, a conversa com o PAM e os números da animação. |
 | `Welcome` | As boas-vindas: `shown`, `step`, `paused` e o "já vi" (`<raiz>/.bem-vindo`). |
 | `Wallpaper` | O papel de parede em uso, a cor tirada dele (`primary`, `hue`) e a lista de imagens. Uma instalação nova nasce com o de fábrica (`factory`, o Maré dos autorais), aplicado uma vez só; quem já usava o Mk não o recebe (`migrations/user/20261128-papel-de-fabrica.sh`). Tem um IPC próprio. |
@@ -198,6 +202,8 @@ aqui. O alvo é `mare`, declarado no `IpcHandler` do `Mare.qml`.
 | `volume` | `change` | `+5`, `-5` (em %) ou `mute`. |
 | `brightness` | `change` | `+5` ou `-5` (em %). |
 | `dnd` | | Liga ou desliga o não perturbe; devolve o novo valor. |
+| `present` | | Liga ou desliga o modo apresentação; devolve se ficou ligado. |
+| `game` | | Liga ou desliga o modo jogo; devolve se ficou ligado. |
 
 Os painéis que `toggle` aceita são os de `Mare.panels`: `project`, `volume`,
 `power`, `network`, `calendar`, `picker`, `launcher`, `switcher`,
@@ -270,6 +276,14 @@ qs -p ~/.config/mk/shell ipc call mare brightness -5
 qs -p ~/.config/mk/shell ipc call mare dnd
 ```
 
+```
+qs -p ~/.config/mk/shell ipc call mare present
+```
+
+```
+qs -p ~/.config/mk/shell ipc call mare game
+```
+
 Sobre o `set`: o valor passa por `JSON.parse` (`10`, `false`, `0.85`); o que
 não for JSON entra como texto (`set hypr.kbLayout us`). Só aceita chaves que
 têm valor de fábrica no `SettingsSchema.js`. Não confere faixa nem opções: um
@@ -284,11 +298,47 @@ e `get`.
 qs -p ~/.config/mk/shell ipc call wallpaper random
 ```
 
+## Modos
+
+Dois alternadores para quando o desktop tem de sair do caminho, no singleton
+`Modes` (`Modes.qml`), com a conta em `Modes.js`:
+
+| Modo | Atalho | IPC | O que faz enquanto durar |
+|---|---|---|---|
+| apresentação | `Super + Shift + P` | `present` | Liga o não perturbe (`Notifs.dnd`) e segura a ociosidade (`Caffeine.on`). |
+| jogo | `Super + Shift + G` | `game` | O mesmo, mais: perfil de energia em "desempenho" (se o power-profiles-daemon oferecer) e animações, desfoque e sombra do Hyprland desligados. |
+
+Também ligam e desligam na linha "modo" dos Controles; ligado, a ilha mostra
+o ícone do modo em cobre (um clique desliga). São exclusivos: ligar um desliga
+o outro. Nenhum é guardado: sessão nova começa desligada.
+
+**O estado de antes.** Ao ligar, o `Modes.js` anota cada interruptor que o
+modo mudou (`{ before, set }`) e não anota o que já estava como o modo quer.
+Ao desligar, volta só o que foi anotado: o não perturbe que já estava ligado
+continua ligado. Se a pessoa mexe num deles à mão durante o modo, a anotação
+some (`reconcile`, chamado a cada mudança de `Notifs.dnd`, `Caffeine.on` e
+`PowerProfiles.profile`) e o modo não desfaz a escolha dela. Trocar de um modo
+para o outro mantém o "antes" original.
+
+**O Hyprland, no modo jogo.** O Lua (`hyprOff`, `hyprBack`) é um `hl.config`
+mandado por `hyprctl eval`, como o dos Ajustes, e fica em `Settings.overlay`
+enquanto o modo dura: todo eval dos Ajustes termina com ele, então mexer na
+Velocidade no meio do jogo não religa as animações. Nada disso vai para o
+`ajustes.lua`. Na saída, as animações voltam ao que a Velocidade dos Ajustes
+diz. Desfoque e sombra não têm ajuste no Mk (de fábrica são desligados): o
+modo lê os dois com `hyprctl -j getoption` ao ligar, desliga só o que estava
+ligado (alguém ligou no `user.lua`) e religa só isso na saída. Se a leitura
+não der em nada, não mexe.
+
+Se o Maré for reiniciado com o modo jogo ligado, as anotações se perdem e o
+Hyprland fica sem animações até um `hyprctl reload` ou o próximo login.
+
 ## A pasta `scripts/`
 
 O QML não lê `/proc` nem conversa com `nmcli`: chama um script, que responde em
-JSON (ou em linhas). Nenhum usa sudo; só o `mare-printers` pede a senha de
-administrador, pelo `pkexec`, quando o CUPS recusa uma ação.
+JSON (ou em linhas). Nenhum usa sudo; dois pedem a senha de administrador,
+pelo `pkexec`: o `mare-printers`, quando o CUPS recusa uma ação, e o
+`mare-dns`, para gravar o DNS em `/etc`.
 
 | Script | O que faz | Quem chama |
 |---|---|---|
@@ -303,7 +353,7 @@ administrador, pelo `pkexec`, quando o CUPS recusa uma ação.
 | `mare-palette` | Imprime a cor principal de uma imagem. | `Wallpaper.qml` |
 | `mare-battery` | JSON com ciclos, saúde e limite de carga da bateria. | `PowerPanel.qml` |
 | `mare-net` | JSON da conexão em uso: interface, IP, gateway, DNS. | `NetworkPanel.qml` |
-| `mare-dns` | Troca o DNS da conexão em uso: `auto`, `cloudflare` ou `google`. | `NetworkPanel.qml` |
+| `mare-dns` | O DNS de todas as redes: `estado` (a opção em vigor e os servidores em uso), `aplicar <provedor>` ou `aplicar outro <ip>...`, `limpar` (volta para o da rede), `testar` (um nome resolve?) e `soltar` (tira o DNS fixo da conexão em uso). | `SettingsDnsPage.qml`; `NetworkPanel.qml` (`estado`) |
 | `mare-wifi` | Redes Wi-Fi guardadas: `list-saved`, `forget`, `autoconnect`. | `NetworkPanel.qml` |
 | `mare-wifi-qr` | Gera o PNG do QR code do Wi-Fi atual e imprime o nome da rede. O PNG contém a senha. | `NetworkPanel.qml` |
 | `mare-vpn` | VPNs do NetworkManager: `list`, `status`, `up`, `down`, `delete`, `autoconnect`, `check`, `import`, `ask`, `watch`. | `Vpn.qml` (`status`, `watch`), `SettingsVpnPage.qml` |
@@ -321,8 +371,42 @@ O cabeçalho de cada script traz o formato exato da saída. Do QML, chame sempre
 por `Quickshell.shellPath("scripts/mare-...")`, com `bash` na frente.
 
 Nunca testados em hardware de verdade: impressoras reais (`mare-printers`),
-importar VPN (`mare-vpn import`), parear Bluetooth (`BluetoothPair.qml`) e mais
-de um monitor (`mare-monitors`).
+importar VPN (`mare-vpn import`), parear Bluetooth (`BluetoothPair.qml`), mais
+de um monitor (`mare-monitors`) e a troca de DNS com o NetworkManager e a
+janela de senha de verdade (`mare-dns`).
+
+### A página DNS
+
+Ajustes › DNS (`settings dns`) troca o servidor de nomes de todas as redes de
+uma vez. São três peças:
+
+- `Dns.js`: a tabela de opções (da rede, Cloudflare, Cloudflare família, Quad9,
+  Google, AdGuard, outro), a validação do que se escreve em "outro" (IPv4 e
+  IPv6 de verdade, no máximo quatro) e os textos da página. Puro, testado em
+  `tests/js/Dns.test.mjs`.
+- `scripts/mare-dns`: lê o estado sem privilégio e pede a troca.
+- `system/mk/mk-dns`, instalado em `/usr/lib/mk/mk-dns` (pelo instalador, pelo
+  `mk-update` e por uma migração): o ajudante que roda como root, pelo
+  `pkexec`. Só aceita endereços IP (confere de novo, do lado do root), grava
+  um arquivo só, `/etc/NetworkManager/conf.d/90-mk-dns.conf`, e roda
+  `nmcli general reload conf` e `nmcli general reload dns-rc` (o nmcli recusa os dois juntos). O `mare-dns` recusa um ajudante que não
+  seja do root.
+
+O arquivo usa o DNS global do NetworkManager (`[global-dns-domain-*]`): vale
+para todas as conexões e não mexe em nenhuma. "Da rede" apaga o arquivo; de
+fábrica ele não existe.
+
+Como nas Impressoras, a janela de senha ficaria atrás da folha dos Ajustes:
+ao ler `{"elevating":true}` a página fecha a folha. A troca corre num processo
+à parte, que depois testa se um nome resolve (`getent hosts archlinux.org`,
+5 s) e reabre os Ajustes na página, com o resultado. Se não resolver, a página
+oferece "voltar para o da rede".
+
+O que fica de fora, e a página diz: DNS cifrado (DoT/DoH), que o
+NetworkManager sozinho não faz (precisaria do systemd-resolved); e uma VPN
+ligada pode impor o DNS dela. O Mk antigo trocava o DNS por conexão, no painel
+de rede; uma conexão que ficou com DNS fixo aparece na página, com o botão
+"soltar".
 
 ## Ajustes
 
@@ -409,7 +493,7 @@ As animações em `SettingsSchema.js` (`animations`) repetem as de
 
 Uma página só de linhas:
 
-1. Em `groups`, acrescente `{ key: "minha", name: "Minha página", num: "17" }`
+1. Em `groups`, acrescente `{ key: "minha", name: "Minha página", num: "19" }`
    ao grupo certo.
 2. Em `blurbs`, a frase que fica no alto dela.
 3. As linhas em `rows`, com `page: "minha"`.

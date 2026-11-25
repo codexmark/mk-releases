@@ -181,8 +181,9 @@ Só quando o canal tem versão nova:
    janela fechada.
 2. Copia para `/usr/share/mk.novo`, apaga `/usr/share/mk` e renomeia.
 3. Reinstala `/usr/bin/mk-session`, `/usr/bin/mk-update`,
-   `/usr/bin/mk-hibernate` (só serve para desfazer um preparo antigo) e o gancho
-   `/etc/pacman.d/hooks/mk-os-release.hook`.
+   `/usr/bin/mk-hibernate` (só serve para desfazer um preparo antigo), o gancho
+   `/etc/pacman.d/hooks/mk-os-release.hook` e `/usr/lib/mk/mk-dns` (o ajudante
+   da página DNS dos Ajustes, que roda como root).
 4. Troca as pastas `hypr`, `shell`, `ghostty`, `fastfetch` e `bash` de
    `~/.config/mk`, cada uma de uma vez (copia ao lado e renomeia). Só troca a
    pasta que tem a marca `.instalado-pelo-mk`, ou que não existe; a que perdeu

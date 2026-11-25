@@ -13,6 +13,8 @@ fontes:
   - "shell/mare/SettingsPrintersPage.qml"
   - "shell/mare/SettingsGamepadPage.qml"
   - "shell/mare/SettingsVpnPage.qml"
+  - "shell/mare/SettingsDnsPage.qml"
+  - "shell/mare/Dns.js"
   - "shell/mare/SettingsKeybindsPage.qml"
   - "shell/mare/scripts/mare-gamepad"
   - "README.md"
@@ -20,7 +22,7 @@ fontes:
 
 # Páginas dos Ajustes
 
-As 17 páginas dos Ajustes, em cinco grupos. A chave de cada uma abre direto nela: `mk ajustes monitores`.
+As 18 páginas dos Ajustes, em cinco grupos. A chave de cada uma abre direto nela: `mk ajustes monitores`.
 
 ## Para quê
 
@@ -43,10 +45,11 @@ Referência do que se configura onde, e de quais páginas são só linhas do esq
 | 11 | Dispositivos | Impressoras | `impressoras` | `SettingsPrintersPage.qml` | [[Impressão]] |
 | 12 | Dispositivos | Controle | `controle` | `SettingsGamepadPage.qml` | o controle Xbox e o driver xone |
 | 13 | Rede | VPN | `vpn` | `SettingsVpnPage.qml` | WireGuard e OpenVPN ([[Rede]]) |
-| 14 | Sistema | Apps padrão | `apps` | `SettingsAppsPage.qml` | [[Apps padrão]] e o terminal |
-| 15 | Sistema | Atualizações | `atualizacoes` | linhas + `SettingsUpdatesLast.qml` | [[Atualizações na ilha e nos Ajustes]] |
-| 16 | Sistema | Atalhos | `atalhos` | `SettingsKeybindsPage.qml` | [[Atalhos do usuário]] |
-| 17 | Sistema | Sobre o Mk | `sobre` | conteúdo da `SettingsWindow` | a máquina (`mare-about`) e onde os ajustes ficam |
+| 14 | Rede | DNS | `dns` | `SettingsDnsPage.qml` + `Dns.js` | o servidor de nomes de todas as redes: da rede, Cloudflare, Quad9, Google, AdGuard ou outro; testar e voltar ([[Rede]]) |
+| 15 | Sistema | Apps padrão | `apps` | `SettingsAppsPage.qml` | [[Apps padrão]] e o terminal |
+| 16 | Sistema | Atualizações | `atualizacoes` | linhas + `SettingsUpdatesLast.qml` | [[Atualizações na ilha e nos Ajustes]] |
+| 17 | Sistema | Atalhos | `atalhos` | `SettingsKeybindsPage.qml` | [[Atalhos do usuário]] |
+| 18 | Sistema | Sobre o Mk | `sobre` | conteúdo da `SettingsWindow` | a máquina (`mare-about`) e onde os ajustes ficam |
 
 **Página com arquivo próprio**: `SettingsWindow.pageFiles` mapeia a chave para o arquivo; o `Loader` `pageLoader` carrega `<nome>.qml` só enquanto a página está aberta. Linhas do esquema com a mesma `page` são desenhadas antes do conteúdo do arquivo. Se a raiz declarar `property string flashKey`, recebe a chave que a busca pediu, para destacar a linha.
 
@@ -62,7 +65,7 @@ Chaves do Hyprland que os Ajustes mudam: `general.gaps_in`, `general.gaps_out`, 
 - **Alt+Shift troca de layout** só quando há dois layouts: a opção `grp:alt_shift_toggle` é montada a partir da escolha.
 
 > [!warning] Nunca testadas em hardware
-> Monitores (mais de um), Impressoras, VPN (importar) e Controle (instalar o xone) existem e nunca foram vistas funcionando numa máquina de verdade ([[Limitações conhecidas]]).
+> Monitores (mais de um), Impressoras, VPN (importar), DNS (a troca de verdade) e Controle (instalar o xone) existem e nunca foram vistas funcionando numa máquina de verdade ([[Limitações conhecidas]]).
 
 ## Onde está no código
 

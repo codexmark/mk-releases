@@ -26,7 +26,7 @@ Avisar sem interromper, e dar retorno visual às teclas de mídia.
 
 - **`Notifs.qml`** usa o `NotificationServer` do Quickshell (com corpo, ações, imagem e persistência) e marca toda notificação como `tracked`.
 - **Aviso (`toast`)**: `Mare.flash("toast", ms)`, com `ms` = `notify.duration` (padrão 5 s; as críticas ficam o dobro). `ToastView.qml` desenha: clique abre a ação padrão do app, o × descarta.
-- **Não perturbe** (`Super + Shift + N`, ou `ipc call mare dnd`): segura os avisos, menos os críticos; o histórico continua registrando tudo.
+- **Não perturbe** (`Super + Shift + N`, ou `ipc call mare dnd`): segura os avisos, menos os críticos; o histórico continua registrando tudo. O modo apresentação (`Super + Shift + P`) e o modo jogo (`Super + Shift + G`) o ligam enquanto duram e, ao sair, o devolvem ao que era (`shell/mare/Modes.qml`).
 - **Histórico** (`Super + N`): a mais nova em cima.
 - **OSD**: `Mare.osd(tipo, valor, mudo)` mostra por 1,3 s uma barra de nível na ilha (`OsdView.qml`) quando o volume ou o brilho mudam pelas teclas.
 - **Bateria fraca** (`BatteryWatch`): dois degraus, 20% (normal) e 8% (crítico, que fura o não perturbe). Cada um avisa uma vez por descarga e se rearma na tomada.

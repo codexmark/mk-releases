@@ -32,7 +32,7 @@ Autorizar ações de administrador numa janela, em português, com a mensagem in
 - **Por que não o `hyprpolkitagent`**: ele "só tem uma linha para a mensagem e os rótulos em inglês". Foi uma das issues da primeira instalação em máquina real: a mensagem era cortada. O Maré quebra o texto em linhas e nunca corta.
 - **Só um agente registra por sessão.** Com o do Maré no ar, o outro não pode subir; por isso ele fica instalado mas parado.
 - **Cancelar com a tela bloqueada**: a folha ficaria escondida atrás do bloqueio e o pedido esperaria para sempre.
-- **Relação com os Ajustes**: a folha dos Ajustes cobre a tela inteira, e a janela de senha ficaria atrás dela. A página Impressoras fecha a folha antes de pedir a senha ([[Impressão]]).
+- **Relação com os Ajustes**: a folha dos Ajustes cobre a tela inteira, e a janela de senha ficaria atrás dela. As páginas Impressoras e DNS fecham a folha antes de pedir a senha ([[Impressão]], [[Rede]]).
 
 Decisão registrada em [[D06 Maré como agente de polkit]].
 

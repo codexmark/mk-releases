@@ -88,4 +88,4 @@ Cada app é uma pasta em `apps/`:
 
 ## Ligações
 
-Depende de: [[Maré]], [[Direção Folha]], [[Polkit]], [[mk-update]]. Apps: [[MkPulso]], [[MkPacotes]], [[MkInstalar e MkComprimir]], [[MkCalc, MkCorte e MkEscrita]], [[MkPorto]]. O caso à parte: [[MkTunes]]. Decisão: [[D17 Apps próprios em Go e QML]]. Testes: [[Testes e TDD]].
+Depende de: [[Maré]], [[Direção Folha]], [[Polkit]], [[mk-update]]. Apps: [[MkPulso]], [[MkPacotes]], [[MkInstalar e MkComprimir]], [[MkCalc, MkCorte e MkEscrita]], [[MkPorto]], [[MkSom]]. O caso à parte: [[MkTunes]]. Decisão: [[D17 Apps próprios em Go e QML]]. Testes: [[Testes e TDD]].

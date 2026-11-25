@@ -37,6 +37,7 @@ Esta é a nota a ler antes de confiar no Mk numa máquina que importa.
 - **Regras de monitor por descrição (`desc:`)**: as regras são pelo nome da saída.
 - **Agente de pareamento Bluetooth**: aparelhos que pedem código ou confirmação falham.
 - **Agente gráfico de segredos para VPN**: a que pede senha conecta num terminal.
+- **DNS cifrado (DoT/DoH)**: Ajustes › DNS troca o servidor, mas sem cifra; o NetworkManager sozinho não faz, precisaria do systemd-resolved ([[Rede]]).
 - **Placas NVIDIA anteriores à geração Turing**: o perfil usa `nvidia-open-dkms`.
 
 ### Nunca testado em hardware real
@@ -48,6 +49,7 @@ Esta é a nota a ler antes de confiar no Mk numa máquina que importa.
 | escolha de Wi-Fi no instalador; esquecer rede, rede oculta, QR | [[Rede]] |
 | impressoras de verdade | [[Impressão]] |
 | importar e conectar uma VPN | [[Rede]] |
+| trocar o DNS em Ajustes › DNS (a janela de senha, o reload do NetworkManager, uma VPN ligada) | [[Rede]] |
 | parear Bluetooth | [[Bluetooth]] |
 | aviso de bateria fraca | [[Notificações e OSD]] |
 | descanso de tela pelo hypridle: a espera real de 3 min, dois monitores e o consumo com ele horas na tela (só foi visto ligar e desligar por IPC, na sessão aninhada) | [[Descanso de tela]] |

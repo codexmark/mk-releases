@@ -28,6 +28,8 @@ var actions = [
     { id: "mare.calendar", group: "MARÉ", desc: "calendário", combo: "SUPER + C" },
     { id: "mare.notifications", group: "MARÉ", desc: "notificações", combo: "SUPER + N" },
     { id: "mare.dnd", group: "MARÉ", desc: "não perturbe", combo: "SUPER + SHIFT + N" },
+    { id: "mare.present", group: "MARÉ", desc: "modo apresentação", combo: "SUPER + SHIFT + P" },
+    { id: "mare.game", group: "MARÉ", desc: "modo jogo", combo: "SUPER + SHIFT + G" },
     { id: "mare.controls", group: "MARÉ", desc: "controles rápidos", combo: "SUPER + ESCAPE" },
     { id: "mare.session", group: "MARÉ", desc: "sair, bloquear, desligar", combo: "SUPER + CTRL + ESCAPE" },
     { id: "mare.wallpaper", group: "MARÉ", desc: "papel de parede", combo: "SUPER + W" },

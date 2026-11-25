@@ -33,6 +33,7 @@ PanelWindow {
         "impressoras": "SettingsPrintersPage",
         "controle": "SettingsGamepadPage",
         "vpn": "SettingsVpnPage",
+        "dns": "SettingsDnsPage",
         "atalhos": "SettingsKeybindsPage"
     })
 

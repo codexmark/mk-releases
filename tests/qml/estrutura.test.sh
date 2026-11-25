@@ -34,6 +34,31 @@ while IFS=: read -r page file; do
   grep -qE "key: \"$page\", name:" "$mare/SettingsSchema.js" || _fail "a página $page não está no SettingsSchema.js"
 done < <(sed -n '/readonly property var pageFiles:/,/})/p' "$mare/SettingsWindow.qml" | sed -nE 's/.*"([a-z]+)": "([A-Za-z]+)".*/\1:\2/p')
 
+t "a página DNS: registrada nos Ajustes, com a lógica no Dns.js e o sistema pelo scripts/mare-dns"
+has "$(sed -n '/readonly property var pageFiles:/,/})/p' "$mare/SettingsWindow.qml")" '"dns": "SettingsDnsPage"'
+dns=$(grep -v '^[[:space:]]*//' "$mare/SettingsDnsPage.qml")
+has "$dns" 'import "Dns.js" as Dns'
+has "$dns" 'Quickshell.shellPath("scripts/mare-dns")'
+# O QML só liga: nada de regra de endereço nem de tabela de provedor nele.
+hasnt "$dns" "1.1.1.1"
+hasnt "$dns" "9.9.9.9"
+hasnt "$dns" "pkexec"
+hasnt "$dns" "nmcli"
+# Diz o que fica de fora (o texto mora no Dns.js) e oferece o caminho de volta.
+has "$dns" "Dns.limits"
+has "$dns" "voltar para o da rede"
+has "$dns" '"testar"'
+# A janela de senha fica atrás da folha: a página sai da frente ao ler "elevating".
+has "$dns" "elevating"
+has "$dns" "Mare.close()"
+
+t "o painel de rede não troca mais o DNS por conexão: mostra e leva aos Ajustes"
+rede=$(<"$mare/NetworkPanel.qml")
+hasnt "$rede" "setDns"
+eq 'command: ["bash", Quickshell.shellPath("scripts/mare-dns"), "estado"]' "$(grep 'scripts/mare-dns' "$mare/NetworkPanel.qml" | sed 's/^ *//')"
+has "$rede" "Dns.summary(panel.dnsState)"
+has "$rede" 'Mare.settingsPage = "dns"'
+
 t "todo script scripts/mare-* citado no QML existe e é executável"
 while read -r s; do
   [[ -x $mare/scripts/$s ]] || _fail "o QML chama scripts/$s, que não existe ou não tem +x"

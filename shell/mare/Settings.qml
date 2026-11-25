@@ -44,6 +44,10 @@ Singleton {
     // o eval dessa comparação, que não vira aviso se for recusado.
     property bool synced: false
     property bool silent: false
+    // Lua a mais no fim de todo eval, enquanto não for vazio: o modo jogo
+    // (Modes.qml) segura as animações desligadas mesmo se um ajuste for
+    // mexido no meio. Não vai para o ajustes.lua.
+    property string overlay: ""
 
     function get(key) {
         return values[key] !== undefined ? values[key] : defaults[key];
@@ -307,7 +311,7 @@ Singleton {
             root.flight = root.undo;
             root.undo = ({});
             root.flightLua = Schema.hyprLua(root.values);
-            apply.command = ["hyprctl", "eval", Schema.hyprCode(root.values, root.touched)];
+            apply.command = ["hyprctl", "eval", Schema.hyprCode(root.values, root.touched) + root.overlay];
             apply.running = true;
         }
     }

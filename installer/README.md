@@ -186,6 +186,8 @@ sudo bash /usr/share/mk/system/mk/boot/limine-default
   pacote `filesystem`.
 - **Sessão**: `/usr/bin/mk-session`, `/usr/bin/mk-update` e
   `/usr/share/wayland-sessions/mk.desktop`.
+- **Ajudante do DNS**: `/usr/lib/mk/mk-dns` (de `system/mk/mk-dns`), que a
+  página DNS dos Ajustes chama pelo `pkexec`.
 - **Aparência**: tema GTK em `/usr/share/themes/Mk`, ícones gerados em
   `/usr/share/icons/Mk` (`system/mk/look/make-icons`), fontes em
   `/usr/share/fonts/mk`, tema do plymouth `mk` e tema do sddm `mk`, com o

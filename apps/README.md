@@ -125,5 +125,16 @@ autentica é o `ssh`, no terminal. Os hosts criados por ele ficam em
 `Include` no topo do `~/.ssh/config`, e o resto do arquivo fica como estava.
 Os hosts do seu config aparecem, mas só você os edita. `F1` mostra os atalhos.
 
+## mksom
+
+O som (`mksom`; `mksom microfone` abre na outra área). **Equalizador** da
+saída: dez bandas de 31 Hz a 16 kHz, pré-ganho, predefinições de fábrica e
+as suas, a curva desenhada. É um sink virtual do PipeWire ("Mk Equalizador"),
+feito com os filtros que já vêm nele (`filter-chain`), sem EasyEffects nem
+plugin de fora; fica numa unidade de usuário (`mksom-eq.service`) e mexer num
+controle aplica ao vivo, sem reiniciar o som. **Microfone**: as entradas,
+volume e mudo, o nível ao vivo, "gravar e ouvir" (cinco segundos, só na
+memória) e uma frase dizendo o que há de errado. `F1` mostra os atalhos.
+
 O sistema liga todos estes (do MkPacotes em diante) por `system/mk/apps-links`.
 

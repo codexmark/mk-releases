@@ -44,19 +44,37 @@ fi
 
 t "todo executável de bin/ e scripts do shell tem o bit de execução"
 for f in bin/* shell/mare/scripts/* tests/run tests/hooks/* apps/mkpulso/bin/mkpulso apps/mkpacotes/bin/mkpacotes apps/mkutil/bin/mkinstalar \
-  apps/mkutil/bin/mkcomprimir apps/mkcalc/bin/mkcalc apps/mkcorte/bin/mkcorte apps/mkescrita/bin/mkescrita apps/mkporto/bin/mkporto apps/mk*/pack apps/mk*/assinatura; do
+  apps/mkutil/bin/mkcomprimir apps/mkcalc/bin/mkcalc apps/mkcorte/bin/mkcorte apps/mkescrita/bin/mkescrita apps/mkporto/bin/mkporto apps/mksom/bin/mksom apps/mk*/pack apps/mk*/assinatura; do
   [[ -f $f && $f != bin/lib-packages.sh ]] || continue
   [[ -x $f ]] || _fail "sem +x: $f"
 done
 
+# O qmllint que vale é o do Qt 6. Num sistema que também tem o Qt 5, o
+# /usr/bin/qmllint é o antigo, que não imprime nada nem para arquivo quebrado:
+# antes de confiar, o escolhido tem de acusar um QML errado de propósito.
+qmllint=""
+printf 'import QtQuick\nItem { width: }\n' >"$SBX/Quebrado.qml"
+for c in /usr/lib/qt6/bin/qmllint qmllint6 qmllint; do
+  command -v "$c" >/dev/null || continue
+  # (Sai com erro de propósito: a saída é guardada antes, por causa do pipefail.)
+  out=$("$c" "$SBX/Quebrado.qml" 2>&1) || true
+  if grep -qiE 'syntax error|failed to parse|Expected token' <<<"$out"; then
+    qmllint=$c
+    break
+  fi
+done
+
 t "QML: nenhum erro de sintaxe"
-if command -v qmllint >/dev/null; then
+if [[ -n $qmllint ]]; then
   for f in "${all[@]}"; do
     [[ $f == *.qml ]] || continue
-    out=$(qmllint "$f" 2>&1 | grep -iE 'syntax error|failed to parse|Expected token') && _fail "$f" "$out"
+    # O qmllint sai com erro quando acha um: com o pipefail, o "| grep ... &&"
+    # nunca chegava ao _fail. A saída é guardada antes.
+    out=$("$qmllint" "$f" 2>&1) || true
+    out=$(grep -iE 'syntax error|failed to parse|Expected token' <<<"$out") && _fail "$f" "$out"
   done
 else
-  echo "  # qmllint ausente: pulado" >&2
+  echo "  # sem um qmllint do Qt 6 que acuse erro: pulado" >&2
 fi
 
 t "JavaScript do shell: sintaxe válida"

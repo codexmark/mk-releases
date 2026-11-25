@@ -513,6 +513,16 @@ PanelWindow {
                     onClicked: Capture.toggleRecording()
                 }
 
+                // Modo apresentação ou jogo ligado (Modes.qml): o ícone do
+                // modo, em cobre. Um clique desliga.
+                IslandItem {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: Modes.on
+                    icon: String.fromCodePoint(Modes.game ? 0xF0297 : 0xF0428)
+                    iconColor: Theme.copper
+                    onClicked: Modes.off()
+                }
+
                 // Atualizações: só aparece pelo que importa (Updates.badge).
                 IslandItem {
                     anchors.verticalCenter: parent.verticalCenter

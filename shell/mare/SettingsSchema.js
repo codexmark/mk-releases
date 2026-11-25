@@ -39,12 +39,13 @@ var groups = [
         { key: "impressoras", name: "Impressoras", num: "11" },
         { key: "controle", name: "Controle", num: "12" } ] },
     { name: "REDE", items: [
-        { key: "vpn", name: "VPN", num: "13" } ] },
+        { key: "vpn", name: "VPN", num: "13" },
+        { key: "dns", name: "DNS", num: "14" } ] },
     { name: "SISTEMA", items: [
-        { key: "apps", name: "Apps padrão", num: "14" },
-        { key: "atualizacoes", name: "Atualizações", num: "15" },
-        { key: "atalhos", name: "Atalhos", num: "16" },
-        { key: "sobre", name: "Sobre o Mk", num: "17" } ] }
+        { key: "apps", name: "Apps padrão", num: "15" },
+        { key: "atualizacoes", name: "Atualizações", num: "16" },
+        { key: "atalhos", name: "Atalhos", num: "17" },
+        { key: "sobre", name: "Sobre o Mk", num: "18" } ] }
 ];
 
 var blurbs = {
@@ -62,6 +63,7 @@ var blurbs = {
     "impressoras": "As impressoras deste computador e as que a rede oferece.",
     "controle": "O controle Xbox (gamepad) e o fone (headset) plugado nele, pelo driver xone.",
     "vpn": "Conexões privadas (WireGuard e OpenVPN) pelo NetworkManager.",
+    "dns": "O servidor de nomes de todas as redes de uma vez: o que a rede entrega ou um público (Cloudflare, Quad9, Google, AdGuard).",
     "apps": "Que app abre cada tipo de coisa: páginas, arquivos, texto, imagens, vídeos, música, PDF, e-mail. E o terminal do Mk.",
     "atalhos": "Os atalhos do Mk. Clique num para trocar a tecla; Super sozinho abre a busca.",
     "sobre": "Esta máquina e onde os ajustes ficam guardados."
@@ -90,6 +92,9 @@ var rows = [
       desc: "Ligar e desligar os dois, com a rede em uso", ctl: "switch", def: true, kw: "controles rápidos rede" },
     { page: "ilha", group: "CONTROLES (SUPER + ESC)", key: "controls.showPower", label: "Perfil de energia",
       desc: "Economia, balanceado ou desempenho", ctl: "switch", def: true, kw: "controles rápidos bateria" },
+    { page: "ilha", group: "CONTROLES (SUPER + ESC)", key: "controls.showModes", label: "Modos",
+      desc: "Apresentação e jogo: sem avisos e sem descanso de tela enquanto durar", ctl: "switch", def: true,
+      kw: "controles rápidos apresentar projetar chamada compartilhar tela jogar game não perturbe cafeína" },
     { page: "ilha", group: "CONTROLES (SUPER + ESC)", key: "controls.showLevels", label: "Volume e brilho",
       desc: "Os dois níveis, para arrastar", ctl: "switch", def: true, kw: "controles rápidos som tela" },
 

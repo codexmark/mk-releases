@@ -1,0 +1,9 @@
+{
+  "ao_vivo": true,
+  "aplicados": [
+    "eq_L_9:Gain",
+    "eq_R_9:Gain"
+  ],
+  "ok": true,
+  "predefinicao": null
+}

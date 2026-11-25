@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MkSom
+GenericName=Equalizador e teste de microfone
+Comment=Equalizador de 10 bandas para a saída de som e teste do microfone, só com o PipeWire
+Exec=mksom
+Icon=mksom
+Terminal=false
+Categories=AudioVideo;Audio;Mixer;Settings;
+Keywords=som;áudio;audio;equalizador;graves;agudos;microfone;volume;entrada;saída;saida;

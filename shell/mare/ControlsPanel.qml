@@ -9,12 +9,13 @@ import "SessionActions.js" as SessionActions
 
 // Controles (Super + Esc): o que se mexe várias vezes por dia, de um relance e
 // num lugar só. As leituras da máquina, Wi-Fi e Bluetooth, o perfil de
-// energia, volume e brilho, a sessão e os alternadores (luz noturna, cafeína,
-// não perturbe, microfone). Nada aqui é novo por baixo: cada bloco usa o mesmo
-// singleton do painel dele (Stats, Display, Notifs…), e quem quer o detalhe
-// abre o painel inteiro pelo título do bloco. Os quatro blocos do meio ligam
-// e desligam em Ajustes › Ilha; um bloco some sozinho quando a máquina não
-// tem aquilo (brilho, Bluetooth, perfis de energia).
+// energia, os modos (apresentação e jogo), volume e brilho, a sessão e os
+// alternadores (luz noturna, cafeína, não perturbe, microfone). Nada aqui é
+// novo por baixo: cada bloco usa o mesmo singleton do painel dele (Stats,
+// Display, Notifs, Modes…), e quem quer o detalhe abre o painel inteiro pelo
+// título do bloco. Os cinco blocos do meio ligam e desligam em Ajustes ›
+// Ilha; um bloco some sozinho quando a máquina não tem aquilo (brilho,
+// Bluetooth, perfis de energia).
 Item {
     id: panel
 
@@ -386,6 +387,31 @@ Item {
                     selected: PowerProfiles.profile === modelData.profile
                     onClicked: PowerProfiles.profile = modelData.profile
                 }
+            }
+            Item { Layout.fillWidth: true }
+        }
+
+        // ── modos ─────────────────────────────────────────────────────
+        // Apresentação e jogo (Modes.qml): um de cada vez. Ligado, acende
+        // também a cafeína e o não perturbe lá embaixo, que é o que ele faz.
+        RowLayout {
+            visible: Settings.get("controls.showModes")
+            Layout.fillWidth: true
+            spacing: 8
+
+            Label {
+                Layout.preferredWidth: 92
+                text: "modo"
+            }
+            PillButton {
+                text: "apresentação"
+                selected: Modes.present
+                onClicked: Modes.toggle("present")
+            }
+            PillButton {
+                text: "jogo"
+                selected: Modes.game
+                onClicked: Modes.toggle("game")
             }
             Item { Layout.fillWidth: true }
         }
