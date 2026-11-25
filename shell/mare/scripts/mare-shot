@@ -67,14 +67,20 @@ fi
 # texto, pelo tesseract. A imagem fica só na memória (XDG_RUNTIME_DIR) e some
 # no fim; o que vai para a área de transferência é texto.
 if [[ $modo == ler ]]; then
-  tmp=$(mktemp --suffix=.png "${XDG_RUNTIME_DIR:-/tmp}/mare-ler.XXXXXX")
-  trap 'rm -f "$tmp"' EXIT
-  # Em dobro: letra pequena de tela o tesseract erra; ampliada, acerta.
-  grim -s 2 -g "$geo" "$tmp"
+  tmp=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/mare-ler.XXXXXX")
+  trap 'rm -rf "${tmp:?}"' EXIT
+  area=$tmp/area.png
+  # Letra pequena de tela o tesseract erra; ampliada, acerta. Quem amplia bem é
+  # o ImageMagick (mais abaixo); sem ele, a captura já sai em dobro.
+  if command -v magick >/dev/null; then
+    grim -g "$geo" "$area"
+  else
+    grim -s 2 -g "$geo" "$area"
+  fi
 
   lido="" titulo="Texto copiado"
   if command -v zbarimg >/dev/null; then
-    lido=$(zbarimg -q --raw "$tmp" 2>/dev/null) || lido=""
+    lido=$(zbarimg -q --raw "$area" 2>/dev/null) || lido=""
     [[ -z $lido ]] || titulo="Código lido"
   fi
   if [[ -z $lido ]]; then
@@ -82,11 +88,18 @@ if [[ $modo == ler ]]; then
       notify-send -a Mk "Não dá para ler texto" "falta o tesseract"
       exit 1
     }
+    # Três vezes maior, em cinza, com filtro bom: foi o que leu melhor. Se a
+    # ampliação falhar, vale a captura como veio.
+    pagina=$area
+    if command -v magick >/dev/null &&
+      magick "$area" -colorspace Gray -filter Lanczos -resize 300% -resize '6000x6000>' "$tmp/grande.png" 2>/dev/null; then
+      pagina=$tmp/grande.png
+    fi
     # Os idiomas que houver, o português na frente.
     idiomas=$(tesseract --list-langs 2>/dev/null | grep -xE 'por|eng' | sort -r | paste -sd+) || idiomas=""
     # O tesseract fecha a página com um \f; linhas só de espaço no começo e no
     # fim saem (o $(...) já tira as quebras de linha do fim).
-    lido=$(tesseract "$tmp" - ${idiomas:+-l "$idiomas"} 2>/dev/null | tr -d '\f' |
+    lido=$(tesseract "$pagina" - ${idiomas:+-l "$idiomas"} 2>/dev/null | tr -d '\f' |
       sed -e 's/[[:space:]]*$//' | sed -e '/./,$!d') || lido=""
   fi
   [[ -n $lido ]] || {

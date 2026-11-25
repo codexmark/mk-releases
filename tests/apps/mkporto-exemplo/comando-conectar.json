@@ -1,0 +1,8 @@
+{
+  "acao": "conectar",
+  "apelido": "atlas",
+  "argv": ["ssh", "--", "atlas"],
+  "texto": "ssh atlas",
+  "terminal": ["foot", "--title=ssh · atlas", "ssh", "--", "atlas"],
+  "aviso": null
+}

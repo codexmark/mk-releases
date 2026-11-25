@@ -314,14 +314,16 @@ zera_ler() {
   rm -f "$SBX/qr" "$SBX/ocr" "$SBX/ocr-falha"
   printf 'List of available languages in "/usr/share/tessdata/" (3):\neng\nosd\npor\n' >"$SBX/idiomas"
 }
-sobras() { find "$XDG_RUNTIME_DIR" -type f | sort; }
+# magick: a ampliação; grava no último argumento o que leu do primeiro.
+stub magick 'for a; do f=$a; done; { cat "$1"; printf "+ampliada"; } >"$f"'
+sobras() { find "$XDG_RUNTIME_DIR" -mindepth 1 | sort; }
 
-t "ler: a área escolhida vira uma imagem temporária (em dobro, que o texto pequeno lê melhor), fora de Capturas"
+t "ler: a área escolhida vira uma imagem temporária, fora de Capturas"
 zera_ler
 printf 'Primeira linha\nsegunda linha\n' >"$SBX/ocr"
 ok run ler
 called "slurp -b 0b0b0b66 -c ce5e32 -w 1"
-like "$(grep '^grim' "$SBX/calls")" "^grim -s 2 -g 100,200 640x480 $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+\.png$"
+like "$(grep '^grim' "$SBX/calls")" "^grim -g 100,200 640x480 $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+/area\.png$"
 absent "$dir"
 
 t "ler: o texto da imagem vai para a área de transferência, sem o lixo do fim"
@@ -330,7 +332,7 @@ called "wl-copy"
 not_called "wl-copy --type image/png"
 
 t "ler: lê em português e inglês quando os dois idiomas estão instalados"
-like "$(grep '^tesseract [^-]' "$SBX/calls")" "^tesseract $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+\.png - -l por\+eng$"
+like "$(grep '^tesseract [^-]' "$SBX/calls")" "^tesseract $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+/grande\.png - -l por\+eng$"
 
 t "ler: o aviso diz que copiou o texto e mostra o começo dele"
 called "notify-send -a Mk Texto copiado Primeira linha (2 linhas)"
@@ -364,7 +366,7 @@ zera_ler
 echo "https://exemplo.org/pagina?a=1" >"$SBX/qr"
 echo "texto em volta" >"$SBX/ocr"
 ok run ler
-like "$(grep '^zbarimg' "$SBX/calls")" "^zbarimg -q --raw $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+\.png$"
+like "$(grep '^zbarimg' "$SBX/calls")" "^zbarimg -q --raw $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+/area\.png$"
 eq "https://exemplo.org/pagina?a=1" "$(<"$SBX/clip")"
 called "notify-send -a Mk Código lido https://exemplo.org/pagina?a=1"
 not_called "tesseract"
@@ -437,3 +439,42 @@ eq "" "$(sobras)"
 
 t "ler: não cria a pasta de Capturas"
 absent "$dir"
+
+# Os casos de cima tiraram o zbar e o tesseract do caminho: voltam.
+stub zbarimg '[[ -s $SBX/qr ]] || exit 4; cat "$SBX/qr"'
+stub tesseract '
+if [[ $1 == --list-langs ]]; then cat "$SBX/idiomas"; exit 0; fi
+[[ ! -e $SBX/ocr-falha ]] || exit 1
+cat "$SBX/ocr" 2>/dev/null; printf "\f"'
+
+t "ler: antes do tesseract a área é ampliada três vezes, em cinza e com filtro bom (letra de tela lê melhor)"
+zera_ler
+echo "texto" >"$SBX/ocr"
+ok run ler
+like "$(grep '^magick' "$SBX/calls")" "^magick $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+/area\.png -colorspace Gray -filter Lanczos -resize 300% -resize 6000x6000> $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+/grande\.png$"
+eq "" "$(sobras)"
+
+t "ler: com um código na área, nada é ampliado"
+zera_ler
+echo "codigo" >"$SBX/qr"
+ok run ler
+not_called "magick"
+
+t "ler: sem o ImageMagick (ele é opcional), a captura já sai em dobro e é ela que o tesseract lê"
+zera_ler
+echo "texto" >"$SBX/ocr"
+rm -f "$SBX/bin/magick"
+ok env PATH="$(path_sem magick)" bash "$shot_sh" ler
+like "$(grep '^grim' "$SBX/calls")" "^grim -s 2 -g 100,200 640x480 $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+/area\.png$"
+like "$(grep '^tesseract [^-]' "$SBX/calls")" "^tesseract $XDG_RUNTIME_DIR/mare-ler\.[A-Za-z0-9]+/area\.png - "
+eq "texto" "$(<"$SBX/clip")"
+eq "" "$(sobras)"
+stub magick 'for a; do f=$a; done; { cat "$1"; printf "+ampliada"; } >"$f"'
+
+t "ler: a ampliação falhando não derruba a leitura: vale a captura como veio"
+zera_ler
+echo "texto" >"$SBX/ocr"
+stub magick 'exit 1'
+ok run ler
+like "$(grep '^tesseract [^-]' "$SBX/calls")" "/area\.png - "
+eq "texto" "$(<"$SBX/clip")"

@@ -420,7 +420,7 @@ Hyprland do Mk.
 | `config/ghostty/`, `config/fastfetch/` | terminal e a ficha que ele mostra ao abrir |
 | `config/mimeapps.list` | os apps padrão de fábrica |
 | `tests/` | os testes automáticos (`tests/run`) e o gancho de `git push` |
-| `apps/` | os apps que vêm com o Mk: o MkTunes (player de música, gerado no repositório dele) e, com o código aqui, em Go por trás e Quickshell na frente: o MkPulso (monitor de sistema), o MkPacotes (gerenciador de pacotes), o MkInstalar, o MkComprimir, o MkCalc (calculadora), o MkCorte (cortes de vídeo) e o MkEscrita (Markdown) |
+| `apps/` | os apps que vêm com o Mk: o MkTunes (player de música, gerado no repositório dele) e, com o código aqui, em Go por trás e Quickshell na frente: o MkPulso (monitor de sistema), o MkPacotes (gerenciador de pacotes), o MkInstalar, o MkComprimir, o MkCalc (calculadora), o MkCorte (cortes de vídeo), o MkEscrita (Markdown) e o MkPorto (conexões SSH) |
 | `vault/` | o Mk explicado por camadas, do kernel aos aplicativos, com os porquês: uma vault do Obsidian (abra a pasta nele e comece por `00 Início`) |
 | `shell/mare/` | o Maré: QML numa pasta só, mais `scripts/` (o que ele roda por fora) |
 | `installer/` | `mk-install` e um arquivo de respostas de exemplo, para testes |

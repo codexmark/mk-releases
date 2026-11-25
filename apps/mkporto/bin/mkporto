@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Abre o MkPorto, o gerente de conexões SSH do Mk. Se a janela já está aberta,
+# só a traz para a frente.
+#   mkporto
+#   MKPORTO_RAIZ   onde estão bin/ e qml/ (padrão: a pasta acima deste script)
+# Não recebe argumento: quem conecta é a janela, abrindo um terminal com o
+# comando que o motor devolve.
+set -euo pipefail
+raiz=${MKPORTO_RAIZ:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
+titulo=MkPorto
+
+# Falta algo: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
+missing() {
+  local text="O $titulo precisa $1. Rode mk atualizar."
+  notify-send -a "$titulo" "$titulo" "$text" 2>/dev/null || true
+  echo "${0##*/}: $text" >&2
+  exit 1
+}
+
+if (($# > 0)); then
+  echo "uso: mkporto" >&2
+  exit 2
+fi
+command -v qs >/dev/null || missing "do Quickshell"
+command -v jq >/dev/null || missing "do jq"
+[[ -x $raiz/bin/mkporto-motor ]] || missing "do motor (bin/mkporto-motor)"
+
+# Uma janela só: se já há uma, foca. O título tem de ser exatamente o do app
+# (o terminal de uma conexão tem outro).
+if qs list --all 2>/dev/null | grep -qF "Config path: $raiz/qml/shell.qml"; then
+  addr=$(hyprctl clients -j 2>/dev/null | jq -r --arg t "$titulo" 'first(.[] | select(.title == $t) | .address) // empty' 2>/dev/null || true)
+  if [[ $addr =~ ^0x[0-9a-f]+$ ]]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 || true
+    exit 0
+  fi
+fi
+exec qs -p "$raiz/qml"

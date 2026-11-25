@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>MkPorto</title>
+  <rect width="64" height="64" rx="12" fill="#0b0b0b"/>
+  <path d="M14 36a18 18 0 0 0 36 0M10 36h8M46 36h8" fill="none" stroke="#cdc4ba" stroke-opacity=".6" stroke-width="2" stroke-linecap="square"/>
+  <path d="M32 22v32M24 29h16" fill="none" stroke="#ce5e32" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="16" r="5" fill="none" stroke="#ce5e32" stroke-width="3"/>
+</svg>

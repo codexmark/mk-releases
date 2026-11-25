@@ -111,5 +111,19 @@ recuperado na abertura seguinte, pré-visualização ao lado (`Ctrl+Shift+P`),
 sumário dos títulos, busca e substituição, exportar HTML. O conversor de
 Markdown é do próprio motor (`mkescrita-motor`). `F1` mostra os atalhos.
 
+## mkporto
+
+O catálogo das conexões SSH (`mkporto`): os hosts do `~/.ssh/config` (com os
+`Include`, com os valores que o `ssh -G` diz), se cada um responde (lê a
+saudação do servidor, sem autenticar; host atrás de um salto é sondado pelo
+salto) e em quantos milissegundos, conectar num terminal (`Enter`), testar se
+a sua chave entra (`Ctrl+T`, sem pedir senha), copiar o comando, enviar uma
+chave pública (`Ctrl+K`, `ssh-copy-id`), gerar uma chave nova (`Ctrl+G`,
+`ssh-keygen` num terminal) e as chaves públicas com a impressão digital. **Não guarda nem pede senha, e nunca lê chave privada**: quem
+autentica é o `ssh`, no terminal. Os hosts criados por ele ficam em
+`~/.ssh/config.d/mkporto.conf`; na primeira gravação entra uma linha
+`Include` no topo do `~/.ssh/config`, e o resto do arquivo fica como estava.
+Os hosts do seu config aparecem, mas só você os edita. `F1` mostra os atalhos.
+
 O sistema liga todos estes (do MkPacotes em diante) por `system/mk/apps-links`.
 

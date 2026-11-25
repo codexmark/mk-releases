@@ -1,0 +1,8 @@
+{
+  "acao": "chave",
+  "apelido": "atlas",
+  "argv": ["ssh-copy-id", "-i", "~/.ssh/id_ed25519.pub", "--", "atlas"],
+  "texto": "ssh atlas",
+  "terminal": ["foot", "--title=ssh · atlas", "ssh-copy-id", "-i", "~/.ssh/id_ed25519.pub", "--", "atlas"],
+  "aviso": null
+}

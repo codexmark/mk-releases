@@ -130,6 +130,15 @@ correção.
 - **MkEscrita:** não imprime (exporte HTML e imprima pelo navegador); cada
   marcação aplicada por atalho conta como dois passos de desfazer; arquivo
   que não é UTF-8 ou passa de 4 MB é recusado.
+- **MkPorto:** só SSH; máquinas virtuais ficaram para depois. Os dados de
+  cada host são os que o `ssh -G` diz (com `Match` e o config do sistema); se
+  ele falhar, valem os do leitor próprio e o detalhe avisa. Salto em cadeia
+  (com vírgula) não é sondado. O `ssh -G` roda os `Match exec` do seu config
+  a cada leitura da lista. **Visto na VM**, pelo teclado, contra um `sshd` de
+  verdade: criar e editar host, a sonda com a versão do servidor, conectar,
+  testar a entrada antes e depois de enviar a chave, enviar a chave, um host
+  por salto (sondado e conectado), gerar uma chave e copiar o comando. **Não
+  visto:** nada com o mouse, e uma máquina de fora (só a própria VM).
 - **MkTunes continua em Java.** O porte para Go espera o repositório dele, que
   não está na máquina onde os outros apps foram feitos.
 - **Controles (Super + Esc):** vistos abrindo na sessão aninhada, com Esc
@@ -142,7 +151,10 @@ correção.
   uma rede WEP por frase-senha gera um QR que o celular pode não aceitar.
 - **`mare-shot`:** duas capturas no mesmo segundo usam o mesmo nome de arquivo.
 - **Ler a tela (`mare-shot ler`):** o texto sai tão bom quanto o tesseract
-  consegue: letra muito pequena, texto sobre foto e fontes de ícone erram. Só
+  consegue: letra muito pequena, texto sobre foto e fontes de ícone erram. Em
+  letra de terminal ele perde acentos ("música" sai "musica") e troca `#` e
+  crase; ampliar pelo ImageMagick (quando instalado) melhora pouco: medido na
+  VM, uma palavra a mais certa em dez linhas. Só
   português e inglês. Um código vale antes do texto: numa área com os dois, o
   texto não é lido.
 - **Descanso de tela:** ele desliga quando a tela é bloqueada (aos 5 min, de

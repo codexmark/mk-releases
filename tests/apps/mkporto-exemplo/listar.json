@@ -1,0 +1,90 @@
+{
+  "pasta": "~/.ssh",
+  "arquivo_do_app": "~/.ssh/config.d/mkporto.conf",
+  "hosts": [
+    {
+      "apelido": "atlas",
+      "host": "atlas.oficina.example",
+      "usuario": "marina",
+      "porta": 22,
+      "chave": "~/.ssh/id_ed25519",
+      "salto": null,
+      "origem": "mkporto",
+      "arquivo": "~/.ssh/config.d/mkporto.conf",
+      "efetivo": true,
+      "escrito": {
+        "host": "atlas.oficina.example",
+        "usuario": "marina",
+        "porta": 22,
+        "chave": "~/.ssh/id_ed25519",
+        "salto": null
+      }
+    },
+    {
+      "apelido": "estufa",
+      "host": "192.0.2.44",
+      "usuario": "marina",
+      "porta": 22,
+      "chave": null,
+      "salto": null,
+      "origem": "mkporto",
+      "arquivo": "~/.ssh/config.d/mkporto.conf",
+      "efetivo": true,
+      "escrito": {
+        "host": "192.0.2.44",
+        "usuario": null,
+        "porta": 22,
+        "chave": null,
+        "salto": null
+      }
+    },
+    {
+      "apelido": "farol",
+      "host": "192.0.2.10",
+      "usuario": "ana",
+      "porta": 2222,
+      "chave": "~/.ssh/trabalho",
+      "salto": null,
+      "origem": "config",
+      "arquivo": "~/.ssh/config",
+      "efetivo": true,
+      "escrito": null
+    },
+    {
+      "apelido": "cofre",
+      "host": "cofre.interno.test",
+      "usuario": "ana",
+      "porta": 22,
+      "chave": "~/.ssh/trabalho",
+      "salto": "farol",
+      "origem": "config",
+      "arquivo": "~/.ssh/config",
+      "efetivo": true,
+      "escrito": null
+    },
+    {
+      "apelido": "web2",
+      "host": "web2.loja.example",
+      "usuario": "deploy",
+      "porta": 22,
+      "chave": null,
+      "salto": null,
+      "origem": "config",
+      "arquivo": "~/.ssh/config.d/loja.conf",
+      "efetivo": true,
+      "escrito": null
+    },
+    {
+      "apelido": "web10",
+      "host": "web10.loja.example",
+      "usuario": "deploy",
+      "porta": 22,
+      "chave": null,
+      "salto": null,
+      "origem": "config",
+      "arquivo": "~/.ssh/config.d/loja.conf",
+      "efetivo": true,
+      "escrito": null
+    }
+  ]
+}

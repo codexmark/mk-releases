@@ -1,0 +1,22 @@
+{
+  "chaves": [
+    {
+      "nome": "id_ed25519.pub",
+      "arquivo": "~/.ssh/id_ed25519.pub",
+      "tipo": "ed25519",
+      "bits": 256,
+      "impressao": "SHA256:EXEMPLOdeImpressaoDigitalQueNaoEDeChaveNenhuma00",
+      "comentario": "marina@oficina.example",
+      "publica": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXEMPLOEXEMPLOEXEMPLOEXEMPLOEXEMPLOEXEMPLOEXEMP marina@oficina.example"
+    },
+    {
+      "nome": "trabalho.pub",
+      "arquivo": "~/.ssh/trabalho.pub",
+      "tipo": "rsa",
+      "bits": 4096,
+      "impressao": "SHA256:EXEMPLOdeOutraImpressaoQueTambemNaoEDeNinguem000",
+      "comentario": "ana@loja.example",
+      "publica": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQEXEMPLOEXEMPLOEXEMPLOEXEMPLOEXEMPLOEXEMPLOEXEMPLOEXEMPLO ana@loja.example"
+    }
+  ]
+}

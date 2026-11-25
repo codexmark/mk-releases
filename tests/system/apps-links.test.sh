@@ -12,7 +12,7 @@ mkdir -p "$raiz"
 
 t "cria comando, atalho e ícone de cada app dentro da raiz"
 ok bash "$mk" "$raiz"
-for par in mkpacotes:mkpacotes mkutil:mkinstalar mkutil:mkcomprimir mkcalc:mkcalc mkcorte:mkcorte mkescrita:mkescrita; do
+for par in mkpacotes:mkpacotes mkutil:mkinstalar mkutil:mkcomprimir mkcalc:mkcalc mkcorte:mkcorte mkescrita:mkescrita mkporto:mkporto; do
   pasta=${par%%:*} nome=${par#*:}
   eq "/usr/share/mk/apps/$pasta/bin/$nome" "$(readlink "$raiz/usr/bin/$nome")"
   eq "/usr/share/mk/apps/$pasta/share/$nome.desktop" "$(readlink "$raiz/usr/share/applications/$nome.desktop")"
@@ -20,7 +20,7 @@ for par in mkpacotes:mkpacotes mkutil:mkinstalar mkutil:mkcomprimir mkcalc:mkcal
 done
 
 t "são dezoito links e mais nada"
-eq 18 "$(find "$raiz" -type l | wc -l)"
+eq 21 "$(find "$raiz" -type l | wc -l)"
 eq 0 "$(find "$raiz" -type f | wc -l)"
 
 t "tudo o que os links apontam existe no repositório, e os comandos são executáveis"
@@ -28,7 +28,7 @@ while IFS= read -r l; do
   alvo=$(readlink "$l")
   exists "$REPO/${alvo#/usr/share/mk/}"
 done < <(find "$raiz" -type l)
-for f in apps/mkpacotes/bin/mkpacotes apps/mkpacotes/bin/mkpacotes-coletor apps/mkutil/bin/mkinstalar apps/mkutil/bin/mkcomprimir apps/mkutil/bin/mkutil-motor apps/mkcalc/bin/mkcalc apps/mkcalc/bin/mkcalc-motor apps/mkcorte/bin/mkcorte apps/mkcorte/bin/mkcorte-motor apps/mkescrita/bin/mkescrita apps/mkescrita/bin/mkescrita-motor; do
+for f in apps/mkpacotes/bin/mkpacotes apps/mkpacotes/bin/mkpacotes-coletor apps/mkutil/bin/mkinstalar apps/mkutil/bin/mkcomprimir apps/mkutil/bin/mkutil-motor apps/mkcalc/bin/mkcalc apps/mkcalc/bin/mkcalc-motor apps/mkcorte/bin/mkcorte apps/mkcorte/bin/mkcorte-motor apps/mkescrita/bin/mkescrita apps/mkescrita/bin/mkescrita-motor apps/mkporto/bin/mkporto apps/mkporto/bin/mkporto-motor; do
   ok test -x "$REPO/$f"
 done
 
@@ -36,7 +36,7 @@ t "rodar de novo dá no mesmo, e um link velho é refeito"
 ln -sfn /opt/velho "$raiz/usr/bin/mkpacotes"
 ok bash "$mk" "$raiz"
 eq "/usr/share/mk/apps/mkpacotes/bin/mkpacotes" "$(readlink "$raiz/usr/bin/mkpacotes")"
-eq 18 "$(find "$raiz" -type l | wc -l)"
+eq 21 "$(find "$raiz" -type l | wc -l)"
 
 t "com uma raiz, não mexe nos caches de menu e de ícones desta máquina"
 not_called "update-desktop-database"

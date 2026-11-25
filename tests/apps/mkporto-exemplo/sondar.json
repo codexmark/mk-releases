@@ -1,0 +1,8 @@
+[
+  {"apelido": "atlas", "responde": true, "ms": 14, "motivo": null, "servidor": "OpenSSH_10.0", "via": null},
+  {"apelido": "web10", "responde": false, "ms": null, "motivo": "recusou a conexão", "servidor": null, "via": null},
+  {"apelido": "farol", "responde": true, "ms": 38, "motivo": null, "servidor": "OpenSSH_9.9 Debian-3", "via": null},
+  {"apelido": "web2", "responde": false, "ms": null, "motivo": "a porta abre, mas não é um servidor ssh", "servidor": null, "via": null},
+  {"apelido": "estufa", "responde": false, "ms": null, "motivo": "não respondeu em 2 s", "servidor": null, "via": null},
+  {"apelido": "cofre", "responde": true, "ms": 183, "motivo": null, "servidor": "OpenSSH_9.9 Debian-3", "via": "farol"}
+]

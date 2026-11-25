@@ -1,1 +1,5 @@
-Captura: ler o texto ou o QR code de uma área (SUPER + SHIFT + T)
+MkPorto: o Delete chega com o cursor na busca, e o terminal espera depois de enviar ou gerar chave
+MkPorto e o ler da captura: fecham os limites da primeira versão
+MkPorto: escolher a chave a enviar pelo teclado
+MkPorto: enviar chave e remover pelo teclado, e o alto cabe numa coluna apertada
+MkPorto: o catálogo das conexões SSH

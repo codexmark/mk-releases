@@ -9,6 +9,7 @@ fontes:
   - "migrations/system/20261130-mkpacotes-mkutil.sh"
   - "migrations/system/20261201-mkcalc-mkcorte-mkescrita.sh"
   - "migrations/system/20261202-ler-tela.sh"
+  - "migrations/system/20261203-mkporto.sh"
   - "migrations/system/20261129-mkpulso.sh"
   - "migrations/user/20261128-papel-de-fabrica.sh"
   - "migrations/system/20261128-entrada-marca.sh"
@@ -61,6 +62,7 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261130-mkpacotes-mkutil.sh` | os links do MkPacotes, do MkInstalar e do MkComprimir (`apps-links`) | |
 | `20261201-mkcalc-mkcorte-mkescrita.sh` | os links do MkCalc, do MkCorte e do MkEscrita (`apps-links`) | `qt6-multimedia`, `qt6-multimedia-ffmpeg` |
 | `20261202-ler-tela.sh` | só avisa se faltar algo do "ler" da captura | `tesseract tesseract-data-por tesseract-data-eng zbar` |
+| `20261203-mkporto.sh` | os links do MkPorto (`apps-links`) | |
 
 ### De usuário (`migrations/user/`)
 

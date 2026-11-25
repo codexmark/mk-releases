@@ -1,0 +1,8 @@
+{
+  "acao": "gerar",
+  "apelido": null,
+  "argv": ["ssh-keygen", "-t", "ed25519", "-f", "~/.ssh/id_ed25519_oficina", "-C", "marina@oficina.example"],
+  "texto": null,
+  "terminal": ["foot", "--title=ssh-keygen · id_ed25519_oficina", "ssh-keygen", "-t", "ed25519", "-f", "~/.ssh/id_ed25519_oficina", "-C", "marina@oficina.example"],
+  "aviso": null
+}

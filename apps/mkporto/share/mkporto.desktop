@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MkPorto
+GenericName=Gerente de conexões SSH
+Comment=Os hosts do seu ~/.ssh/config, com o estado de cada um; conectar abre um terminal
+Exec=mkporto
+Icon=mkporto
+Terminal=false
+Categories=Network;System;Utility;
+Keywords=ssh;conexão;conexao;servidor;host;remoto;terminal;chave;porto;
