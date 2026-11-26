@@ -1,5 +1,3 @@
-Limites: o que a VM mostrou do MkFiles
-MkFiles: as teclas do painel chegam na primeira, e a documentação
-MkFiles, fase 3: rede e remotos pelo gvfs; VM de teste sem janela
-MkFiles, fase 2: renomear em lote, compactados e prévia rápida
-MkFiles, fase 1: o núcleo do gerenciador de arquivos
+MkTunes: respostas gravadas do YouTube reduzidas ao que o leitor lê
+MkTunes: o Início volta quando o daemon é trocado com a janela aberta
+MkTunes: o daemon passa a ser um binário em Go

@@ -9,6 +9,9 @@ fontes:
   - "docs/limites.md"
   - "apps/README.md"
   - "apps/mktunes/VERSION"
+  - "apps/mktunes/CONTRATO.md"
+  - "apps/mktunes/NOTICE.md"
+  - "migrations/system/20261207-mktunes-go.sh"
   - "apps/mktunes/bin/mktunes"
   - "system/mk/mktunes-links"
   - "migrations/system/20261127-mktunes.sh"
@@ -17,7 +20,7 @@ fontes:
 
 # MkTunes
 
-O MkTunes é o player de música do Mk: músicas, álbuns, rádios e letras, sem conta. Foi o primeiro app "do Mk" a vir pronto dentro do repositório, em `apps/mktunes`, e é o único cujo código mora fora dele e cujo núcleo é em Java.
+O MkTunes é o player de música do Mk: músicas, álbuns, rádios e letras, sem conta. Foi o primeiro app "do Mk" a vir pronto dentro do repositório, em `apps/mktunes`. O núcleo era um daemon em Kotlin, gerado em outro repositório; hoje é um daemon em Go cujo código mora aqui, como nos outros apps.
 
 ## Para quê
 
@@ -25,30 +28,34 @@ Tocar música com uma janela na mesma linguagem do Maré e aparecendo na ilha.
 
 ## Como funciona
 
-- **Duas partes**: a janela é do Quickshell (QML, com os tokens do Maré) e o núcleo é um *daemon* Java (`mktunesd`) que toca pelo `mpv` e aparece na ilha pelo MPRIS. As tags das músicas locais vêm do `ffprobe`.
-- **`apps/mktunes/`**: `bin/mktunes` (o lançador), `daemon/` (`bin`, `lib`), `qml/`, `share/` (o `.desktop` e o ícone), `VERSION`, `LICENSE`.
-- **O lançador**: sobe o `mktunesd` se ninguém responde no soquete (`$XDG_RUNTIME_DIR/mktunes/mktunes.sock`) e abre a janela; se já está aberta, só a traz para a frente. Se falta o `mpv` ou o Quickshell, avisa por notificação.
+- **Duas partes**: a janela é do Quickshell (QML, com os tokens do Maré) e o núcleo é um *daemon* em Go (`mktunesd`, só com a biblioteca padrão) que toca pelo `mpv` e aparece na ilha pelo MPRIS. Os dois conversam por um soquete (`$XDG_RUNTIME_DIR/mktunes/mktunes.sock`), uma linha JSON por mensagem; o protocolo está em `apps/mktunes/CONTRATO.md`.
+- **`apps/mktunes/`**: `bin/mktunes` (o lançador), `bin/mktunesd` (o daemon compilado) e `bin/mktunesd.de` (a assinatura do código de que ele veio), `src/` (o código em Go), `qml/`, `share/` (o `.desktop` e o ícone), `pack`, `assinatura`, `CONTRATO.md`, `VERSION`, `LICENSE`, `NOTICE.md`.
+- **De onde vem a música**: a busca, as sugestões, o Início, as páginas de álbum e artista e a fila automática vêm do YouTube Music por um cliente próprio (InnerTube); o endereço do áudio é pedido ao `yt-dlp` do sistema; as letras vêm do LRCLIB e as rádios do radio-browser. As tags das músicas locais vêm do `ffprobe`.
+- **A biblioteca**: arquivos JSON em `~/.local/share/mktunes` (`biblioteca.json`, `preferencias.json`, `sessao.json`, `downloads.json`, `historico.jsonl`), escritos num temporário e trocados de nome.
+- **O MPRIS**: `org.mpris.MediaPlayer2.mktunes`, por um cliente D-Bus próprio (`src/internal/dbus`), escrito a partir da especificação pública.
+- **O lançador**: sobe o `mktunesd` se ninguém responde no soquete e abre a janela; se já está aberta, só a traz para a frente. Se falta o `mpv` ou o Quickshell, avisa por notificação.
 - **Ligação ao sistema** (`system/mk/mktunes-links`): três links simbólicos para `/usr/share/mk/apps/mktunes`: `/usr/bin/mktunes`, o atalho em `/usr/share/applications` e o ícone em `hicolor`.
-- **Dependências**: `jre-openjdk-headless`, `mpv`, `ffmpeg`, em `desktop.packages`.
+- **Dependências**: `mpv`, `ffmpeg`, `yt-dlp`, `sqlite`, em `desktop.packages`.
 
 ## Por quê assim
 
-- **A pasta é gerada, nunca editada aqui**: o código mora no repositório do MkTunes, que tem um comando para testar o pacote e outro para empacotar para dentro de `apps/mktunes`. O `VERSION` diz de qual commit veio.
+- **Porte, não reescrita livre**: o daemon em Go segue o daemon em Kotlin campo por campo, e os testes dele foram portados junto. Por isso a janela não mudou.
+- **Sem a máquina virtual**: o daemon em Kotlin pedia uma JVM e ocupava por volta de 100 MB; o binário em Go ocupa menos de 20 MB tocando e sobe na hora. O pacote `jre-openjdk-headless` saiu de `desktop.packages` (ninguém o remove de uma máquina já instalada: pode ser de outro programa).
+- **Só a biblioteca padrão**: as três peças que dependiam de bibliotecas foram trocadas. O SQLite virou arquivos JSON; o extrator do YouTube virou o cliente InnerTube próprio mais o `yt-dlp`; a biblioteca de D-Bus virou um cliente mínimo escrito à mão.
+- **Quem vinha da versão em Kotlin não faz nada**: o lançador para o daemon antigo que ficou no ar (achado em `/proc` pelo nome da classe) e, na primeira subida, o daemon novo lê o banco `mktunes.db` com o `sqlite3`, junta à biblioteca e o renomeia para `mktunes.db.migrado`. Daí em diante, um `mktunesd` de versão diferente da instalada é encerrado (guardando a sessão) para o novo subir.
+- **Licença própria**: o MkTunes é GPL-3.0-or-later, e o porte continua sendo. É a única pasta do repositório com licença própria (`LICENSE`, `NOTICE.md`).
 - **Vem compilado dentro do Mk**: o `mk-update` troca `/usr/share/mk` inteiro, então "uma versão nova de um app chega como qualquer outra mudança do Mk", sem pacote, sem AUR, sem repositório de binários.
 - **Links em vez de cópias**: "a versão que o mk-update traz vale sozinha, sem rodar isto de novo".
-- **Em `desktop.packages`, não em `apps.packages`**: `mpv` e `ffmpeg` também estão na lista de apps; estão aqui "porque o MkTunes não é opcional".
-- **Continua em Java**: os apps que vieram depois têm o motor em Go ([[Apps do Mk (motor em Go, janela em QML)]]). O porte do MkTunes para Go espera o repositório dele, que não estava na máquina onde os outros apps foram feitos (`docs/limites.md`). Até lá, ele é o único app do Mk que pede uma JVM (`jre-openjdk-headless`).
-- **Java só de linha de comando** (`headless`): o núcleo não tem parte gráfica.
-- **Daemon velho depois de um `mk-update`**: o lançador detecta um daemon que segura os jars que a atualização apagou (arquivos `(deleted)` em `/proc/<pid>/fd`), para-o e sobe o novo.
-- **Num Mk já instalado**: a migração `20261127-mktunes.sh` cria os links e pede os três pacotes.
+- **Em `desktop.packages`, não em `apps.packages`**: `mpv`, `ffmpeg` e `yt-dlp` também estão na lista de apps; estão aqui "porque o MkTunes não é opcional".
+- **Num Mk já instalado**: a migração `20261127-mktunes.sh` cria os links e a `20261207-mktunes-go.sh` pede o `yt-dlp` e o `sqlite`.
 
-> [!note] Fora do lint
-> `tests/lint.test.sh` deixa `apps/` de fora: é código gerado em outro repositório.
+> [!warning] Depende de serviços de fora
+> O YouTube muda as respostas sem avisar. A busca e o Início dependem dos leitores próprios; o áudio, do `yt-dlp` da máquina estar em dia. O que foi e o que não foi conferido está em `docs/limites.md`.
 
 ## Onde está no código
 
-`apps/README.md`, `apps/mktunes/`, `system/mk/mktunes-links`, `migrations/system/20261127-mktunes.sh`.
+`apps/README.md`, `apps/mktunes/`, `system/mk/mktunes-links`, `migrations/system/20261127-mktunes.sh`, `migrations/system/20261207-mktunes-go.sh`, `tests/apps/mktunes-go.test.sh`, `tests/apps/mktunes-janela.test.sh`.
 
 ## Ligações
 
-Depende de: [[Áudio]], [[Listas de pacotes]], [[Direção Folha]]. Atualizado por: [[mk-update]]. Aparece em: [[Ilha]], [[Painéis]] (mídia).
+Depende de: [[Áudio]], [[Listas de pacotes]], [[Direção Folha]], [[Apps do Mk (motor em Go, janela em QML)]]. Atualizado por: [[mk-update]]. Aparece em: [[Ilha]], [[Painéis]] (mídia).

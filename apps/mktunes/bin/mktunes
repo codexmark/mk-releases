@@ -1,54 +1,70 @@
 #!/usr/bin/env bash
-# Abre o MkTunes: sobe o mktunesd se ninguém responde no socket e abre a janela (Quickshell).
-# Se a janela já está aberta, só a traz para a frente.
-#   MKTUNES_HOME   onde estão daemon/ e qml/ (padrão: a pasta acima deste script)
+# Abre o MkTunes: sobe o mktunesd se ninguém responde no socket e abre a janela
+# (Quickshell). Se a janela já está aberta, só a traz para a frente.
+#   MKTUNES_HOME   onde estão bin/ e qml/ (padrão: a pasta acima deste script)
+#   MKTUNES_PROC   outra raiz no lugar de /proc: só os testes trocam
 set -euo pipefail
 home=${MKTUNES_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
-sock=${XDG_RUNTIME_DIR:-/tmp}/mktunes/mktunes.sock
 log=${XDG_CACHE_HOME:-$HOME/.cache}/mktunes/mktunesd.log
+daemon=$home/bin/mktunesd
 
 # Falta algo do sistema: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
 missing() {
-  local text="O MkTunes precisa $1. Rode mk-update ou: sudo pacman -S $2"
+  local text="O MkTunes precisa $1. Rode mk atualizar${2:+ ou: sudo pacman -S $2}"
   notify-send -a MkTunes -i mktunes "MkTunes" "$text" 2>/dev/null || true
   echo "mktunes: $text" >&2
   exit 1
 }
 command -v mpv >/dev/null || missing "do mpv" "mpv"
 command -v qs >/dev/null || missing "do Quickshell" "quickshell"
+[[ -x $daemon ]] || missing "do daemon (bin/mktunesd)"
 
-daemon_bin=$home/daemon/bin/mktunesd
-[[ -x $daemon_bin ]] || daemon_bin=$home/daemon/build/install/mktunesd/bin/mktunesd
-
-# Depois de um mk-update, o daemon que já rodava ainda é o da versão velha: ele segura os jars
-# que a atualização apagou. Esse para (salva a sessão ao sair) e sobe o novo.
-for pid in $(pgrep -f "dev.mk.mktunes.desktop.MainKt" || true); do
-  if ls -l "/proc/$pid/fd" 2>/dev/null | grep -q "$home/daemon/lib/.*(deleted)"; then
-    kill "$pid" 2>/dev/null || true
-    for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
-  fi
+# O daemon de antes deste (o da JVM) pode estar no ar depois de um mk atualizar:
+# os arquivos dele já foram apagados. Esse para (ele guarda a sessão ao sair) e o
+# novo sobe. É achado pelo nome da classe entre os argumentos de um processo
+# deste usuário, lido direto em /proc.
+classe_antiga=dev.mk.mktunes.desktop.MainKt
+for dir in "${MKTUNES_PROC:-/proc}"/[0-9]*; do
+  [[ -O $dir && -r $dir/cmdline ]] || continue
+  argv=()
+  mapfile -d '' -t argv <"$dir/cmdline" 2>/dev/null || continue
+  antigo=0
+  for arg in "${argv[@]}"; do
+    [[ $arg == "$classe_antiga" ]] && antigo=1
+  done
+  ((antigo)) || continue
+  pid=${dir##*/}
+  kill "$pid" 2>/dev/null || true
+  for _ in {1..40}; do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+  done
 done
 
-if ! python3 -c "import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1])" "$sock" 2>/dev/null; then
+# Quem responde no socket? Um mktunesd de outra versão (o Mk foi atualizado com
+# ele no ar) sai, guardando a sessão, para o novo subir.
+respondendo=0
+if viva=$("$daemon" --ping 2>/dev/null); then
+  respondendo=1
+  if [[ $viva != "$("$daemon" --versao)" ]]; then
+    "$daemon" --encerra >/dev/null 2>&1 || true
+    "$daemon" --ping >/dev/null 2>&1 || respondendo=0
+  fi
+fi
+if ((!respondendo)); then
   mkdir -p "$(dirname "$log")"
   # O daemon abre a janela por aqui quando a ilha pede ("Raise" do MPRIS).
-  export MKTUNES_LAUNCHER=$(readlink -f "$0")
-  if command -v java >/dev/null; then
-    setsid -f "$daemon_bin" >"$log" 2>&1
-  elif [[ -x $home/../gradlew ]] && command -v mise >/dev/null; then
-    # Rodando do repositório: o Java vem do mise.
-    setsid -f mise exec -C "$home/.." -- "$daemon_bin" >"$log" 2>&1
-  else
-    missing "do Java" "jre-openjdk-headless"
-  fi
+  MKTUNES_LAUNCHER=$(readlink -f "$0")
+  export MKTUNES_LAUNCHER
+  setsid -f "$daemon" >"$log" 2>&1
 fi
 
 # Uma janela só: se já há uma, foca (Hyprland com configuração em Lua, como no Mk, ou a clássica).
-if qs list --all 2>/dev/null | grep -q "Config path: $home/qml/shell.qml"; then
-  addr=$(hyprctl clients -j 2>/dev/null | python3 -c "import json,sys; print(next((c['address'] for c in json.load(sys.stdin) if c['title'] == 'MkTunes'), ''))")
-  if [[ -n $addr ]]; then
+if command -v jq >/dev/null && qs list --all 2>/dev/null | grep -qF "Config path: $home/qml/shell.qml"; then
+  addr=$(hyprctl clients -j 2>/dev/null | jq -r 'first(.[] | select(.title == "MkTunes") | .address) // empty' 2>/dev/null || true)
+  if [[ $addr =~ ^0x[0-9a-f]+$ ]]; then
     hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 ||
-      hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
+      hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1 || true
     exit 0
   fi
 fi

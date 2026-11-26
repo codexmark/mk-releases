@@ -81,7 +81,7 @@ A lista de `docs/limites.md`, onde cada item "tem dono certo: virar um caso que 
 - **MkPacotes chama `pkexec pacman` pelo nome**: o certo é o motor passar o caminho fixo, como o MkInstalar já faz. E não remove pacote do AUR com letra maiúscula no nome ([[MkPacotes]]).
 - **MkComprimir**: fechar a janela no meio de uma codificação pode deixar um arquivo `.mkcomprimir-*.parcial.*` escondido ao lado do vídeo ([[MkInstalar e MkComprimir]]).
 - **MkCalc, MkCorte e MkEscrita**: vistos na sessão aninhada pelo teclado (conta, histórico, dividir, remover, exportar, digitar, salvar sozinho, pré-visualização). Nada com o mouse foi exercitado, nem a instalação na VM. O MkCorte não pergunta pela edição ao ser fechado pelo compositor; o MkEscrita não imprime ([[MkCalc, MkCorte e MkEscrita]]).
-- **MkTunes continua em Java**: o porte para Go espera o repositório dele ([[MkTunes]]).
+- **MkTunes (daemon em Go)**: nenhum som foi ouvido nos testes (o mpv tocou com `--ao=null`, e a VM estava sem placa de som); nada com o mouse na janela; uma biblioteca grande na migração não foi exercitada; a busca e o Início dependem de leitores próprios das respostas do YouTube, e o áudio, do `yt-dlp` em dia ([[MkTunes]]).
 - **`mare-wifi-qr`**: duas conexões salvas com o mesmo nome se confundem, e uma rede WEP por frase-senha gera um QR que o celular pode não aceitar.
 - **`mare-shot`**: duas capturas no mesmo segundo usam o mesmo nome de arquivo.
 - **Descanso de tela**: desliga quando a tela é bloqueada (aos 5 min, de fábrica); com "Bloquear" em 0 fica até a tela apagar ([[Descanso de tela]]).

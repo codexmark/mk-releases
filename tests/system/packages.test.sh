@@ -53,11 +53,12 @@ done
 t "nenhum pacote repetido entre base, desktop e dev (as três entram sempre, juntas)"
 eq "" "$(for l in base desktop dev; do read_list "$PKG_DIR/$l.packages"; done | sort | uniq -d)"
 
-t "apps só repete de outra lista o que o desktop não pode dispensar (mpv e ffmpeg, do MkTunes)"
+t "apps só repete de outra lista o que o desktop não pode dispensar (mpv, ffmpeg e yt-dlp, do MkTunes)"
 eq "ffmpeg
-mpv" "$(comm -12 <(read_list "$PKG_DIR/apps.packages" | sort) \
+mpv
+yt-dlp" "$(comm -12 <(read_list "$PKG_DIR/apps.packages" | sort) \
   <(for l in base desktop dev; do read_list "$PKG_DIR/$l.packages"; done | sort))"
-has "$(<"$PKG_DIR/desktop.packages")" "mpv e ffmpeg também estão em"
+has "$(<"$PKG_DIR/desktop.packages")" "mpv, ffmpeg e yt-dlp também estão em"
 
 t "nenhum pacote do AUR nas listas dos repositórios"
 for l in "${repos[@]}"; do

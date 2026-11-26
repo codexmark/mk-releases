@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # Sintaxe e lint do repositório inteiro: nada que não passa aqui é lançado.
-# apps/mktunes (gerado no repositório do MkTunes) e as pastas de trabalho da
-# ISO ficam de fora.
+# As pastas de trabalho da ISO ficam de fora.
 . "$(dirname "$0")/lib.sh"
 
 cd "$REPO" || exit 1
 mapfile -t all < <(find . -type f \
-  -not -path './.git/*' -not -path './apps/mktunes/*' -not -path './iso/work/*' -not -path './iso/out/*' |
+  -not -path './.git/*' -not -path './iso/work/*' -not -path './iso/out/*' |
   sed 's|^\./||' | sort)
 
 # shells: os que têm #! de bash; libs: os que são carregados com `.` (sem #!).
@@ -44,7 +43,7 @@ fi
 
 t "todo executável de bin/ e scripts do shell tem o bit de execução"
 for f in bin/* shell/mare/scripts/* tests/run tests/hooks/* apps/mkpulso/bin/mkpulso apps/mkpacotes/bin/mkpacotes apps/mkutil/bin/mkinstalar \
-  apps/mkutil/bin/mkcomprimir apps/mkcalc/bin/mkcalc apps/mkcorte/bin/mkcorte apps/mkescrita/bin/mkescrita apps/mkporto/bin/mkporto apps/mksom/bin/mksom apps/mkfiles/bin/mkfiles apps/mk*/pack apps/mk*/assinatura; do
+  apps/mkutil/bin/mkcomprimir apps/mkcalc/bin/mkcalc apps/mkcorte/bin/mkcorte apps/mkescrita/bin/mkescrita apps/mkporto/bin/mkporto apps/mksom/bin/mksom apps/mkfiles/bin/mkfiles apps/mktunes/bin/mktunes apps/mk*/pack apps/mk*/assinatura; do
   [[ -f $f && $f != bin/lib-packages.sh ]] || continue
   [[ -x $f ]] || _fail "sem +x: $f"
 done

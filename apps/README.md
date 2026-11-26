@@ -7,27 +7,32 @@ qualquer outra mudança do Mk.
 ## mktunes
 
 O player de música do Mk: músicas, álbuns, rádios e letras, sem conta. A
-janela é do Quickshell (tokens do Maré) e o núcleo é um daemon Java
-(`mktunesd`) que toca pelo mpv e aparece na ilha pelo MPRIS.
+janela é do Quickshell (tokens do Maré) e o núcleo é um daemon em Go
+(`mktunesd`, só com a biblioteca padrão) que toca pelo mpv e aparece na ilha
+pelo MPRIS. O que os dois conversam está em `mktunes/CONTRATO.md`.
 
-O código mora no repositório do MkTunes; esta pasta é gerada lá, nunca
-editada aqui:
+O daemon é um porte do daemon em Kotlin do MkTunes (o projeto do player para
+Android, do mesmo autor): o mesmo protocolo e as mesmas regras, sem a máquina
+virtual. **O código mora aqui** (`mktunes/src`), como nos outros apps; esta é a
+única pasta do repositório com licença própria, a GPL-3.0-or-later
+(`mktunes/LICENSE`, `mktunes/NOTICE.md`).
 
 ```bash
-desktop/bin/check-pack                 # testa o pacote inteiro
-desktop/bin/pack ~/Work/mk/apps/mktunes
+apps/mktunes/pack          # formata, testa, compila e grava a assinatura
+tests/run mktunes
 ```
 
-`apps/mktunes/VERSION` diz de qual commit do MkTunes veio. O sistema liga o
-app por `system/mk/mktunes-links` (comando `mktunes`, atalho no menu e ícone,
-todos apontando para cá) e precisa de `jre-openjdk-headless`, `mpv` e
-`ffmpeg` (em `system/packages/desktop.packages`).
+O sistema liga o app por `system/mk/mktunes-links` (comando `mktunes`, atalho
+no menu e ícone, todos apontando para cá) e precisa de `mpv`, `ffmpeg`,
+`yt-dlp` e `sqlite` (em `system/packages/desktop.packages`). Quem vinha da
+versão em Kotlin não faz nada: o lançador para o daemon antigo e a biblioteca
+do banco `mktunes.db` é trazida na primeira subida.
 
 ## mkpulso
 
 O monitor de sistema do Mk: processos agrupados por app e por serviço,
 desempenho, a ficha da máquina, o que sobe no login e os serviços do systemd.
-Ao contrário do MkTunes, **o código mora aqui**:
+**O código mora aqui**:
 
 | Pasta | O que é |
 |---|---|

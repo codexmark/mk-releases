@@ -187,8 +187,22 @@ correção.
   testar a entrada antes e depois de enviar a chave, enviar a chave, um host
   por salto (sondado e conectado), gerar uma chave e copiar o comando. **Não
   visto:** nada com o mouse, e uma máquina de fora (só a própria VM).
-- **MkTunes continua em Java.** O porte para Go espera o repositório dele, que
-  não está na máquina onde os outros apps foram feitos.
+- **MkTunes com o daemon em Go** (porte do daemon em Kotlin). Conferido com as
+  ferramentas de verdade, numa pasta pessoal de mentira e num barramento
+  D-Bus à parte: busca (músicas e geral), sugestões, Início, página de
+  artista, tocar pelo `yt-dlp` e pelo mpv (qualidade alta e econômica), letra
+  sincronizada, autoplay, baixar uma música, rádio, músicas locais (com e sem
+  etiqueta), exportar e importar o backup, o MPRIS lido e comandado
+  pelo `playerctl` e pelo `busctl`, e a migração de um banco SQLite escrito
+  pelo daemon antigo (curtida, playlist, tocadas, ajustes, a fila e a
+  posição). Na VM, depois de um `mk-update` de verdade com o MkTunes antigo
+  tocando: o lançador parou o daemon da máquina virtual e subiu o novo, a
+  biblioteca veio do banco, a janela mostrou o Início e as tocadas recentes, a
+  música tocou e a ilha reagiu. **Não visto:** nenhum som ouvido (o mpv tocou
+  com `--ao=null` aqui e sem placa de som na VM), nada com o mouse na janela, e
+  uma biblioteca grande na
+  migração. O YouTube muda as respostas sem avisar: a busca e o Início dependem
+  de leitores próprios, e o áudio, do `yt-dlp` da máquina estar em dia.
 - **Controles (Super + Esc):** vistos abrindo na sessão aninhada, com Esc
   fechando e a troca para outro painel; os botões e as chaves não foram
   clicados, e a cafeína segurando de fato o descanso de tela não foi vista. A

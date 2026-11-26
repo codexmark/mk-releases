@@ -26,6 +26,8 @@ ListView {
     Connections {
         target: daemon
         function onHomeChanged() { page.syncShelves(); }
+        // O daemon foi trocado com a janela aberta: o novo ainda não carregou o Início.
+        function onConnectedChanged() { if (daemon.connected && page.visible) daemon.send({ cmd: "home" }); }
     }
     function syncShelves() {
         const key = JSON.stringify(daemon.home.shelves);

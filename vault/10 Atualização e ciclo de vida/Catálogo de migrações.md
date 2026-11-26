@@ -13,6 +13,7 @@ fontes:
   - "migrations/system/20261204-dns-ajudante.sh"
   - "migrations/system/20261205-mksom.sh"
   - "migrations/system/20261206-mkfiles.sh"
+  - "migrations/system/20261207-mktunes-go.sh"
   - "migrations/system/20261129-mkpulso.sh"
   - "migrations/user/20261128-papel-de-fabrica.sh"
   - "migrations/system/20261128-entrada-marca.sh"
@@ -58,7 +59,7 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261126-boot-gerenciado.sh` | tira a entrada fixa do menu e deixa o `limine-update` escrever | |
 | `20261126-chaveiro-ssh.sh` | `gcr-ssh-agent.socket` para todos | `gcr-4` |
 | `20261127-editor-nuvem.sh` | `vercel` no `aur-pendentes.txt` | `code aws-cli-v2 wrangler` |
-| `20261127-mktunes.sh` | os links do MkTunes | `jre-openjdk-headless mpv ffmpeg` |
+| `20261127-mktunes.sh` | os links do MkTunes | `mpv ffmpeg` |
 | `20261128-entrada-marca.sh` | o tema novo do sddm (a marca construída), mantendo o `theme.conf.user` | |
 | `20261128-shellcheck.sh` | só avisa se o `shellcheck` não veio | `shellcheck` |
 | `20261129-mkpulso.sh` | os links do MkPulso (comando, atalho, ícone); avisa se o coletor não veio | |
@@ -69,6 +70,7 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261204-dns-ajudante.sh` | copia o ajudante do DNS dos Ajustes para `/usr/lib/mk/mk-dns` (do root, 755); não muda o DNS de ninguém | |
 | `20261205-mksom.sh` | os links do MkSom (`apps-links`) | |
 | `20261206-mkfiles.sh` | os links do MkFiles (`apps-links`) | |
+| `20261207-mktunes-go.sh` | o MkTunes com o daemon em Go: refaz os links; não remove a máquina virtual de ninguém | `yt-dlp sqlite mpv ffmpeg` |
 
 ### De usuário (`migrations/user/`)
 
@@ -98,7 +100,7 @@ Essa migração existe porque o instalador, até certa versão, **descartava** o
 
 ## Onde está no código
 
-`migrations/system/` (29 arquivos) e `migrations/user/` (8 arquivos).
+`migrations/system/` (30 arquivos) e `migrations/user/` (8 arquivos).
 
 ## Ligações
 

@@ -45,7 +45,7 @@ Até aqui o Mk cobria essas funções com o que já existia: o `btop` num termin
 - **Binários no git** (alguns megabytes cada), e a obrigação de recompilar e fazer o commit do binário junto com o código; o `tests/run` reprova um binário velho. O `go` já está em `dev.packages`.
 - O instalador precisou passar a devolver o bit de execução também a binários compilados (`fix_exec` reconhece ELF), porque o `mkarchiso` grava tudo como 644 ([[Instalador passo a passo]]).
 - A suíte ganhou `tests/apps/`: os testes em Go de cada motor, a estrutura das janelas, os lançadores e as contas em JavaScript.
-- O MkTunes fica como exceção: continua em Java, e o porte para Go espera o repositório dele.
+- O MkTunes foi a exceção até o porte: o daemon em Kotlin virou um daemon em Go (`apps/mktunes/src`), com o mesmo protocolo e a mesma janela. É a única pasta com licença própria (GPL-3.0-or-later).
 - As janelas são código novo e pouco visto: os botões nunca foram clicados de verdade ([[Limitações conhecidas]]).
 - Mais superfície para manter: três contratos, três motores, cinco janelas.
 

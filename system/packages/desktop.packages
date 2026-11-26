@@ -38,11 +38,13 @@ qt6-multimedia
 qt6-multimedia-ffmpeg
 libnotify
 
-# MkTunes, o player de música do Mk (apps/mktunes): o núcleo roda no Java só de
-# linha de comando (sem a parte gráfica), o som sai pelo mpv e as tags das
-# músicas do computador vêm do ffprobe. mpv e ffmpeg também estão em
+# MkTunes, o player de música do Mk (apps/mktunes): o daemon vai pronto (um
+# binário em Go), o som sai pelo mpv, o áudio do YouTube é achado pelo yt-dlp,
+# as tags das músicas do computador vêm do ffprobe e o sqlite3 leva a
+# biblioteca da versão antiga para a nova. mpv, ffmpeg e yt-dlp também estão em
 # apps.packages; aqui é porque o MkTunes não é opcional
-jre-openjdk-headless
+yt-dlp
+sqlite
 mpv
 ffmpeg
 
