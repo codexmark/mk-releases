@@ -154,9 +154,8 @@ Kotlin (`"format":"mktunes-backup","version":1`).
 
 | Variável | Padrão | Para quê |
 |---|---|---|
-| `MKTUNES_MPV` | `mpv` | o tocador: `--config=no --load-scripts=no --idle=yes --no-video --no-terminal --audio-display=no --input-ipc-server=<pasta do socket>/mpv.sock --keep-open=no` |
+| `MKTUNES_MPV` | `mpv` | o tocador: `--config=no --load-scripts=no --idle=yes --no-video --no-terminal --audio-display=no --input-ipc-server=<pasta do socket>/mpv.sock --keep-open=no --ytdl=no`; recebe o endereço do áudio pronto (`loadfile <endereço> replace`) e nunca procura um por conta própria |
 | `MKTUNES_MPV_ARGS` | | opções a mais do mpv, separadas por espaço (`--ao=null`: sem som) |
-| `MKTUNES_YTDLP` | `yt-dlp` | o áudio do YouTube: `-f <seletor> -g --no-playlist --no-warnings -- https://music.youtube.com/watch?v=<id>`; só ids `[A-Za-z0-9_-]{11}`, só endereços https de `googlevideo.com` e `youtube.com` |
 | `MKTUNES_SQLITE3` | `sqlite3` | a migração |
 | `MKTUNES_FFPROBE` | `ffprobe` | as etiquetas das músicas locais |
 | `MKTUNES_LAUNCHER` | `mktunes` | o que o "Raise" do MPRIS roda |
@@ -164,9 +163,39 @@ Kotlin (`"format":"mktunes-backup","version":1`).
 | `MKTUNES_MPRIS` | | `0`: fica fora do barramento |
 | `MKTUNES_INNERTUBE_URL`, `MKTUNES_LRCLIB_URL`, `MKTUNES_RADIO_URL` | os serviços de verdade | outro endereço (os testes) |
 
-Nenhum comando passa por shell. Sem `yt-dlp`, a faixa fica `failed` e a janela
-recebe um aviso com o pacote. Sem barramento de sessão
+Nenhum comando passa por shell. Sem barramento de sessão
 (`DBUS_SESSION_BUS_ADDRESS`), o daemon sobe sem MPRIS, sem erro.
+
+**O áudio do YouTube**: o daemon acha o endereço ele mesmo, pelo `player` do
+InnerTube com o perfil `VISIONOS` (`X-YouTube-Client-Name: 101`), que entrega
+`streamingData.adaptiveFormats[].url` sem cifra e que a CDN serve inteiro. Só
+ids `[A-Za-z0-9_-]{11}` são pedidos; a resposta tem de vir com
+`playabilityStatus.status` `OK` (senão a faixa fica `failed`, com o motivo no
+log); só endereços https de `googlevideo.com` são aceitos. A escolha: a faixa
+original (sem DRC, sem dublagem), M4A primeiro, depois a maior taxa; em
+`economy`, até 128 kbps, ou a mais leve. O pedido leva o visitante de convidado
+que o YouTube Music entrega (sem ele a resposta é `LOGIN_REQUIRED`): se ainda
+não há um, o daemon pede o Início antes; se o que há é recusado, tenta uma vez
+mais com um novo. O endereço fica guardado até dois minutos antes de vencer
+(`expiresInSeconds`), no máximo 32 endereços e 3 pedidos ao mesmo tempo. O
+volume medido (`loudnessDb`) vem do `player` do perfil `ANDROID_VR`, pedido em
+paralelo e sem segurar a música; se ele não responde, vale o do formato.
+
+**Tocar**: `now.status` fica `loading` enquanto o endereço é achado e até o
+mpv dizer que abriu a faixa (`file-loaded`); só então vira `playing` (ou
+`paused`, se o ouvinte pausou na espera). Um `end-file` com erro vira `failed`.
+O eco de uma pausa que o daemon já desfez não muda o estado.
+
+**Downloads**: o mesmo endereço, baixado pelo próprio daemon em pedaços de
+1 MiB (`Range`), para `<pasta>/.mktunes-incomplete/` e só movido para o lugar
+quando inteiro; cancelar apaga o pedaço.
+
+**Log**: o daemon escreve em stderr (o lançador o guarda em
+`$XDG_CACHE_HOME/mktunes/mktunesd.log`) uma linha quando não acha o áudio de
+uma faixa (`sem stream para <id>: …`), quando o mpv a recusa (`o mpv recusou
+<id>: <motivo>`), quando o mpv morre e é religado (`o mpv saiu (…); subindo
+outro`, `o mpv foi religado`) e quando um download falha (`o download de <id>
+falhou: …`). Os endereços aparecem só com o servidor, nunca inteiros.
 
 ## MPRIS
 

@@ -7,7 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"math/rand/v2"
+	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -111,16 +113,25 @@ func Monta(p Portas, c Config) *App {
 	if c.AoMudarAjustes == nil {
 		c.AoMudarAjustes = func(dominio.Ajustes) {}
 	}
+	// O que vai para o log nunca leva um endereço inteiro: os do áudio trazem a
+	// assinatura (e o IP) de quem pediu.
+	registra := func(texto string) { c.Registro(semEnderecos(texto)) }
 	quadro := NovoQuadro()
 	acervo := app.NovoAcervo(c.Guarda, c.Codec, c.Laco.Agora)
 	downloads := app.NovosDownloads(p.Streams, p.Arquivos, c.Guarda, c.Laco, func() int { return acervo.Ajustes().Trabalhadores })
+	downloads.AoFalhar = func(f dominio.Faixa, erro error) {
+		registra("o download de " + f.ID + " falhou: " + erro.Error())
+	}
 	sessao := app.NovaSessao(app.OpcoesDaSessao{
 		Resolvedor: p.Streams, Tocador: p.Tocador, Laco: c.Laco, Autoplay: p.Filas,
 		AutoplayLigado: func() bool { return acervo.Ajustes().Autoplay },
 		Normalizar:     func() bool { return acervo.Ajustes().Normalizar },
 		Local:          downloads.StreamLocal,
 		AoFalhar: func(f dominio.Faixa, erro error) {
-			c.Registro("sem stream para " + f.ID + ": " + erro.Error())
+			registra("sem stream para " + f.ID + ": " + erro.Error())
+		},
+		AoRecusar: func(f dominio.Faixa, motivo string) {
+			registra("o mpv recusou " + f.ID + ": " + motivo)
 		},
 	})
 	soneca := app.NovaSoneca(sessao, c.Laco)
@@ -148,6 +159,18 @@ func Monta(p Portas, c Config) *App {
 		novoLocal(quadro, c.Laco, p.Local),
 	}
 	return a
+}
+
+var endereco = regexp.MustCompile(`https?://[^\s"'<>]+`)
+
+// semEnderecos troca cada endereço do texto só pelo servidor dele.
+func semEnderecos(texto string) string {
+	return endereco.ReplaceAllStringFunc(texto, func(bruto string) string {
+		if u, erro := url.Parse(bruto); erro == nil && u.Host != "" {
+			return u.Scheme + "://" + u.Host + "/…"
+		}
+		return "(endereço)"
+	})
 }
 
 // Trata recebe uma linha da janela. Uma linha que não é um comando (JSON

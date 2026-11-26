@@ -330,6 +330,14 @@ func TestDownloads(t *testing.T) {
 		x.d.Enfileira(um)
 		x.l.Roda()
 		igual(t, "HTTP 403", x.de("one").Motivo)
+		// E a causa vai para quem anota (o log do daemon); um download que deu certo não.
+		var anotadas []string
+		x = novosDownloads(1)
+		x.d.AoFalhar = func(f dominio.Faixa, erro error) { anotadas = append(anotadas, f.ID+": "+erro.Error()) }
+		x.b.falhando["https://media/one"] = true
+		x.d.Enfileira(um, dois)
+		x.l.Roda()
+		igual(t, []string{"one: HTTP 403"}, anotadas)
 
 		x = novosDownloads(1)
 		x.r.Muda(func(r *prova.Resolvedor) { r.Indisponiveis["one"] = true })

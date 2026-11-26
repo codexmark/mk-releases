@@ -32,6 +32,8 @@ type Downloads struct {
 	trabalhadores func() int
 	// Mudou avisa a cada mudança da lista (inclusive de progresso).
 	Mudou Sinal
+	// AoFalhar recebe o erro de um download que não deu certo (para o registro).
+	AoFalhar func(f dominio.Faixa, erro error)
 
 	lista   []dominio.Download // o mais novo primeiro
 	rodando map[string]laco.Tarefa
@@ -184,6 +186,7 @@ func (d *Downloads) comeca(f dominio.Faixa) {
 		} else if !errors.Is(erro, ErrStream) {
 			erro = errors.Join(ErrStream, erro)
 		}
+		causa := erro
 		var falha *ErroDownload
 		switch {
 		case erro == nil:
@@ -201,6 +204,9 @@ func (d *Downloads) comeca(f dominio.Faixa) {
 		}
 		return func() {
 			delete(d.rodando, id)
+			if causa != nil && d.AoFalhar != nil {
+				d.AoFalhar(f, causa)
+			}
 			d.estado(id, fim, true)
 			d.bombeia()
 		}

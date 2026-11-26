@@ -55,6 +55,8 @@ const (
 	// PediuTocar: "tocar" de fora; a sessão decide se é retomar, tentar de novo
 	// ou carregar a fila restaurada.
 	PediuTocar
+	// Carregou: o tocador abriu a faixa que mandaram tocar e o som começa.
+	Carregou
 )
 
 // Evento do tocador. Tocando vale para MudouPausa; Motivo para FalhouAoTocar.

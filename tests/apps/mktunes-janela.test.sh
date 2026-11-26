@@ -205,9 +205,11 @@ has "$desktop" "Icon=mktunes"
 t "o NOTICE diz de onde o código vem, que o NewPipe saiu e quais serviços são usados"
 aviso=$(<"$app/NOTICE.md")
 for trecho in "Copyright (C) 2026 codexmark" "SPDX-License-Identifier: GPL-3.0-or-later" "porte do daemon em Kotlin" "Ryotunes" \
-  "Não usa mais o NewPipe" "yt-dlp" "LRCLIB" "radio-browser.info" "InnerTube"; do
+  "Não usa mais o NewPipe" "LRCLIB" "radio-browser.info" "InnerTube"; do
   has "$aviso" "$trecho"
 done
+# O endereço do áudio vem do cliente InnerTube próprio: nenhum extrator de fora.
+like "$aviso" 'endereço do áudio também vem desse cliente'
 ok grep -qF "GNU GENERAL PUBLIC LICENSE" "$app/LICENSE"
 
 t "o Início pede a página de novo quando o daemon volta (trocado numa atualização, com a janela aberta)"

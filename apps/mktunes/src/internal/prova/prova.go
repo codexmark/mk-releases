@@ -45,7 +45,11 @@ func IDs(faixas []dominio.Faixa) []string {
 }
 
 // Tocador é um tocador de mentira que anota o que pediram. Só o laço o usa.
+// Com AoEvento ligado à sessão, cada faixa "carrega" na hora em que mandam
+// tocar; com Demora, só quando o teste chama Carrega.
 type Tocador struct {
+	AoEvento func(e app.Evento)
+	Demora   bool
 	Chamadas []string
 	Pos, Dur time.Duration
 	Tocando  *dominio.Faixa
@@ -62,6 +66,16 @@ func (t *Tocador) Toca(s app.Stream, f dominio.Faixa) {
 	t.anota("play %s", s.URL)
 	t.Tocando, t.Stream = &f, s
 	t.Tocados = append(t.Tocados, s)
+	if !t.Demora {
+		t.Carrega()
+	}
+}
+
+// Carrega conta à sessão que a faixa abriu.
+func (t *Tocador) Carrega() {
+	if t.AoEvento != nil {
+		t.AoEvento(app.Evento{Tipo: app.Carregou})
+	}
 }
 func (t *Tocador) Pausa()                    { t.anota("pause") }
 func (t *Tocador) Segura(f dominio.Faixa)    { t.anota("hold %s", f.ID); t.Pos = 0 }

@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # apps/mktunes/src: o mktunesd, o daemon do MkTunes (o player de música do Mk),
 # em Go. Os testes dele são `go test` (com a guarda em pastas temporárias e o
-# mpv, o yt-dlp, o sqlite3, o ffprobe, o barramento e a rede de mentira); aqui
+# mpv, o sqlite3, o ffprobe, o barramento e a rede de mentira); aqui
 # eles entram na suíte do Mk, junto com o formato (gofmt), o go vet, a
 # conferência de que o binário que vai no pacote é o do código que está no
 # repositório, uma conversa de ponta a ponta com esse binário (uma janela de
 # mentira no socket: search, play, toggle, like) e as regras que o código não
 # pode quebrar (só a biblioteca padrão, todo comando por variável e sem shell,
-# o id do vídeo conferido antes de ir para a linha de comando).
+# o id do vídeo conferido antes de ir ao YouTube, o mpv sem procurar endereço
+# por conta própria).
 . "$(dirname "$0")/../lib.sh"
 
 command -v go >/dev/null || skip "falta o go"
@@ -18,7 +19,7 @@ bin=$app/bin/mktunesd
 contrato=$(<"$app/CONTRATO.md")
 # Nenhum destes roda de verdade aqui: quem os chama é o daemon, e ele recebe o
 # caminho de um dublê por variável. Se algum teste escapar, cai nestes.
-for c in mpv yt-dlp ffprobe xdg-user-dir; do stub "$c" 'exit 1'; done
+for c in mpv ffprobe xdg-user-dir; do stub "$c" 'exit 1'; done
 # O cache de compilação fica fora da caixa de areia, para não recompilar tudo
 # a cada rodada; o resto (HOME, módulos) continua dentro dela.
 export GOCACHE=${MK_GOCACHE:-/var/tmp/mk-gocache-$(id -u)}
@@ -52,23 +53,23 @@ compgen -G "$src/*_test.go" >/dev/null || _fail "sem teste: o pacote principal"
 
 t "os casos que não podem faltar estão na suíte"
 for caso in TestFila TestListasInteligentes TestResumoDeEscuta TestCaminhoDoDownload TestLetras TestNormalizacaoEAjustes \
-  TestSessaoToca TestSessaoControles TestAutoplay TestRetomar TestSoneca TestHistoricoDeEscuta TestDownloads TestBackup \
+  TestSessaoToca TestSessaoEsperaOTocadorCarregar TestSessaoControles TestAutoplay TestRetomar TestSoneca TestHistoricoDeEscuta TestDownloads TestBackup \
   TestBibliotecaVoltaDepoisDeReabrir TestHistoricoEmLinhas TestArquivoEstragadoOuNovoDemais TestBackupNoFormatoDaFonte \
   TestMigraOBancoAntigoUmaVez TestMigracaoQueNaoDaCertoDeixaTudoComoEstava TestMigraComOSqliteDeVerdade \
-  TestArgumentos TestTocador TestProcessoFalaComUmMpv \
+  TestArgumentos TestTocador TestProcessoFalaComUmMpv TestOMpvNaoMorreComAThreadQueOSubiu \
   TestInicioEContinuacao TestFilaERelogio TestPaginas TestBuscas TestBuscaDeMusicasDeduzida TestCliente TestFeed TestVolumeMedido \
-  TestResolvePeloYtdlp TestSoUmYtdlpPorFaixaDeCadaVez TestFalhasViramStreamIndisponivel TestSemYtdlpAvisaOPacoteUmaVez TestOCacheTemTeto \
+  TestPlayerResolvePeloVisionOS TestEscolheOAudio TestPlayerRecusas TestPlayerPedeVisitante TestPlayerQualidadeECache TestSoUmPedidoPorFaixaDeCadaVez \
   TestLetrasDoLrclib TestRadioBrowser TestArquivos TestPastaDeMusica TestEtiquetasDoFfprobe \
-  TestPlayer TestBusca TestInicioDoApp TestBibliotecaDoApp TestDownloadsDoApp TestCompasso TestAjustesDoApp \
+  TestPlayer TestBusca TestInicioDoApp TestBibliotecaDoApp TestDownloadsDoApp TestCompasso TestAjustesDoApp TestCarregandoEOLogDoDaemon \
   TestAFilaEAPosicaoVoltamDepoisDeReiniciar TestServidorDoSocket TestComandoDeQuemJaFoiEmboraAindaChega TestMelhorResultado \
   TestBytesPelaEspecificacao TestTodosOsTiposVaoEVoltam TestRecusaOQueNaoCabe TestMensagemOla TestConversaComUmBarramentoDeMentira \
   TestSemBarramentoOuRecusado TestModelo TestServicoRespondeComoUmPlayer TestOsBotoesDoSistemaChegamComoComandos TestContaAsMudancasEOsPulos \
-  TestConversaDePontaAPonta TestSemMpvODaemonNaoSobe; do
+  TestConversaDePontaAPonta TestSemMpvODaemonNaoSobe TestOMpvQueMorreEReligadoEVaiParaOLog; do
   grep -qhE "^func $caso\(" "$src"/*_test.go "$src"/internal/*/*_test.go || _fail "falta o caso: $caso"
 done
 
 t "as respostas gravadas do InnerTube estão lá, e a deduzida diz que é deduzida"
-for f in home home-continuation next album playlist artist search-albums search-artists search-playlists search-suggestions player-vr; do
+for f in home home-continuation next album playlist artist search-albums search-artists search-playlists search-suggestions player-vr player-visionos; do
   ok jq -e . "$src/internal/innertube/testdata/$f.json" >/dev/null
 done
 ok jq -e . "$src/internal/innertube/testdata/search-songs.DEDUZIDO.json" >/dev/null
@@ -82,7 +83,7 @@ for f in $(find "$src" -name '*.go' | sort); do
 done
 
 t "todo comando externo vem por variável de ambiente, e são os do contrato"
-for v in MKTUNES_MPV MKTUNES_YTDLP MKTUNES_SQLITE3 MKTUNES_FFPROBE MKTUNES_LAUNCHER; do
+for v in MKTUNES_MPV MKTUNES_SQLITE3 MKTUNES_FFPROBE MKTUNES_LAUNCHER; do
   ok grep -qF "ambiente(\"$v\"," "$src/main.go"
   has "$contrato" "\`$v\`" "o contrato não cita a variável $v"
 done
@@ -91,24 +92,28 @@ for v in MKTUNES_MPV_ARGS MKTUNES_MUSIC_DIR MKTUNES_MPRIS MKTUNES_INNERTUBE_URL 
   has "$contrato" "\`$v\`" "o contrato não cita a variável $v"
 done
 # Fora do main, nenhum nome de comando solto: os pacotes recebem o comando de quem os monta.
-eq "" "$(grep -nE '"(mpv|yt-dlp|sqlite3|ffprobe|ffmpeg|xdg-user-dir|setsid|busctl|dbus-send|playerctl)"' "${fontes[@]}" | grep -v "^$src/main.go:" || true)"
+eq "" "$(grep -nE '"(mpv|sqlite3|ffprobe|ffmpeg|xdg-user-dir|setsid|busctl|dbus-send|playerctl)"' "${fontes[@]}" | grep -v "^$src/main.go:" || true)"
 
 t "nenhum comando passa por shell, e todo o que pode demorar tem prazo"
 # ("su" fica de fora da lista: é uma assinatura de tipos do D-Bus, texto e uint32.)
 eq "" "$(grep -nE '"(sh|bash|/bin/sh|/bin/bash|zsh|env|sudo|doas|run0|pkexec)"|"-c"' "${fontes[@]}" || true)"
 # Os dois que ficam no ar (o mpv e a janela que o Raise abre) são os únicos sem prazo.
 eq "$(printf '%s\n' "internal/mpv/mpv.go" "main.go")" "$(grep -lE 'exec\.Command\(' "${fontes[@]}" | sed "s|^$src/||" | sort)"
-eq "3" "$(grep -hoE 'exec\.CommandContext\(' "${fontes[@]}" | wc -l)"
+eq "2" "$(grep -hoE 'exec\.CommandContext\(' "${fontes[@]}" | wc -l)"
 ok grep -qF 'context.WithTimeout(ctx, prazoDoSqlite)' "$src/internal/guarda/migra.go"
 ok grep -qF 'context.WithTimeout(ctx, prazoFfprobe)' "$src/internal/local/local.go"
-ok grep -qF 'context.WithTimeout(context.Background(), prazo)' "$src/internal/ytdlp/ytdlp.go"
+ok grep -qF 'context.WithTimeout(context.Background(), prazo)' "$src/internal/innertube/player.go"
 
-t "o yt-dlp e o mpv recebem os argumentos do contrato, e o id do vídeo é conferido antes"
-ok grep -qF 'return []string{"-f", seletor, "-g", "--no-playlist", "--no-warnings", "--", "https://music.youtube.com/watch?v=" + id}' "$src/internal/ytdlp/ytdlp.go"
-ok grep -qF 'idDeVideo = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)' "$src/internal/ytdlp/ytdlp.go"
-ok grep -qF 'var hostsDoYouTube = []string{"googlevideo.com", "youtube.com"}' "$src/internal/ytdlp/ytdlp.go"
+t "o áudio vem do InnerTube com o id conferido antes, só da CDN do YouTube, e o mpv recebe os argumentos do contrato"
+ok grep -qF 'idDeVideo = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)' "$src/internal/innertube/player.go"
+ok grep -qF 'const hostDoAudio = "googlevideo.com"' "$src/internal/innertube/player.go"
 # A conferência do id vem antes de qualquer outra coisa no Resolve.
-like "$(grep -n -A8 '^func (r \*Resolvedor) Resolve' "$src/internal/ytdlp/ytdlp.go")" 'IDValido\(f\.ID\)'
+like "$(grep -n -A8 '^func (p \*Player) Resolve' "$src/internal/innertube/player.go")" 'IDValido\(f\.ID\)'
+# O daemon acha o endereço sozinho: nem ele nem o mpv chamam um extrator de fora.
+absent "$src/internal/ytdlp"
+eq "" "$(grep -liE 'yt-?dlp' "${fontes[@]}" "$app/CONTRATO.md" "$app/NOTICE.md" || true)"
+ok grep -qF '"--ytdl=no",' "$src/internal/mpv/mpv.go"
+has "$contrato" "--keep-open=no --ytdl=no"
 ok grep -qF '"--config=no", "--load-scripts=no", "--idle=yes", "--no-video", "--no-terminal",' "$src/internal/mpv/mpv.go"
 ok grep -qF '"--audio-display=no", "--input-ipc-server=" + socket, "--keep-open=no",' "$src/internal/mpv/mpv.go"
 ok grep -qF 'exec.CommandContext(ctx, sqlite3, "-readonly", "-json", filepath.Clean(banco), sql)' "$src/internal/guarda/migra.go"
@@ -120,7 +125,7 @@ ok grep -qF 'destino := banco + ".migrado"' "$src/internal/guarda/migra.go"
 eq "" "$(grep -nE 'RemoveAll\(' "${fontes[@]}" || true)"
 
 t "a memória tem teto: os caches e as filas dizem o limite"
-ok grep -qE '^\s*guardados = 32$' "$src/internal/ytdlp/ytdlp.go"
+ok grep -qE '^\s*guardados = 32$' "$src/internal/innertube/player.go"
 ok grep -qE '^const lembradas = 16$' "$src/internal/app/casos.go"
 ok grep -qE '^const abertasGuardadas = 32$' "$src/internal/daemon/inicio.go"
 ok grep -qE '^const avulsasNaFila = 64$' "$src/internal/daemon/quadro.go"

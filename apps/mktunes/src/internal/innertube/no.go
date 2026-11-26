@@ -208,3 +208,9 @@ func (n *No) trechos() []string {
 
 // RunsIniciais são os runs antes do primeiro " • ": os artistas de um subtítulo.
 func (n *No) RunsIniciais() string { return n.trechos()[0] }
+
+// Bool lê um verdadeiro ou falso (falso quando não há).
+func (n *No) Bool(chave string) bool {
+	f := n.filho(chave)
+	return f != nil && f.tipo == 'b' && f.texto == "true"
+}

@@ -64,6 +64,8 @@ type OpcoesDaSessao struct {
 	Local func(f dominio.Faixa) (Stream, bool)
 	// AoFalhar recebe o erro de um stream que não veio (para o registro).
 	AoFalhar func(f dominio.Faixa, erro error)
+	// AoRecusar recebe o motivo de o tocador não ter aberto a faixa (para o registro).
+	AoRecusar func(f dominio.Faixa, motivo string)
 }
 
 // Sessao é dona da fila: pede os streams ao resolvedor e diz ao tocador o que
@@ -83,6 +85,11 @@ type Sessao struct {
 	// retomarEm é onde começar quando uma sessão restaurada for tocada: até lá
 	// nada é carregado.
 	retomarEm *time.Duration
+	// esperaTocador: o tocador já recebeu a faixa e ainda não disse que a abriu
+	// (a situação continua Carregando até ele dizer, ou falhar).
+	esperaTocador bool
+	// pausaAoCarregar: o ouvinte pausou nessa espera; a faixa abre pausada.
+	pausaAoCarregar bool
 	// geracao sobe quando o ouvinte troca a fila: respostas atrasadas do
 	// autoplay da fila antiga são descartadas.
 	geracao int
@@ -138,6 +145,16 @@ func (s *Sessao) AlternaPausa() {
 		return
 	}
 	switch s.estado.Situacao {
+	case Carregando:
+		// Antes de o tocador ter a faixa não há o que pausar.
+		if !s.esperaTocador {
+			return
+		}
+		if s.pausaAoCarregar = !s.pausaAoCarregar; s.pausaAoCarregar {
+			s.o.Tocador.Pausa()
+		} else {
+			s.o.Tocador.Continua()
+		}
 	case Tocando:
 		s.o.Tocador.Pausa()
 		s.situacao(Pausado)
@@ -238,7 +255,7 @@ func (s *Sessao) VaiPara(posicao time.Duration) {
 		return
 	}
 	// Enquanto o próximo stream é resolvido o tocador segura a faixa antiga.
-	if s.estado.Situacao == Carregando {
+	if s.estado.Situacao == Carregando && !s.esperaTocador {
 		return
 	}
 	s.o.Tocador.VaiPara(posicao)
@@ -254,7 +271,7 @@ func (s *Sessao) Progresso() Progresso {
 	if s.retomarEm != nil {
 		return Progresso{*s.retomarEm, doCatalogo}
 	}
-	if s.estado.Situacao == Carregando {
+	if s.estado.Situacao == Carregando && !s.esperaTocador {
 		return Progresso{0, doCatalogo}
 	}
 	duracao := s.o.Tocador.Duracao()
@@ -272,7 +289,26 @@ func (s *Sessao) AoEvento(e Evento) {
 		if s.estado.Situacao != Carregando {
 			s.carrega(s.estado.Fila.AoTerminar(), nil)
 		}
+	case Carregou:
+		if !s.esperaTocador {
+			return
+		}
+		s.esperaTocador = false
+		if s.pausaAoCarregar {
+			s.situacao(Pausado)
+		} else {
+			s.situacao(Tocando)
+		}
 	case FalhouAoTocar:
+		// O que o tocador segura enquanto a próxima é resolvida também pode
+		// falhar: não é a faixa nova falhando.
+		if s.estado.Situacao == Carregando && !s.esperaTocador {
+			return
+		}
+		s.esperaTocador = false
+		if faixa, tem := s.estado.Faixa(); tem && s.o.AoRecusar != nil {
+			s.o.AoRecusar(faixa, e.Motivo)
+		}
 		s.situacao(FalhouTocador)
 	case MudouPausa:
 		switch {
@@ -287,7 +323,7 @@ func (s *Sessao) AoEvento(e Evento) {
 		s.Anterior()
 	case PediuTocar:
 		// Só "tocar", nunca pausar.
-		if s.retomarEm != nil || s.estado.Situacao == Pausado || s.estado.Situacao.Falhou() {
+		if s.retomarEm != nil || s.estado.Situacao == Pausado || s.estado.Situacao.Falhou() || (s.esperaTocador && s.pausaAoCarregar) {
 			s.AlternaPausa()
 		}
 	}
@@ -332,6 +368,7 @@ func (s *Sessao) situacao(sit Situacao) {
 
 func (s *Sessao) carrega(fila dominio.Fila, comecaEm *time.Duration) {
 	s.retomarEm = nil
+	s.esperaTocador, s.pausaAoCarregar = false, false
 	s.tocaASeguir = 0
 	laco.Cancela(s.carregando)
 	faixa, tem := fila.Atual()
@@ -370,11 +407,13 @@ func (s *Sessao) comeca(faixa dominio.Faixa, stream Stream, comecaEm *time.Durat
 	if s.o.Normalizar() {
 		stream.Volume = dominio.VolumePara(stream.LoudnessDb)
 	}
+	// A situação só vira Tocando quando o tocador conta que abriu a faixa
+	// (Carregou): até lá a janela mostra "carregando", não um 0:00 parado.
+	s.esperaTocador = true
 	s.o.Tocador.Toca(stream, faixa)
 	if comecaEm != nil {
 		s.o.Tocador.VaiPara(*comecaEm)
 	}
-	s.situacao(Tocando)
 	s.estendeComRadio()
 }
 

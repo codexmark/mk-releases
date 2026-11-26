@@ -70,7 +70,7 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261204-dns-ajudante.sh` | copia o ajudante do DNS dos Ajustes para `/usr/lib/mk/mk-dns` (do root, 755); não muda o DNS de ninguém | |
 | `20261205-mksom.sh` | os links do MkSom (`apps-links`) | |
 | `20261206-mkfiles.sh` | os links do MkFiles (`apps-links`) | |
-| `20261207-mktunes-go.sh` | o MkTunes com o daemon em Go: refaz os links; não remove a máquina virtual de ninguém | `yt-dlp sqlite mpv ffmpeg` |
+| `20261207-mktunes-go.sh` | o MkTunes com o daemon em Go: refaz os links; não remove a máquina virtual de ninguém | `sqlite mpv ffmpeg` |
 
 ### De usuário (`migrations/user/`)
 

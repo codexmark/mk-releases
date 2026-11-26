@@ -3,6 +3,7 @@
 package daemon
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -533,4 +534,34 @@ func TestAFilaEAPosicaoVoltamDepoisDeReiniciar(t *testing.T) {
 	terceiro := novaBancada(t, pasta, nil)
 	igual(t, 77.0, terceiro.estado("progress")["position"])
 	_ = app.Tocando
+}
+
+func TestCarregandoEOLogDoDaemon(t *testing.T) {
+	t.Run("a janela vê loading até o tocador abrir a faixa", func(t *testing.T) {
+		b := novaBancada(t, "", nil)
+		b.p.Demora = true
+		b.toca(0, b.c.musicas...)
+		igual(t, "loading", b.estado("now")["status"])
+		b.p.Carrega()
+		b.l.Roda()
+		igual(t, "playing", b.estado("now")["status"])
+		igual(t, 0, len(b.registro))
+	})
+	t.Run("a faixa que o mpv recusa vai para o log com o id e o motivo", func(t *testing.T) {
+		b := novaBancada(t, "", nil)
+		b.p.Demora = true
+		b.toca(1, b.c.musicas...)
+		b.app.Sessao.AoEvento(app.Evento{Tipo: app.FalhouAoTocar, Motivo: "loading failed"})
+		b.l.Roda()
+		igual(t, "failed", b.estado("now")["status"])
+		igual(t, []string{"o mpv recusou 2: loading failed"}, b.registro)
+	})
+	t.Run("o download que falha vai para o log com o id e o motivo, sem o endereço assinado", func(t *testing.T) {
+		b := novaBancada(t, "", nil)
+		b.d.falha = fmt.Errorf("%w: Get \"https://rr1---sn-x.googlevideo.com/videoplayback?expire=1&ip=203.0.113.9&sig=SEGREDO\": EOF", &app.ErroDownload{Motivo: "Conexão interrompida"})
+		b.manda(msg{"cmd": "download", "track": faixaNoFio(b.c.musicas[0])})
+		b.l.Avanca(300 * time.Millisecond)
+		igual(t, "failed", lista(b.estado("downloads"), "jobs")[0]["status"])
+		igual(t, []string{`o download de 1 falhou: Conexão interrompida: Get "https://rr1---sn-x.googlevideo.com/…": EOF`}, b.registro)
+	})
 }

@@ -190,7 +190,7 @@ correção.
 - **MkTunes com o daemon em Go** (porte do daemon em Kotlin). Conferido com as
   ferramentas de verdade, numa pasta pessoal de mentira e num barramento
   D-Bus à parte: busca (músicas e geral), sugestões, Início, página de
-  artista, tocar pelo `yt-dlp` e pelo mpv (qualidade alta e econômica), letra
+  artista, tocar pelo mpv (qualidade alta e econômica), salto de posição, letra
   sincronizada, autoplay, baixar uma música, rádio, músicas locais (com e sem
   etiqueta), exportar e importar o backup, o MPRIS lido e comandado
   pelo `playerctl` e pelo `busctl`, e a migração de um banco SQLite escrito
@@ -202,7 +202,9 @@ correção.
   com `--ao=null` aqui e sem placa de som na VM), nada com o mouse na janela, e
   uma biblioteca grande na
   migração. O YouTube muda as respostas sem avisar: a busca e o Início dependem
-  de leitores próprios, e o áudio, do `yt-dlp` da máquina estar em dia.
+  de leitores próprios, e o áudio, de o YouTube continuar servindo inteiro o
+  endereço do perfil visionOS (o do `yt-dlp`, usado na primeira versão do
+  porte, passou a levar 403 depois de 1 MiB numa máquina de verdade).
 - **Controles (Super + Esc):** vistos abrindo na sessão aninhada, com Esc
   fechando e a troca para outro painel; os botões e as chaves não foram
   clicados, e a cafeína segurando de fato o descanso de tela não foi vista. A

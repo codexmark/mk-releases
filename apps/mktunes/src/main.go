@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // mktunesd é o daemon do MkTunes, o player de música do Mk: toca pelo mpv,
-// busca no YouTube Music (InnerTube) e resolve o áudio com o yt-dlp, guarda a
+// busca no YouTube Music e acha o endereço do áudio pelo InnerTube, guarda a
 // biblioteca em JSON e aparece na ilha pelo MPRIS. A janela (Quickshell) fala
 // com ele por $XDG_RUNTIME_DIR/mktunes/mktunes.sock; o protocolo está em
 // CONTRATO.md. Este arquivo é a raiz de composição: o único lugar que sabe
@@ -43,11 +43,10 @@ import (
 	"mktunes/internal/mpris"
 	"mktunes/internal/mpv"
 	"mktunes/internal/rede"
-	"mktunes/internal/ytdlp"
 )
 
 // Versao é a deste binário; o lançador troca um daemon que responde outra.
-const Versao = "0.2.0"
+const Versao = "0.2.1"
 
 const prazoDaRede = 10 * time.Second
 
@@ -285,11 +284,18 @@ func sobe(socket string) int {
 					for len(quedas) > 0 && agora.Sub(quedas[0]) > time.Minute {
 						quedas = quedas[1:]
 					}
-					avisa("o mpv saiu; subindo outro")
-					if len(quedas) > 5 || ligaMpv() != nil {
+					avisa("o mpv saiu (%s); subindo outro", processo.Saida())
+					// Se só a conversa caiu, o mpv antigo não fica para trás.
+					processo.Fecha()
+					if len(quedas) > 5 {
 						avisa("o mpv não fica de pé; o daemon segue sem som")
 						return
 					}
+					if erro := ligaMpv(); erro != nil {
+						avisa("não deu para religar o mpv (%v); o daemon segue sem som", erro)
+						return
+					}
+					avisa("o mpv foi religado")
 					tocador.Religa(processo.Envia)
 					aplicativo.Sessao.AoEvento(app.Evento{Tipo: app.FalhouAoTocar, Motivo: "o mpv saiu"})
 				})
@@ -305,10 +311,10 @@ func sobe(socket string) int {
 	}
 	tocador = mpv.NovoTocador(processo.Envia, func(e app.Evento) { aplicativo.Sessao.AoEvento(e) })
 
-	resolvedor := &ytdlp.Resolvedor{
-		Comando: ambiente("MKTUNES_YTDLP", "yt-dlp"),
+	resolvedor := &innertube.Player{
+		Cliente: &innertube.Cliente{HTTP: rapida, Perfil: innertube.VisionOS, Base: base, Idioma: "pt", Regiao: pais, Visitante: visitante},
 		Volume:  volume.LoudnessDb,
-		Aviso:   func(texto string) { l.Posta(func() { aplicativo.Quadro.Aviso(texto) }) },
+		Visita:  feed.Visita,
 	}
 
 	var servidor *daemon.Servidor

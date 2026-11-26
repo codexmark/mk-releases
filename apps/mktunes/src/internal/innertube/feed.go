@@ -161,3 +161,11 @@ func (v Volume) LoudnessDb(ctx context.Context, id string) *float64 {
 	}
 	return nil
 }
+
+// Visita faz uma chamada qualquer do YouTube Music (o Início) só para o
+// YouTube entregar um visitante de convidado, que o Cliente guarda: o "player"
+// não responde a quem chega sem um.
+func (f Feed) Visita(ctx context.Context) error {
+	_, erro := f.Cliente.Posta(ctx, "browse", map[string]any{"browseId": inicio})
+	return erro
+}

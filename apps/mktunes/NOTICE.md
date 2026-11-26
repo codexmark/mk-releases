@@ -24,8 +24,8 @@ O MkTunes, por sua vez, segue o comportamento do [Ryotunes](https://github.com/r
 ## O que mudou no porte
 
 - Não usa mais o NewPipe Extractor. A busca, as sugestões, o Início, as páginas e as filas
-  vão pelo cliente InnerTube próprio; o endereço do áudio é pedido ao `yt-dlp` instalado no
-  sistema, que o daemon só executa (não o inclui nem o modifica).
+  vão pelo cliente InnerTube próprio; o endereço do áudio também vem desse cliente (o `player` do
+  InnerTube), sem programa de fora.
 - A biblioteca saiu do SQLite para arquivos JSON; o banco antigo é migrado uma vez, com o
   `sqlite3` do sistema.
 - O MPRIS fala com o barramento de sessão por um cliente D-Bus próprio, escrito a partir da
@@ -36,7 +36,6 @@ O MkTunes, por sua vez, segue o comportamento do [Ryotunes](https://github.com/r
 | Programa | Para quê | Licença |
 |---|---|---|
 | [mpv](https://mpv.io) | tocar | GPL-2.0-or-later / LGPL-2.1-or-later |
-| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | achar o endereço do áudio | Unlicense |
 | ffprobe ([FFmpeg](https://ffmpeg.org)) | ler as etiquetas das músicas locais | LGPL-2.1-or-later / GPL-2.0-or-later |
 | [SQLite](https://sqlite.org) (`sqlite3`) | migrar o banco antigo, uma vez | domínio público |
 
@@ -45,6 +44,6 @@ biblioteca padrão do Go (BSD-3-Clause).
 
 ## Serviços usados sem conta
 
-YouTube Music (InnerTube, por cliente próprio, e `yt-dlp`), [LRCLIB](https://lrclib.net) para
+YouTube Music (InnerTube, por cliente próprio), [LRCLIB](https://lrclib.net) para
 letras e [radio-browser.info](https://www.radio-browser.info) para rádio. O MkTunes não é
 afiliado a nenhum deles.

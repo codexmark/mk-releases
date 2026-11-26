@@ -1,0 +1,27 @@
+{
+  "responseContext": {"visitorData": "VISITANTE-DE-TESTE"},
+  "playabilityStatus": {"status": "OK", "playableInEmbed": true},
+  "streamingData": {
+    "expiresInSeconds": "21540",
+    "adaptiveFormats": [
+      {"itag": 137, "mimeType": "video/mp4; codecs=\"avc1.640020\"", "bitrate": 350013, "averageBitrate": 120000,
+       "url": "https://rr1---sn-teste.googlevideo.com/videoplayback?itag=137&expire=1795370340"},
+      {"itag": 139, "mimeType": "audio/mp4; codecs=\"mp4a.40.5\"", "bitrate": 50440, "averageBitrate": 48826, "contentLength": "1844614",
+       "audioQuality": "AUDIO_QUALITY_LOW", "url": "https://rr1---sn-teste.googlevideo.com/videoplayback?itag=139&expire=1795370340"},
+      {"itag": 140, "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"", "bitrate": 131206, "averageBitrate": 129530, "contentLength": "4892985", "loudnessDb": -1.79,
+       "audioQuality": "AUDIO_QUALITY_MEDIUM", "url": "https://rr1---sn-teste.googlevideo.com/videoplayback?itag=140&expire=1795370340"},
+      {"itag": 140, "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"", "bitrate": 131300, "averageBitrate": 129900, "isDrc": true,
+       "audioQuality": "AUDIO_QUALITY_MEDIUM", "url": "https://rr1---sn-teste.googlevideo.com/videoplayback?itag=140&xtags=drc%3D1&expire=1795370340"},
+      {"itag": 140, "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"", "bitrate": 131400, "averageBitrate": 130000,
+       "audioTrack": {"displayName": "English (dubbed)", "id": "en.4", "audioIsDefault": false},
+       "audioQuality": "AUDIO_QUALITY_MEDIUM", "url": "https://rr1---sn-teste.googlevideo.com/videoplayback?itag=140&xtags=lang%3Den&expire=1795370340"},
+      {"itag": 141, "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"", "bitrate": 256000, "averageBitrate": 255000,
+       "audioQuality": "AUDIO_QUALITY_HIGH", "signatureCipher": "s=ABC&sp=sig&url=https%3A%2F%2Frr1---sn-teste.googlevideo.com%2Fvideoplayback%3Fitag%3D141"},
+      {"itag": 249, "mimeType": "audio/webm; codecs=\"opus\"", "bitrate": 61080, "averageBitrate": 51349,
+       "audioQuality": "AUDIO_QUALITY_LOW", "url": "https://rr1---sn-teste.googlevideo.com/videoplayback?itag=249&expire=1795370340"},
+      {"itag": 251, "mimeType": "audio/webm; codecs=\"opus\"", "bitrate": 147710, "averageBitrate": 133161,
+       "audioQuality": "AUDIO_QUALITY_MEDIUM", "url": "https://rr1---sn-teste.googlevideo.com/videoplayback?itag=251&expire=1795370340"}
+    ],
+    "hlsManifestUrl": "https://manifest.googlevideo.com/api/manifest/hls_variant/expire/1795370340/x"
+  }
+}

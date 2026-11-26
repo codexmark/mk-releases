@@ -23,8 +23,8 @@ tests/run mktunes
 ```
 
 O sistema liga o app por `system/mk/mktunes-links` (comando `mktunes`, atalho
-no menu e ícone, todos apontando para cá) e precisa de `mpv`, `ffmpeg`,
-`yt-dlp` e `sqlite` (em `system/packages/desktop.packages`). Quem vinha da
+no menu e ícone, todos apontando para cá) e precisa de `mpv`, `ffmpeg`
+e `sqlite` (em `system/packages/desktop.packages`). Quem vinha da
 versão em Kotlin não faz nada: o lançador para o daemon antigo e a biblioteca
 do banco `mktunes.db` é trazida na primeira subida.
 

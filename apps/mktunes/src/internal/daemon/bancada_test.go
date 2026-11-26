@@ -147,11 +147,16 @@ type discoFalso struct {
 	mu       sync.Mutex
 	salvos   map[string]string
 	quebrado bool
+	// falha, quando não é nil, é o erro que o download devolve.
+	falha error
 }
 
 func (d *discoFalso) Busca(_ context.Context, url, relativo string, progresso func(float64)) (string, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.falha != nil {
+		return "", d.falha
+	}
 	if d.quebrado {
 		return "", errors.New("disco cheio")
 	}
@@ -195,11 +200,13 @@ type bancada struct {
 	volumes []float64
 	locais  []dominio.Faixa
 	avisos  []string
-	avulsas []map[string]any
-	ajustes []dominio.Ajustes
-	saiu    int
-	pasta   string
-	backups string
+	// registro é o que o daemon anotou no log.
+	registro []string
+	avulsas  []map[string]any
+	ajustes  []dominio.Ajustes
+	saiu     int
+	pasta    string
+	backups  string
 }
 
 func novaBancada(t *testing.T, pasta string, volume GuardaDeVolume) *bancada {
@@ -215,6 +222,7 @@ func novaBancada(t *testing.T, pasta string, volume GuardaDeVolume) *bancada {
 		t.Fatal(erro)
 	}
 	b := &bancada{t: t, l: laco.NovoTeste(), c: novoCatalogo(), p: &prova.Tocador{}, d: &discoFalso{salvos: map[string]string{}}, pasta: pasta, backups: t.TempDir()}
+	b.p.AoEvento = func(e app.Evento) { b.app.Sessao.AoEvento(e) }
 	b.locais = []dominio.Faixa{prova.Faixa("l1", prova.Titulo("Local Um"), prova.Provedor(dominio.Local), func(f *dominio.Faixa) { f.Stream = "file:///m/um.mp3" })}
 	b.app = Monta(Portas{
 		Catalogo: b.c, Inicio: b.c, Filas: b.c, Navegador: b.c, Paginas: b.c, Sugestoes: b.c,
@@ -226,6 +234,7 @@ func novaBancada(t *testing.T, pasta string, volume GuardaDeVolume) *bancada {
 		Versao: "9.9.9", Volume: volume,
 		AoMudarAjustes: func(a dominio.Ajustes) { b.ajustes = append(b.ajustes, a) },
 		AoSair:         func() { b.saiu++ },
+		Registro:       func(texto string) { b.registro = append(b.registro, texto) },
 	})
 	b.app.Quadro.Ouve(func(tipo, linha string) {
 		if tipo != "" {

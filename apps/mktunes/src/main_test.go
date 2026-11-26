@@ -45,6 +45,7 @@ func mpvDeMentira() {
 	}
 	diario, _ := os.OpenFile(os.Getenv("MKTUNES_MPV_DIARIO"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	fmt.Fprintln(diario, "args "+strings.Join(os.Args[1:], " "))
+	fmt.Fprintf(diario, "pid %d\n", os.Getpid())
 	escuta, erro := net.Listen("unix", socket)
 	if erro != nil {
 		os.Exit(3)
@@ -55,14 +56,24 @@ func mpvDeMentira() {
 	}
 	linhas := bufio.NewScanner(conexao)
 	linhas.Buffer(make([]byte, 64*1024), 4<<20)
+	entrada := 0
 	for linhas.Scan() {
 		fmt.Fprintln(diario, linhas.Text())
-		fmt.Fprintln(conexao, `{"error":"success"}`)
-		if strings.Contains(linhas.Text(), `"loadfile"`) {
-			fmt.Fprintln(conexao, `{"event":"file-loaded"}`)
-			fmt.Fprintln(conexao, `{"event":"property-change","id":2,"name":"duration","data":144.0}`)
-			fmt.Fprintln(conexao, `{"event":"property-change","id":1,"name":"time-pos","data":7.5}`)
+		var pedido struct {
+			Pedido int `json:"request_id"`
 		}
+		_ = json.Unmarshal(linhas.Bytes(), &pedido)
+		if !strings.Contains(linhas.Text(), `"loadfile"`) {
+			fmt.Fprintf(conexao, "{\"error\":\"success\",\"request_id\":%d}\n", pedido.Pedido)
+			continue
+		}
+		// Como o mpv de verdade: numera o arquivo, começa a abrir e carrega.
+		entrada++
+		fmt.Fprintf(conexao, "{\"data\":{\"playlist_entry_id\":%d},\"request_id\":%d,\"error\":\"success\"}\n", entrada, pedido.Pedido)
+		fmt.Fprintf(conexao, "{\"event\":\"start-file\",\"playlist_entry_id\":%d}\n", entrada)
+		fmt.Fprintln(conexao, `{"event":"file-loaded"}`)
+		fmt.Fprintln(conexao, `{"event":"property-change","id":2,"name":"duration","data":144.0}`)
+		fmt.Fprintln(conexao, `{"event":"property-change","id":1,"name":"time-pos","data":7.5}`)
 	}
 }
 
@@ -110,6 +121,8 @@ func novoMundo(t *testing.T) *mundo {
 			w.Write(gravada("search-songs.DEDUZIDO.json"))
 		case strings.HasSuffix(r.URL.Path, "/search") && strings.Contains(string(corpo), "EgWKAQIYAWoMEA4QChADEAQQCRAF"):
 			w.Write(gravada("search-albums.json"))
+		case strings.HasSuffix(r.URL.Path, "/player") && strings.Contains(string(corpo), `"VISIONOS"`):
+			w.Write(gravada("player-visionos.json"))
 		case strings.HasSuffix(r.URL.Path, "/player"):
 			w.Write(gravada("player-vr.json"))
 		case strings.HasPrefix(r.URL.Path, "/api/get"):
@@ -124,7 +137,6 @@ func novoMundo(t *testing.T) *mundo {
 
 	eu, _ := os.Executable()
 	mpv := escreve(t, filepath.Join(pasta, "bin", "mpv"), "#!/bin/sh\nMKTUNES_PAPEL=mpv exec '"+eu+"' \"$@\"\n", 0o755)
-	ytdlp := escreve(t, filepath.Join(pasta, "bin", "yt-dlp"), "#!/bin/sh\nprintf '%s\\n' \"$*\" >>'"+pasta+"/ytdlp.diario'\necho 'https://rr1---sn-teste.googlevideo.com/videoplayback?expire=9999999999&itag=140'\n", 0o755)
 	sqlite := escreve(t, filepath.Join(pasta, "bin", "sqlite3"), `#!/bin/sh
 case "$4" in
   *"FROM liked_track"*) echo '[{"track_id":"antiga00001","provider":"YOUTUBE","title":"Do banco antigo","artist":"Alguém","duration_ms":1000,"artwork_url":null,"stream_url":null,"liked_at":5}]' ;;
@@ -134,7 +146,7 @@ esac
 		"HOME="+pasta, "XDG_RUNTIME_DIR="+pasta+"/run", "XDG_DATA_HOME="+pasta+"/dados", "XDG_CACHE_HOME="+pasta+"/cache",
 		"XDG_STATE_HOME="+pasta+"/estado", "XDG_CONFIG_HOME="+pasta+"/config", "LANG=pt_BR.UTF-8", "LC_ALL=",
 		"MKTUNES_MUSIC_DIR="+pasta+"/Música/MkTunes", "MKTUNES_MPV="+mpv, "MKTUNES_MPV_ARGS=--ao=null", "MKTUNES_MPV_DIARIO="+pasta+"/mpv.diario",
-		"MKTUNES_YTDLP="+ytdlp, "MKTUNES_SQLITE3="+sqlite, "MKTUNES_FFPROBE="+pasta+"/bin/ffprobe-que-falta",
+		"MKTUNES_SQLITE3="+sqlite, "MKTUNES_FFPROBE="+pasta+"/bin/ffprobe-que-falta",
 		"MKTUNES_INNERTUBE_URL="+m.rede.URL+"/youtubei/v1/", "MKTUNES_LRCLIB_URL="+m.rede.URL, "MKTUNES_RADIO_URL="+m.rede.URL,
 		"MKTUNES_LAUNCHER="+pasta+"/bin/mktunes-que-falta", "DBUS_SESSION_BUS_ADDRESS=", "MKTUNES_PAPEL=daemon",
 	)
@@ -280,7 +292,8 @@ func TestConversaDePontaAPonta(t *testing.T) {
 		t.Fatalf("seções: %v", secoes)
 	}
 
-	// play: a faixa volta inteira; o yt-dlp resolve o áudio e o mpv o carrega.
+	// play: a faixa volta inteira; o "player" do InnerTube dá o endereço do
+	// áudio e o mpv o carrega.
 	lista, _ := json.Marshal(faixas)
 	j.manda(`{"cmd":"play","tracks":` + string(lista) + `,"index":0}`)
 	j.ate("a música tocando", func() bool { return j.campo("now", "status") == "playing" })
@@ -289,15 +302,11 @@ func TestConversaDePontaAPonta(t *testing.T) {
 	}
 	j.ate("a letra sincronizada", func() bool { return j.campo("lyrics", "status") == "synced" })
 	j.ate("a posição que o mpv informa", func() bool { return j.campo("progress", "position") == 7.5 && j.campo("progress", "duration") == 144.0 })
-	chamada, _ := os.ReadFile(filepath.Join(m.pasta, "ytdlp.diario"))
-	if !strings.Contains(string(chamada), "-g --no-playlist --no-warnings -- https://music.youtube.com/watch?v=W40W7L1fhUM") {
-		t.Fatalf("yt-dlp chamado com: %s", chamada)
-	}
 	diario := func() string {
 		bruto, _ := os.ReadFile(filepath.Join(m.pasta, "mpv.diario"))
 		return string(bruto)
 	}
-	for _, trecho := range []string{"--config=no --load-scripts=no --idle=yes --no-video", "--ao=null", `["loadfile","https://rr1---sn-teste.googlevideo.com/videoplayback?expire=9999999999&itag=140","replace"]`,
+	for _, trecho := range []string{"--config=no --load-scripts=no --idle=yes --no-video", "--ytdl=no", "--ao=null", `["loadfile","https://rr1---sn-teste.googlevideo.com/videoplayback?itag=140&expire=1795370340","replace"]`,
 		// O volume vem normalizado pelo loudness que o InnerTube informou (6,68 dB → 46 %).
 		`["set_property","volume",46]`, `["set_property","force-media-title","Natanzinho Lima e Ronaldinho Gaúcho — Até Quando"]`} {
 		if !strings.Contains(diario(), trecho) {
@@ -425,4 +434,64 @@ func TestPastasDoUsuarioERegiao(t *testing.T) {
 	if codigo := roda([]string{"--inventada"}); codigo != 2 {
 		t.Fatalf("opção desconhecida: %d", codigo)
 	}
+}
+
+// O mpv que morre é trocado por outro, e o log do daemon conta o que houve.
+func TestOMpvQueMorreEReligadoEVaiParaOLog(t *testing.T) {
+	m := novoMundo(t)
+	registro := filepath.Join(m.pasta, "mktunesd.log")
+	arquivo, erro := os.Create(registro)
+	if erro != nil {
+		t.Fatal(erro)
+	}
+	defer arquivo.Close()
+	daemon := m.comando()
+	daemon.Stderr = arquivo
+	if erro := daemon.Start(); erro != nil {
+		t.Fatal(erro)
+	}
+	t.Cleanup(func() { _ = daemon.Process.Kill(); _, _ = daemon.Process.Wait() })
+	for i := 0; ; i++ {
+		if conexao, erro := net.Dial("unix", m.socket); erro == nil {
+			conexao.Close()
+			break
+		}
+		if i == 100 {
+			t.Fatal("o daemon não abriu o socket")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	j := m.conecta()
+	faixa := `{"id":"W40W7L1fhUM","provider":"YOUTUBE","title":"Até Quando","artist":"Natanzinho Lima","durationMs":144000}`
+	j.manda(`{"cmd":"play","tracks":[` + faixa + `],"index":0}`)
+	j.ate("a música tocando", func() bool { return j.campo("now", "status") == "playing" })
+
+	diario, _ := os.ReadFile(filepath.Join(m.pasta, "mpv.diario"))
+	var pid int
+	for _, linha := range strings.Split(string(diario), "\n") {
+		_, _ = fmt.Sscanf(linha, "pid %d", &pid)
+	}
+	if pid == 0 {
+		t.Fatalf("o mpv de mentira não disse o pid:\n%s", diario)
+	}
+	if erro := syscall.Kill(pid, syscall.SIGKILL); erro != nil {
+		t.Fatal(erro)
+	}
+	j.ate("a falha na tela", func() bool { return j.campo("now", "status") == "failed" })
+	log := func() string {
+		bruto, _ := os.ReadFile(registro)
+		return string(bruto)
+	}
+	for _, trecho := range []string{"mktunesd: o mpv saiu (signal: killed); subindo outro", "mktunesd: o mpv foi religado", "mktunesd: o mpv recusou W40W7L1fhUM: o mpv saiu"} {
+		if !strings.Contains(log(), trecho) {
+			t.Fatalf("o log não tem %q:\n%s", trecho, log())
+		}
+	}
+	// Nenhum endereço de áudio inteiro no log.
+	if strings.Contains(log(), "videoplayback") {
+		t.Fatalf("o log tem um endereço de áudio:\n%s", log())
+	}
+	// Tocar de novo usa o mpv novo.
+	j.manda(`{"cmd":"toggle"}`)
+	j.ate("a música tocando de novo", func() bool { return j.campo("now", "status") == "playing" })
 }

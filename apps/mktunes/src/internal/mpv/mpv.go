@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Pacote mpv: a saída de áudio do daemon é um mpv sem janela, falado por JSON
-// no socket de --input-ipc-server. O mpv também é quem baixa o stream.
+// no socket de --input-ipc-server. O mpv também é quem baixa o stream, do
+// endereço que o daemon achou: ele nunca procura um por conta própria
+// (--ytdl=no).
 package mpv
 
 import (
@@ -14,6 +16,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -31,6 +34,7 @@ func Argumentos(socket string, extras []string) []string {
 	return append([]string{
 		"--config=no", "--load-scripts=no", "--idle=yes", "--no-video", "--no-terminal",
 		"--audio-display=no", "--input-ipc-server=" + socket, "--keep-open=no",
+		"--ytdl=no",
 	}, extras...)
 }
 
@@ -55,14 +59,26 @@ func Inicia(programa, socket string, extras []string, aoLinha func(linha string)
 	comando := exec.Command(programa, Argumentos(socket, extras)...)
 	// Se o daemon morrer sem se despedir, o mpv vai junto.
 	comando.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
-	if erro := comando.Start(); erro != nil {
-		return nil, erro
-	}
 	p := &Processo{comando: comando, saiu: make(chan struct{})}
+	subiu := make(chan error, 1)
 	go func() {
+		// O Pdeathsig vale para a thread que criou o processo, não para o daemon
+		// inteiro: se o Go encerrasse essa thread, o mpv seria derrubado por
+		// engano. Esta goroutine fica presa a uma thread só dela, que vive
+		// enquanto o mpv vive.
+		runtime.LockOSThread()
+		erro := comando.Start()
+		subiu <- erro
+		if erro != nil {
+			runtime.UnlockOSThread()
+			return
+		}
 		_ = comando.Wait()
 		close(p.saiu)
 	}()
+	if erro := <-subiu; erro != nil {
+		return nil, erro
+	}
 	for range tentativas {
 		select {
 		case <-p.saiu:
@@ -100,6 +116,17 @@ func (p *Processo) Envia(linha string) {
 	_, _ = p.conexao.Write([]byte(linha + "\n"))
 }
 
+// Saida diz como o mpv terminou ("exit status 2", "signal: killed"), para o
+// registro; espera um instante por ele, e diz se ainda está de pé.
+func (p *Processo) Saida() string {
+	select {
+	case <-p.saiu:
+		return p.comando.ProcessState.String()
+	case <-time.After(time.Second):
+		return "ainda rodando"
+	}
+}
+
 // Fecha encerra a conversa e o mpv.
 func (p *Processo) Fecha() {
 	_ = p.conexao.Close()
@@ -128,6 +155,16 @@ type Tocador struct {
 	// volume do mpv.
 	volumeDoStream, volumeDoOuvinte float64
 	velocidade                      float64
+	// pausaPedida é o último pedido de pausa feito ao mpv: um eco que diz outra
+	// coisa é de um pedido mais antigo, já desfeito.
+	pausaPedida *bool
+	// O mpv numera cada arquivo que mandam abrir (playlist_entry_id): pedido é
+	// o request_id do último loadfile; entrada, o número que o mpv deu a ele
+	// (0: ainda não respondeu; -1: este mpv não numera); comecou, o do último
+	// arquivo que ele começou a abrir. Assim o que chega atrasado da faixa
+	// antiga não passa por notícia da nova.
+	pedido           int
+	entrada, comecou int64
 }
 
 // NovoTocador começa a observar posição, duração e pausa.
@@ -141,7 +178,8 @@ func NovoTocador(envia func(linha string), aoEvento func(e app.Evento)) *Tocador
 // repõe o volume e a velocidade.
 func (t *Tocador) Religa(envia func(linha string)) {
 	t.envia = envia
-	t.carregando, t.puloPendente = false, nil
+	t.carregando, t.puloPendente, t.pausaPedida = false, nil, nil
+	t.pedido, t.entrada, t.comecou = 0, 0, 0
 	for i, nome := range observadas {
 		t.comando("observe_property", i+1, nome)
 	}
@@ -150,12 +188,14 @@ func (t *Tocador) Religa(envia func(linha string)) {
 	}
 }
 
-func (t *Tocador) comando(args ...any) {
+func (t *Tocador) comando(args ...any) { t.manda(map[string]any{"command": args}) }
+
+func (t *Tocador) manda(pedido map[string]any) {
 	// Sem trocar & por um escape: o endereço do stream vai como é.
 	var linha bytes.Buffer
 	codificador := json.NewEncoder(&linha)
 	codificador.SetEscapeHTML(false)
-	_ = codificador.Encode(map[string]any{"command": args})
+	_ = codificador.Encode(pedido)
 	t.envia(strings.TrimRight(linha.String(), "\n"))
 }
 
@@ -170,8 +210,10 @@ func (t *Tocador) Toca(s app.Stream, f dominio.Faixa) {
 	t.comando("set_property", "force-media-title", f.Artista+" — "+f.Titulo)
 	t.volumeDoStream = s.Volume
 	t.aplicaVolume()
-	t.comando("loadfile", s.URL, "replace")
-	t.comando("set_property", "pause", false)
+	t.pedido++
+	t.entrada = 0
+	t.manda(map[string]any{"command": []any{"loadfile", s.URL, "replace"}, "request_id": t.pedido})
+	t.pausa(false)
 }
 
 func (t *Tocador) Segura(dominio.Faixa) {
@@ -179,8 +221,21 @@ func (t *Tocador) Segura(dominio.Faixa) {
 	t.posicao, t.duracao = 0, 0
 }
 
-func (t *Tocador) Pausa()    { t.comando("set_property", "pause", true) }
-func (t *Tocador) Continua() { t.comando("set_property", "pause", false) }
+func (t *Tocador) Pausa()    { t.pausa(true) }
+func (t *Tocador) Continua() { t.pausa(false) }
+
+func (t *Tocador) pausa(ligada bool) {
+	t.pausaPedida = &ligada
+	t.comando("set_property", "pause", ligada)
+}
+
+// daAtual diz se um evento com este playlist_entry_id é da faixa pedida por último.
+func (t *Tocador) daAtual(id int64) bool {
+	if t.pedido == 0 || t.entrada < 0 || id == 0 {
+		return true // nada pedido ainda, ou um mpv que não numera
+	}
+	return id == t.entrada
+}
 
 func (t *Tocador) VaiPara(posicao time.Duration) {
 	s := float64(posicao.Milliseconds()) / 1000
@@ -220,16 +275,46 @@ func (t *Tocador) AoLinha(linha string) {
 		Data      json.RawMessage `json:"data"`
 		Reason    string          `json:"reason"`
 		FileError string          `json:"file_error"`
+		Entrada   int64           `json:"playlist_entry_id"`
+		Pedido    int             `json:"request_id"`
+		Erro      string          `json:"error"`
 	}
 	if json.Unmarshal([]byte(linha), &m) != nil {
 		return
 	}
 	switch m.Event {
+	case "":
+		// A resposta ao último loadfile: o número que o mpv deu à faixa, ou a recusa.
+		if t.pedido == 0 || m.Pedido != t.pedido || t.entrada != 0 {
+			return
+		}
+		if m.Erro != "" && m.Erro != "success" {
+			t.entrada = -1
+			t.falhou(m.Erro)
+			return
+		}
+		var dados struct {
+			Entrada int64 `json:"playlist_entry_id"`
+		}
+		if _ = json.Unmarshal(m.Data, &dados); dados.Entrada > 0 {
+			t.entrada = dados.Entrada
+		} else {
+			t.entrada = -1
+		}
+	case "start-file":
+		t.comecou = m.Entrada
 	case "file-loaded":
+		if !t.daAtual(t.comecou) {
+			return
+		}
+		eraNova := t.carregando
 		t.carregando = false
 		if t.puloPendente != nil {
 			t.comando("seek", *t.puloPendente, "absolute")
 			t.puloPendente = nil
+		}
+		if eraNova {
+			t.aoEvento(app.Evento{Tipo: app.Carregou})
 		}
 	case "property-change":
 		var numero float64
@@ -245,20 +330,31 @@ func (t *Tocador) AoLinha(linha string) {
 			}
 		case "pause":
 			if len(m.Data) > 0 && string(m.Data) != "null" && json.Unmarshal(m.Data, &ligado) == nil {
+				// O eco de um pedido que o daemon já desfez (o "segura" de antes
+				// de tocar) não é o estado de agora.
+				if t.pausaPedida != nil && *t.pausaPedida != ligado {
+					return
+				}
 				t.aoEvento(app.Evento{Tipo: app.MudouPausa, Tocando: !ligado})
 			}
 		}
 	case "end-file":
+		if !t.daAtual(m.Entrada) {
+			return
+		}
 		switch m.Reason {
 		case "eof":
 			t.aoEvento(app.Evento{Tipo: app.Terminou})
 		case "error":
-			t.carregando, t.puloPendente = false, nil
-			motivo := m.FileError
-			if motivo == "" {
-				motivo = "erro do mpv"
-			}
-			t.aoEvento(app.Evento{Tipo: app.FalhouAoTocar, Motivo: motivo})
+			t.falhou(m.FileError)
 		}
 	}
+}
+
+func (t *Tocador) falhou(motivo string) {
+	t.carregando, t.puloPendente = false, nil
+	if motivo == "" {
+		motivo = "erro do mpv"
+	}
+	t.aoEvento(app.Evento{Tipo: app.FalhouAoTocar, Motivo: motivo})
 }

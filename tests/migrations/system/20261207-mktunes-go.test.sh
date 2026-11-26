@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # migrations/system/20261207-mktunes-go.sh: o MkTunes com o daemon em Go. Pede
-# o yt-dlp e o sqlite, refaz os links e não mexe no Java de ninguém.
+# o sqlite, refaz os links e não mexe no Java de ninguém.
 . "$(dirname "$0")/../../lib.sh"
 . "$TESTS/migrations/mig.sh" system/20261207-mktunes-go.sh
 stub update-desktop-database
@@ -9,14 +9,17 @@ stub gtk-update-icon-cache
 app=/usr/share/mk/apps/mktunes
 
 t "declara o que o daemon em Go usa do sistema"
-eq "yt-dlp sqlite mpv ffmpeg" "$(sed -n 's/^# pacotes: //p' "$MIG")"
+eq "sqlite mpv ffmpeg" "$(sed -n 's/^# pacotes: //p' "$MIG")"
 
 t "os mesmos pacotes estão na lista do desktop, e a JVM saiu dela"
 lista=$(<"$REPO/system/packages/desktop.packages")
-for p in yt-dlp sqlite mpv ffmpeg; do
+for p in sqlite mpv ffmpeg; do
   has "$lista" $'\n'"$p"$'\n'
 done
 eq "" "$(grep -iE 'jre|jdk|java' "$REPO/system/packages/desktop.packages" || true)"
+
+t "o yt-dlp não é mais do MkTunes: o daemon acha o áudio sozinho"
+eq "" "$(grep -n "yt-dlp" "$REPO/system/packages/desktop.packages" "$MIG" || true)"
 
 t "refaz os links do MkTunes"
 ok mig

@@ -1,3 +1,1 @@
-MkTunes: respostas gravadas do YouTube reduzidas ao que o leitor lê
-MkTunes: o Início volta quando o daemon é trocado com a janela aberta
-MkTunes: o daemon passa a ser um binário em Go
+MkTunes 0.2.1: o daemon volta a achar o endereço do áudio sozinho

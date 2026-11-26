@@ -2,7 +2,7 @@
 
 // Pacote laco: o laço único do daemon. Todo o estado (a sessão, as áreas da
 // janela, a guarda) só é tocado por funções que rodam nele, uma de cada vez;
-// o que demora (rede, yt-dlp, disco grande) roda fora, em Vai, e volta ao laço
+// o que demora (rede, disco grande) roda fora, em Vai, e volta ao laço
 // com o resultado. É o que troca as corrotinas do daemon em Kotlin.
 package laco
 

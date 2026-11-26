@@ -10,8 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -49,16 +51,25 @@ func mpvDeMentira() {
 		os.Exit(4)
 	}
 	linhas := bufio.NewScanner(conexao)
+	entrada := 0
 	for linhas.Scan() {
 		var pedido struct {
 			Command []any `json:"command"`
+			Pedido  int   `json:"request_id"`
 		}
 		_ = json.Unmarshal(linhas.Bytes(), &pedido)
-		fmt.Fprintln(conexao, `{"error":"success"}`)
-		if len(pedido.Command) > 0 && pedido.Command[0] == "loadfile" {
+		if len(pedido.Command) == 0 || pedido.Command[0] != "loadfile" {
+			fmt.Fprintf(conexao, "{\"error\":\"success\",\"request_id\":%d}\n", pedido.Pedido)
+			continue
+		}
+		// Como o mpv de verdade: numera o arquivo, começa a abrir, carrega, toca.
+		entrada++
+		fmt.Fprintf(conexao, "{\"data\":{\"playlist_entry_id\":%d},\"request_id\":%d,\"error\":\"success\"}\n", entrada, pedido.Pedido)
+		fmt.Fprintf(conexao, "{\"event\":\"start-file\",\"playlist_entry_id\":%d}\n", entrada)
+		{
 			fmt.Fprintln(conexao, `{"event":"file-loaded"}`)
 			fmt.Fprintln(conexao, `{"event":"property-change","id":2,"name":"duration","data":1.0}`)
-			fmt.Fprintln(conexao, `{"event":"end-file","reason":"eof"}`)
+			fmt.Fprintf(conexao, "{\"event\":\"end-file\",\"reason\":\"eof\",\"playlist_entry_id\":%d}\n", entrada)
 		}
 	}
 }
@@ -155,6 +166,70 @@ func TestTocador(t *testing.T) {
 		p.AoLinha(`{"event":"property-change","id":3,"name":"pause","data":true}`)
 		igual(t, []app.Evento{{Tipo: app.MudouPausa, Tocando: false}}, f.eventos)
 	})
+	t.Run("o eco de uma pausa que o daemon já desfez não chega à sessão", func(t *testing.T) {
+		p, f := novoTocador()
+		// Segura a antiga (pausa) e toca a nova (despausa): o mpv ecoa as duas.
+		p.Segura(prova.Faixa("2"))
+		p.Toca(app.Stream{URL: "file:///m/2.m4a", Volume: 1}, prova.Faixa("2"))
+		p.AoLinha(`{"event":"property-change","id":3,"name":"pause","data":true}`)
+		igual(t, 0, len(f.eventos))
+		p.AoLinha(`{"event":"property-change","id":3,"name":"pause","data":false}`)
+		igual(t, []app.Evento{{Tipo: app.MudouPausa, Tocando: true}}, f.eventos)
+		// O eco do último pedido passa, nos dois sentidos.
+		p.Pausa()
+		p.AoLinha(`{"event":"property-change","id":3,"name":"pause","data":true}`)
+		p.Continua()
+		p.Pausa()
+		p.AoLinha(`{"event":"property-change","id":3,"name":"pause","data":false}`)
+		igual(t, []app.Evento{{Tipo: app.MudouPausa, Tocando: true}, {Tipo: app.MudouPausa, Tocando: false}}, f.eventos)
+	})
+	t.Run("conta que carregou quando o mpv abre a faixa pedida, e só ela", func(t *testing.T) {
+		p, f := novoTocador()
+		p.Toca(app.Stream{URL: "https://a/1.m4a", Volume: 1}, prova.Faixa("1"))
+		igual(t, 0, len(f.eventos))
+		p.AoLinha(`{"data":{"playlist_entry_id":1},"request_id":1,"error":"success"}`)
+		p.AoLinha(`{"event":"start-file","playlist_entry_id":1}`)
+		igual(t, 0, len(f.eventos))
+		p.AoLinha(`{"event":"file-loaded"}`)
+		igual(t, []app.Evento{{Tipo: app.Carregou}}, f.eventos)
+
+		// A faixa seguinte é pedida enquanto chega o resto da primeira: o que é
+		// da antiga (abriu de novo, acabou, falhou) não vale para a nova.
+		f.eventos = nil
+		p.Toca(app.Stream{URL: "https://a/2.m4a", Volume: 1}, prova.Faixa("2"))
+		p.AoLinha(`{"event":"file-loaded"}`)
+		p.AoLinha(`{"event":"end-file","reason":"eof","playlist_entry_id":1}`)
+		p.AoLinha(`{"data":{"playlist_entry_id":2},"request_id":2,"error":"success"}`)
+		p.AoLinha(`{"event":"file-loaded"}`)
+		p.AoLinha(`{"event":"end-file","reason":"error","playlist_entry_id":1,"file_error":"loading failed"}`)
+		igual(t, 0, len(f.eventos))
+		p.AoLinha(`{"event":"start-file","playlist_entry_id":2}`)
+		p.AoLinha(`{"event":"file-loaded"}`)
+		p.AoLinha(`{"event":"end-file","reason":"eof","playlist_entry_id":2}`)
+		igual(t, []app.Evento{{Tipo: app.Carregou}, {Tipo: app.Terminou}}, f.eventos)
+	})
+	t.Run("a faixa que o mpv não abre falha com o motivo dele", func(t *testing.T) {
+		p, f := novoTocador()
+		p.Toca(app.Stream{URL: "https://a/1.m4a", Volume: 1}, prova.Faixa("1"))
+		p.AoLinha(`{"data":{"playlist_entry_id":1},"request_id":1,"error":"success"}`)
+		p.AoLinha(`{"event":"start-file","playlist_entry_id":1}`)
+		p.AoLinha(`{"event":"end-file","reason":"error","playlist_entry_id":1,"file_error":"loading failed"}`)
+		igual(t, []app.Evento{{Tipo: app.FalhouAoTocar, Motivo: "loading failed"}}, f.eventos)
+		// Um loadfile recusado também.
+		f.eventos = nil
+		p.Toca(app.Stream{URL: "", Volume: 1}, prova.Faixa("2"))
+		p.AoLinha(`{"request_id":2,"error":"invalid parameter"}`)
+		igual(t, []app.Evento{{Tipo: app.FalhouAoTocar, Motivo: "invalid parameter"}}, f.eventos)
+	})
+	t.Run("um mpv que não numera os arquivos também carrega", func(t *testing.T) {
+		p, f := novoTocador()
+		p.Toca(app.Stream{URL: "https://a/1.m4a", Volume: 1}, prova.Faixa("1"))
+		p.AoLinha(`{"request_id":1,"error":"success"}`)
+		p.AoLinha(`{"event":"start-file"}`)
+		p.AoLinha(`{"event":"file-loaded"}`)
+		p.AoLinha(`{"event":"end-file","reason":"eof"}`)
+		igual(t, []app.Evento{{Tipo: app.Carregou}, {Tipo: app.Terminou}}, f.eventos)
+	})
 	t.Run("pula, pausa, continua, para e muda a velocidade", func(t *testing.T) {
 		p, f := novoTocador()
 		f.enviadas = nil
@@ -219,18 +294,20 @@ func TestProcessoFalaComUmMpv(t *testing.T) {
 	eventos := make(chan app.Evento, 8)
 	tocador := NovoTocador(processo.Envia, func(e app.Evento) { eventos <- e })
 	tocador.Toca(app.Stream{URL: "/tmp/silencio.wav", Volume: 1}, prova.Faixa("1"))
+	var tipos []app.TipoEvento
 	prazo := time.After(10 * time.Second)
 	for terminou := false; !terminou; {
 		select {
 		case linha := <-linhas:
 			tocador.AoLinha(linha)
 		case e := <-eventos:
-			igual(t, app.Terminou, e.Tipo)
-			terminou = true
+			tipos = append(tipos, e.Tipo)
+			terminou = e.Tipo == app.Terminou
 		case <-prazo:
 			t.Fatal("o mpv de mentira não tocou até o fim")
 		}
 	}
+	igual(t, []app.TipoEvento{app.Carregou, app.Terminou}, tipos)
 	igual(t, time.Second, tocador.Duracao())
 	argumentos, _ := os.ReadFile(vistos)
 	igual(t, strings.Join(Argumentos(socket, []string{"--ao=null"}), "\n"), string(argumentos))
@@ -239,6 +316,10 @@ func TestProcessoFalaComUmMpv(t *testing.T) {
 	case <-fim:
 	case <-time.After(5 * time.Second):
 		t.Fatal("o fim da conversa não foi avisado")
+	}
+	// Como ele saiu fica para o registro: pelo SIGTERM, ou sozinho ao perder a conversa.
+	if saida := processo.Saida(); saida != "signal: terminated" && saida != "exit status 0" {
+		t.Fatalf("saída do mpv: %q", saida)
 	}
 }
 
@@ -252,4 +333,46 @@ func TestMpvQueNaoSobe(t *testing.T) {
 	if _, erro := Inicia(filepath.Join(pasta, "não-existe"), filepath.Join(pasta, "mpv.sock"), nil, func(string) {}, nil); erro == nil {
 		t.Fatal("um mpv que não existe é um erro")
 	}
+}
+
+// O Pdeathsig do Linux vale para a thread que criou o processo: se o mpv fosse
+// criado numa thread qualquer do Go e ela acabasse, ele morreria com o daemon
+// ainda de pé.
+func TestOMpvNaoMorreComAThreadQueOSubiu(t *testing.T) {
+	pasta, _ := os.MkdirTemp("", "mkt")
+	t.Cleanup(func() { os.RemoveAll(pasta) })
+	t.Setenv("MKTUNES_MPV_DE_MENTIRA", "1")
+	t.Setenv("MKTUNES_MPV_ARGS_VISTOS", filepath.Join(pasta, "args"))
+	fim := make(chan struct{})
+	subiu := make(chan *Processo, 1)
+	segura := make(chan struct{})
+	t.Cleanup(func() { close(segura) })
+	var sobe func()
+	sobe = func() {
+		// Esta goroutine acaba presa à sua thread: a thread acaba junto com ela.
+		// (Menos a thread principal, que o Go nunca encerra: se caiu nela, fica
+		// ali segurando-a e outra goroutine tenta de novo.)
+		runtime.LockOSThread()
+		if syscall.Gettid() == os.Getpid() {
+			go sobe()
+			<-segura
+			return
+		}
+		processo, erro := Inicia(os.Args[0], filepath.Join(pasta, "mpv.sock"), nil, func(string) {}, func() { close(fim) })
+		if erro != nil {
+			t.Error(erro)
+		}
+		subiu <- processo
+	}
+	go sobe()
+	processo := <-subiu
+	if processo == nil {
+		t.FailNow()
+	}
+	select {
+	case <-fim:
+		t.Fatalf("o mpv morreu com a thread que o subiu (%s)", processo.Saida())
+	case <-time.After(500 * time.Millisecond):
+	}
+	processo.Fecha()
 }

@@ -72,6 +72,7 @@ func novaBancada(ajusta func(o *app.OpcoesDaSessao)) *bancada {
 		ajusta(&o)
 	}
 	b.s = app.NovaSessao(o)
+	b.p.AoEvento = b.s.AoEvento
 	return b
 }
 
@@ -662,5 +663,117 @@ func TestHistoricoDeEscuta(t *testing.T) {
 		b.l.Avanca(31 * time.Second)
 		igual(t, 1, len(m.Tocadas))
 		igual(t, "song", m.Tocadas[0].Faixa.ID)
+	})
+}
+
+// O tocador pode levar uns segundos para abrir uma faixa (a rede, a CDN):
+// até ele dizer que carregou, a sessão continua em "carregando".
+func TestSessaoEsperaOTocadorCarregar(t *testing.T) {
+	lenta := func() *bancada {
+		b := novaBancada(nil)
+		b.p.Demora = true
+		return b
+	}
+	t.Run("fica carregando até o tocador abrir a faixa, e só então toca", func(t *testing.T) {
+		b := lenta()
+		b.toca(0, "1", "2")
+		igual(t, app.Carregando, b.s.Estado().Situacao)
+		igual(t, "play https://stream.example/1", b.p.Chamadas[len(b.p.Chamadas)-1])
+		b.p.Carrega()
+		igual(t, app.Tocando, b.s.Estado().Situacao)
+		// Um segundo "carregou" (atrasado) não muda mais nada.
+		b.s.AlternaPausa()
+		b.p.Carrega()
+		igual(t, app.Pausado, b.s.Estado().Situacao)
+	})
+	t.Run("a faixa que o tocador não abre vira falha, com o motivo anotado", func(t *testing.T) {
+		var recusas []string
+		b := novaBancada(func(o *app.OpcoesDaSessao) {
+			o.AoRecusar = func(f dominio.Faixa, motivo string) { recusas = append(recusas, f.ID+": "+motivo) }
+		})
+		b.p.Demora = true
+		b.toca(0, "1")
+		b.evento(app.Evento{Tipo: app.FalhouAoTocar, Motivo: "loading failed"})
+		igual(t, app.FalhouTocador, b.s.Estado().Situacao)
+		igual(t, []string{"1: loading failed"}, recusas)
+		// Tocar de novo tenta outra vez.
+		b.s.AlternaPausa()
+		b.l.Roda()
+		igual(t, app.Carregando, b.s.Estado().Situacao)
+		b.p.Carrega()
+		igual(t, app.Tocando, b.s.Estado().Situacao)
+	})
+	t.Run("o começo pedido e um pulo durante o carregamento chegam ao tocador", func(t *testing.T) {
+		b := lenta()
+		b.s.Restaura(app.SessaoSalva{Fila: dominio.NovaFila([]dominio.Faixa{prova.Faixa("1", prova.SemStream)}, 0).Retrato(), Posicao: 42 * time.Second})
+		b.s.AlternaPausa()
+		b.l.Roda()
+		igual(t, app.Carregando, b.s.Estado().Situacao)
+		igual(t, []string{"seek 42s"}, b.p.Com("seek"))
+		// A posição pedida já aparece, em vez de um zero parado.
+		igual(t, 42*time.Second, b.s.Progresso().Posicao)
+		b.s.VaiPara(50 * time.Second)
+		igual(t, []string{"seek 42s", "seek 50s"}, b.p.Com("seek"))
+		b.p.Carrega()
+		igual(t, app.Tocando, b.s.Estado().Situacao)
+	})
+	t.Run("pausar durante o carregamento vale para quando a faixa abrir", func(t *testing.T) {
+		b := lenta()
+		b.toca(0, "1")
+		b.s.AlternaPausa()
+		igual(t, app.Carregando, b.s.Estado().Situacao)
+		igual(t, "pause", b.p.Chamadas[len(b.p.Chamadas)-1])
+		b.p.Carrega()
+		igual(t, app.Pausado, b.s.Estado().Situacao)
+		b.s.AlternaPausa()
+		igual(t, app.Tocando, b.s.Estado().Situacao)
+
+		// Pausar e desistir da pausa antes de abrir: toca.
+		b = lenta()
+		b.toca(0, "1")
+		b.s.AlternaPausa()
+		b.s.AlternaPausa()
+		igual(t, []string{"pause", "resume"}, b.p.Chamadas[len(b.p.Chamadas)-2:])
+		b.p.Carrega()
+		igual(t, app.Tocando, b.s.Estado().Situacao)
+
+		// A pausa de uma faixa não passa para a seguinte.
+		b = lenta()
+		b.toca(0, "1", "2")
+		b.s.AlternaPausa()
+		b.s.Proxima()
+		b.l.Roda()
+		b.p.Carrega()
+		igual(t, "2", b.atual())
+		igual(t, app.Tocando, b.s.Estado().Situacao)
+	})
+	t.Run("trocar de faixa durante o carregamento não deixa nada preso", func(t *testing.T) {
+		b := lenta()
+		b.toca(0, "1", "2")
+		portao := b.pendente("2")
+		b.s.Proxima()
+		b.l.Roda()
+		// O que chega da faixa antiga (abriu, falhou, acabou) enquanto a nova é
+		// resolvida não é da nova.
+		b.p.Carrega()
+		igual(t, app.Carregando, b.s.Estado().Situacao)
+		b.evento(app.Evento{Tipo: app.FalhouAoTocar, Motivo: "loading failed"})
+		b.evento(app.Evento{Tipo: app.Terminou})
+		igual(t, app.Carregando, b.s.Estado().Situacao)
+		igual(t, "2", b.atual())
+		portao.Abre()
+		b.l.Roda()
+		igual(t, app.Carregando, b.s.Estado().Situacao)
+		b.p.Carrega()
+		igual(t, app.Tocando, b.s.Estado().Situacao)
+		igual(t, "2", b.atual())
+	})
+	t.Run("o eco da pausa que segura a faixa antiga não aparece como pausado", func(t *testing.T) {
+		b := lenta()
+		b.toca(0, "1")
+		b.evento(app.Evento{Tipo: app.MudouPausa, Tocando: false})
+		igual(t, app.Carregando, b.s.Estado().Situacao)
+		b.p.Carrega()
+		igual(t, app.Tocando, b.s.Estado().Situacao)
 	})
 }

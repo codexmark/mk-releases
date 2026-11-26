@@ -39,11 +39,10 @@ qt6-multimedia-ffmpeg
 libnotify
 
 # MkTunes, o player de música do Mk (apps/mktunes): o daemon vai pronto (um
-# binário em Go), o som sai pelo mpv, o áudio do YouTube é achado pelo yt-dlp,
-# as tags das músicas do computador vêm do ffprobe e o sqlite3 leva a
-# biblioteca da versão antiga para a nova. mpv, ffmpeg e yt-dlp também estão em
-# apps.packages; aqui é porque o MkTunes não é opcional
-yt-dlp
+# binário em Go) e acha o áudio sozinho; o som sai pelo mpv, as tags das
+# músicas do computador vêm do ffprobe e o sqlite3 leva a biblioteca da versão
+# antiga para a nova. mpv e ffmpeg também estão em apps.packages; aqui é porque
+# o MkTunes não é opcional
 sqlite
 mpv
 ffmpeg
