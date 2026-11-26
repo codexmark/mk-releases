@@ -34,3 +34,26 @@ hasnt "$bar" 'Math.round(Stats.cpu * 100) + "%"'
 hasnt "$bar" 'Math.round(Stats.mem * 100) + "%"'
 hasnt "$bar" 'Stats.rate(Stats.rxRate).replace'
 hasnt "$bar" 'bar.batteryPct + "%"'
+
+# ---------------------------------------------------------------- a onda
+
+som=$(<"$REPO/shell/mare/Sound.qml")
+
+t "o som guarda o nível e um rastro dele, pelas contas do Wave.js"
+has "$som" 'import "Wave.js" as Wave'
+has "$som" 'property var trail: []'
+has "$som" 'levels = Wave.smooth(levels, raw, bands)'
+has "$som" 'trail = Wave.trail(trail, levels, bands)'
+
+t "ao desligar o som (ou o cava cair) o rastro some junto"
+eq 2 "$(grep -c 'trail = \[\]' <<<"$som")"
+
+t "a ilha desenha duas linhas: a onda e o rastro dela, mais fraco, pela mesma curva"
+has "$bar" 'import "Wave.js" as Wave'
+has "$bar" 'Wave.curve(Sound.levels, Sound.bands, wave.width, wave.amp)'
+has "$bar" 'Wave.curve(Sound.trail, Sound.bands, wave.width, wave.amp)'
+eq 2 "$(grep -c 'PathPolyline { path: wave.curve }' <<<"$bar")"
+eq 1 "$(grep -c 'PathPolyline { path: wave.ghost }' <<<"$bar")"
+
+t "o rastro é só traço (sem preenchimento) e vem antes da onda, que fica por cima"
+like "$bar" 'ShapePath \{[^}]*fillColor: "transparent"[^}]*PathPolyline \{ path: wave\.ghost \}'

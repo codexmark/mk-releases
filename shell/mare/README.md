@@ -171,7 +171,7 @@ Cada arquivo com `pragma Singleton` é dono de um pedaço do estado.
 | `Monitors` | As telas para a página Monitores: o que o Hyprland tem (`live`), o rascunho (`draft`) e a contagem de 15 s depois de aplicar. Gera o texto do `<raiz>/monitores.lua`; quem grava é o `scripts/mare-monitors trial`. |
 | `Keyboard` | Os layouts do teclado principal e qual está ativo. |
 | `Media` | O player MPRIS em destaque. |
-| `Sound` | O espectro do som que está tocando (`levels`, `energy`), para a onda da ilha. |
+| `Sound` | O espectro do som que está tocando (`levels`, `energy`) e o rastro dele (`trail`), para as duas linhas da onda da ilha; as contas estão no `Wave.js`. |
 | `Stats` | CPU, memória, temperatura, rede e disco a cada 2 s, com o histórico dos gráficos e o `alert`. |
 | `Weather` | O clima (`data`), renovado a cada 30 min. |
 | `Updates` | O resultado da última procura por atualizações (`info`) e se a ilha deve acender (`badge`). |

@@ -9,6 +9,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.SystemTray
 import Quickshell.Services.UPower
 import "Island.js" as Island
+import "Wave.js" as Wave
 
 // A ilha, no molde da do Ryoku (orpheus): uma peça só, pendurada no meio da
 // borda de cima, com filetes côncavos onde encosta na tela. Esquerda: marca,
@@ -185,8 +186,8 @@ PanelWindow {
 
         // A ilha responde ao som: a borda de baixo ondula com o espectro do
         // que está tocando (Sound.qml), graves à esquerda e agudos à direita,
-        // como se a música mexesse num líquido. Com um painel aberto, ou em
-        // silêncio, é uma linha reta.
+        // como se a música mexesse num líquido, e um rastro mais fraco vem atrás.
+        // Com um painel aberto, ou em silêncio, é uma linha reta.
         Shape {
             id: wave
             x: bar.fillet + bar.corner
@@ -196,38 +197,29 @@ PanelWindow {
             preferredRendererType: Shape.CurveRenderer
 
             readonly property real amp: (bar.waveRoom - 3) * Sound.presence * (bar.panelOpen ? 0 : 1)
-            // A curva: três pontos por faixa, suavizados, presos em zero nas pontas.
-            readonly property var curve: {
-                const pts = [Qt.point(0, 0)];
-                const lv = Sound.levels, n = Sound.bands, steps = n * 3;
-                if (wave.amp > 0.05 && lv.length === n && wave.width > 0) {
-                    // Contraste: a faixa mais fraca do momento fica perto de
-                    // zero e a mais forte usa a altura toda. Sem isso, com
-                    // todas as faixas soando, a borda só descia por igual.
-                    let lo = 1, hi = 0;
-                    for (let i = 0; i < n; i++) {
-                        lo = Math.min(lo, lv[i]);
-                        hi = Math.max(hi, lv[i]);
-                    }
-                    const floor = lo * 0.85, span = Math.max(0.08, hi - floor);
-                    const gain = 0.55 + 0.45 * Math.min(1, hi * 1.6);
-                    for (let i = 1; i < steps; i++) {
-                        const t = i / steps, p = t * (n - 1), a = Math.floor(p), b = Math.min(n - 1, a + 1);
-                        const k = (1 - Math.cos((p - a) * Math.PI)) / 2;
-                        const raw = lv[a] * (1 - k) + lv[b] * k;
-                        const v = Math.pow(Math.max(0, (raw - floor) / span), 0.6) * gain;
-                        const edge = Math.sin(t * Math.PI);
-                        pts.push(Qt.point(t * wave.width, v * wave.amp * Math.pow(edge, 0.6)));
-                    }
-                }
-                pts.push(Qt.point(wave.width, 0));
+            // A onda e o rastro dela (a mesma conta, com os níveis atrasados): as
+            // duas linhas se cruzam quando o som sobe e desce. Wave.js faz a curva.
+            function points(pairs) {
+                const pts = [];
+                for (let i = 0; i < pairs.length; i++)
+                    pts.push(Qt.point(pairs[i][0], pairs[i][1]));
                 return pts;
             }
+            readonly property var curve: points(Wave.curve(Sound.levels, Sound.bands, wave.width, wave.amp))
+            readonly property var ghost: points(Wave.curve(Sound.trail, Sound.bands, wave.width, wave.amp))
 
             ShapePath {
                 fillColor: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, island.solidity)
                 strokeColor: "transparent"
                 PathPolyline { path: wave.curve }
+            }
+            // O rastro: só traço, mais fraco, por baixo da linha da onda.
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: Qt.rgba(Theme.copper.r, Theme.copper.g, Theme.copper.b,
+                    0.38 * Sound.presence * (bar.panelOpen ? 0 : 1))
+                strokeWidth: 1
+                PathPolyline { path: wave.ghost }
             }
             ShapePath {
                 fillColor: "transparent"

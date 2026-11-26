@@ -2,9 +2,11 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Wave.js" as Wave
 
 // O som que está tocando, em faixas dos graves aos agudos (scripts/mare-cava).
-// A ilha usa para ondular a borda de baixo com a música. Em silêncio o cava
+// A ilha usa para ondular a borda de baixo com a música, com um rastro atrás
+// (as contas estão no Wave.js). Em silêncio o cava
 // repete a mesma linha, que é ignorada: nada é redesenhado.
 Singleton {
     id: root
@@ -14,6 +16,8 @@ Singleton {
 
     // 0 a 1 por faixa, e a média.
     property var levels: []
+    // O mesmo, com atraso: a segunda linha da ilha.
+    property var trail: []
     property real energy: 0
     // Sobe quando há som e desce devagar quando para (a onda não some de estalo).
     property real presence: energy > 0.015 ? 1 : 0
@@ -29,23 +33,21 @@ Singleton {
             return;
         last = line;
         const parts = line.split(";");
-        const out = [];
+        const raw = [];
+        for (let i = 0; i < bands; i++)
+            raw.push((parseInt(parts[i]) || 0) / 100);
+        levels = Wave.smooth(levels, raw, bands);
+        trail = Wave.trail(trail, levels, bands);
         let sum = 0;
-        for (let i = 0; i < bands; i++) {
-            const v = Math.max(0, Math.min(1, (parseInt(parts[i]) || 0) / 100));
-            // Meio caminho entre o quadro anterior e este: movimento de líquido.
-            const prev = levels[i] || 0;
-            const s = v > prev ? prev + (v - prev) * 0.7 : prev + (v - prev) * 0.35;
-            out.push(s);
-            sum += s;
-        }
-        levels = out;
+        for (let i = 0; i < bands; i++)
+            sum += levels[i];
         energy = sum / bands;
     }
 
     onEnabledChanged: {
         if (!enabled) {
             levels = [];
+            trail = [];
             energy = 0;
             last = "";
         }
@@ -62,6 +64,7 @@ Singleton {
         // caiu por outro motivo, logo.
         onExited: (code, status) => {
             root.levels = [];
+            root.trail = [];
             root.energy = 0;
             retry.interval = code === 127 ? 60000 : 4000;
             if (root.enabled)
