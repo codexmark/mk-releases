@@ -1,0 +1,22 @@
+[
+ {
+  "item": {
+   "nome": "Imagem colada.png",
+   "caminho": "/home/ana/Documentos/Imagem colada.png",
+   "tipo": "arquivo",
+   "tamanho": 204811,
+   "mtime": 1753786029,
+   "modo": 420,
+   "permissoes": "rw-r--r--",
+   "dono": "ana",
+   "grupo": "ana",
+   "oculto": false,
+   "mime": "image/png",
+   "icone": "image-png",
+   "icone_reserva": "image-x-generic",
+   "alvo": null,
+   "quebrado": false,
+   "alvo_tipo": null
+  }
+ }
+]

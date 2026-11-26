@@ -1,0 +1,27 @@
+[
+ {
+  "tarefa": 9
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 9,
+  "acao": "restaurar",
+  "estado": "feita",
+  "titulo": "Restaurando 1 item",
+  "itens": 1,
+  "itens_total": 1,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": true
+ },
+ {
+  "evento": "lixeira",
+  "itens": 2
+ }
+]

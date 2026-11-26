@@ -1,0 +1,15 @@
+[
+ {
+  "lancar": [
+   {
+    "app": "org.exemplo.Editor.desktop",
+    "nome": "Editor de texto",
+    "argv": [
+     "editor",
+     "/home/ana/Documentos/anotações.txt"
+    ]
+   }
+  ],
+  "sem_app": []
+ }
+]

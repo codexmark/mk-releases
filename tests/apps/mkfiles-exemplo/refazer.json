@@ -1,0 +1,29 @@
+[
+ {
+  "tarefa": 13,
+  "descricao": "Mover 5 itens"
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 13,
+  "acao": "refazer",
+  "estado": "feita",
+  "titulo": "Refazendo: Mover 5 itens",
+  "itens": 1,
+  "itens_total": 1,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": true
+ },
+ {
+  "evento": "historico",
+  "desfazer": "Mover 5 itens",
+  "refazer": null
+ }
+]

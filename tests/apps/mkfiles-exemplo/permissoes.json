@@ -1,0 +1,25 @@
+[
+ {
+  "itens": [
+   {
+    "nome": "Fotos da viagem",
+    "caminho": "/home/ana/Documentos/Fotos da viagem",
+    "tipo": "pasta",
+    "tamanho": 0,
+    "mtime": 1766435037,
+    "modo": 493,
+    "permissoes": "rwxr-xr-x",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "inode/directory",
+    "icone": "folder",
+    "icone_reserva": "folder",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null
+   }
+  ],
+  "erros": []
+ }
+]

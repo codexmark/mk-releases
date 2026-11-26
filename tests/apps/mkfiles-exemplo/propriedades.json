@@ -1,0 +1,53 @@
+[
+ {
+  "itens": [
+   {
+    "nome": "Fotos da viagem",
+    "caminho": "/home/ana/Documentos/Fotos da viagem",
+    "tipo": "pasta",
+    "tamanho": 0,
+    "mtime": 1766435037,
+    "modo": 493,
+    "permissoes": "rwxr-xr-x",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "inode/directory",
+    "icone": "folder",
+    "icone_reserva": "folder",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null
+   }
+  ],
+  "onde": "/home/ana/Documentos",
+  "sou_dono": true,
+  "grupos": [
+   "ana",
+   "wheel",
+   "video"
+  ],
+  "contagem": {
+   "arquivos": 0,
+   "pastas": 0,
+   "tamanho": 0
+  },
+  "fim": false
+ },
+ {
+  "contagem": {
+   "arquivos": 212,
+   "pastas": 9,
+   "tamanho": 3865470566
+  },
+  "fim": false
+ },
+ {
+  "contagem": {
+   "arquivos": 431,
+   "pastas": 14,
+   "tamanho": 8123400112
+  },
+  "fim": true
+ }
+]

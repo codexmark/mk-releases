@@ -1,0 +1,12 @@
+[
+ {
+  "remotos": [
+   {"uri": "sftp://ana@servidor/", "raiz": "/run/user/1000/gvfs/sftp:host=servidor,user=ana", "nome": "servidor", "protocolo": "sftp", "host": "servidor"},
+   {"uri": "smb://nas/fotos/", "raiz": "/run/user/1000/gvfs/smb-share:server=nas,share=fotos", "nome": "fotos em nas", "protocolo": "smb", "host": "nas"}
+  ],
+  "rede": [
+   {"uri": "smb://nas/", "nome": "NAS"},
+   {"uri": "sftp://impressora.local/", "nome": "impressora"}
+  ]
+ }
+]

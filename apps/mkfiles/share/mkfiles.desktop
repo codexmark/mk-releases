@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=MkFiles
+GenericName=Gerenciador de arquivos
+Comment=Arquivos e pastas: abas, painel duplo, lixeira, busca, miniaturas e discos
+Exec=mkfiles %U
+Icon=mkfiles
+Terminal=false
+Categories=System;FileManager;Utility;
+MimeType=inode/directory;
+Keywords=arquivos;pastas;gerenciador;explorador;lixeira;copiar;mover;disco;
+Actions=nova-janela;
+
+[Desktop Action nova-janela]
+Name=Nova janela
+Exec=mkfiles --nova-janela

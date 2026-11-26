@@ -1,0 +1,86 @@
+[
+ {
+  "itens": [
+   {
+    "nome": "capítulo 1.md",
+    "caminho": "/home/ana/Documentos/capítulo 1.md",
+    "tipo": "arquivo",
+    "tamanho": 15320,
+    "mtime": 1762482222,
+    "modo": 420,
+    "permissoes": "rw-r--r--",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "text/markdown",
+    "icone": "text-markdown",
+    "icone_reserva": "text-x-generic",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null
+   },
+   {
+    "nome": "capítulo 2.md",
+    "caminho": "/home/ana/Documentos/capítulo 2.md",
+    "tipo": "arquivo",
+    "tamanho": 18744,
+    "mtime": 1762218701,
+    "modo": 420,
+    "permissoes": "rw-r--r--",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "text/markdown",
+    "icone": "text-markdown",
+    "icone_reserva": "text-x-generic",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null
+   }
+  ],
+  "fim": false
+ },
+ {
+  "itens": [
+   {
+    "nome": "capítulo 10.md",
+    "caminho": "/home/ana/Documentos/capítulo 10.md",
+    "tipo": "arquivo",
+    "tamanho": 9321,
+    "mtime": 1761955180,
+    "modo": 420,
+    "permissoes": "rw-r--r--",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "text/markdown",
+    "icone": "text-markdown",
+    "icone_reserva": "text-x-generic",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null
+   },
+   {
+    "nome": "capa.png",
+    "caminho": "/home/ana/Documentos/Faculdade/capa.png",
+    "tipo": "arquivo",
+    "tamanho": 88211,
+    "mtime": 1754840113,
+    "modo": 420,
+    "permissoes": "rw-r--r--",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "image/png",
+    "icone": "image-png",
+    "icone_reserva": "image-x-generic",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null
+   }
+  ],
+  "fim": true,
+  "total": 4,
+  "vistos": 312
+ }
+]

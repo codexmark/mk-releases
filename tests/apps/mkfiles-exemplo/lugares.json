@@ -1,0 +1,84 @@
+[
+ {
+  "lugares": [
+   {
+    "id": "pessoal",
+    "nome": "Pasta pessoal",
+    "caminho": "/home/ana",
+    "icone": "user-home"
+   },
+   {
+    "id": "documentos",
+    "nome": "Documentos",
+    "caminho": "/home/ana/Documentos",
+    "icone": "folder-documents"
+   },
+   {
+    "id": "downloads",
+    "nome": "Downloads",
+    "caminho": "/home/ana/Downloads",
+    "icone": "folder-download"
+   },
+   {
+    "id": "imagens",
+    "nome": "Imagens",
+    "caminho": "/home/ana/Imagens",
+    "icone": "folder-pictures"
+   },
+   {
+    "id": "musicas",
+    "nome": "Músicas",
+    "caminho": "/home/ana/Músicas",
+    "icone": "folder-music"
+   },
+   {
+    "id": "videos",
+    "nome": "Vídeos",
+    "caminho": "/home/ana/Vídeos",
+    "icone": "folder-videos"
+   },
+   {
+    "id": "lixeira",
+    "nome": "Lixeira",
+    "caminho": null,
+    "icone": "user-trash"
+   },
+   {
+    "id": "raiz",
+    "nome": "Raiz",
+    "caminho": "/",
+    "icone": "drive-harddisk"
+   }
+  ],
+  "favoritos": [
+   {
+    "caminho": "/home/ana/Work",
+    "uri": "file:///home/ana/Work",
+    "nome": "Work",
+    "existe": true,
+    "remoto": false
+   },
+   {
+    "caminho": "/home/ana/Documentos/Faculdade",
+    "uri": "file:///home/ana/Documentos/Faculdade",
+    "nome": "Faculdade",
+    "existe": true,
+    "remoto": false
+   },
+   {
+    "caminho": "/home/ana/Pasta que sumiu",
+    "uri": "file:///home/ana/Pasta%20que%20sumiu",
+    "nome": "Pasta que sumiu",
+    "existe": false,
+    "remoto": false
+   },
+   {
+    "caminho": null,
+    "uri": "sftp://servidor.exemplo/home/ana",
+    "nome": "servidor",
+    "existe": true,
+    "remoto": true
+   }
+  ]
+ }
+]

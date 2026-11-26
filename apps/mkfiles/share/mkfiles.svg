@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>MkFiles</title>
+  <rect width="64" height="64" rx="12" fill="#0b0b0b"/>
+  <path d="M12 20h14l5 6h21v24H12z" fill="none" stroke="#cdc4ba" stroke-opacity=".6" stroke-width="2" stroke-linejoin="miter"/>
+  <path d="M12 32h40M20 41h12" fill="none" stroke="#ce5e32" stroke-width="3" stroke-linecap="round"/>
+</svg>

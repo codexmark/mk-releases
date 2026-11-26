@@ -1,0 +1,30 @@
+[
+ {
+  "tarefa": 4
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 4,
+  "acao": "criar-pasta",
+  "estado": "feita",
+  "titulo": "Criando a pasta Nova pasta",
+  "itens": 1,
+  "itens_total": 1,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [
+   "/home/ana/Documentos/Nova pasta"
+  ],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": true
+ },
+ {
+  "evento": "historico",
+  "desfazer": "Criar a pasta Nova pasta",
+  "refazer": null
+ }
+]

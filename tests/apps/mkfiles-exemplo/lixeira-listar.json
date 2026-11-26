@@ -1,0 +1,73 @@
+[
+ {
+  "itens": [
+   {
+    "nome": "rascunho velho.txt",
+    "caminho": "/home/ana/.local/share/Trash/files/rascunho velho.txt",
+    "tipo": "arquivo",
+    "tamanho": 2210,
+    "mtime": 1755630676,
+    "modo": 420,
+    "permissoes": "rw-r--r--",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "text/plain",
+    "icone": "text-plain",
+    "icone_reserva": "text-x-generic",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null,
+    "nome_original": "rascunho velho.txt",
+    "origem": "/home/ana/Documentos/rascunho velho.txt",
+    "apagado_s": 1767139200,
+    "lixeira": "/home/ana/.local/share/Trash"
+   },
+   {
+    "nome": "foto tremida.jpg",
+    "caminho": "/home/ana/.local/share/Trash/files/foto tremida.jpg",
+    "tipo": "arquivo",
+    "tamanho": 1822004,
+    "mtime": 1755367155,
+    "modo": 420,
+    "permissoes": "rw-r--r--",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "image/jpeg",
+    "icone": "image-jpeg",
+    "icone_reserva": "image-x-generic",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null,
+    "nome_original": "foto tremida.jpg",
+    "origem": "/home/ana/Imagens/foto tremida.jpg",
+    "apagado_s": 1766880000,
+    "lixeira": "/home/ana/.local/share/Trash"
+   },
+   {
+    "nome": "Projeto antigo",
+    "caminho": "/home/ana/.local/share/Trash/files/Projeto antigo",
+    "tipo": "pasta",
+    "tamanho": 0,
+    "mtime": 1755103634,
+    "modo": 493,
+    "permissoes": "rwxr-xr-x",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "inode/directory",
+    "icone": "folder",
+    "icone_reserva": "folder",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null,
+    "nome_original": "Projeto antigo",
+    "origem": "/home/ana/Work/Projeto antigo",
+    "apagado_s": 1764547200,
+    "lixeira": "/home/ana/.local/share/Trash"
+   }
+  ],
+  "fim": true
+ }
+]

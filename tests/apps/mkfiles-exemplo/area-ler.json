@@ -1,0 +1,10 @@
+[
+ {
+  "tipos": [
+   "text/uri-list",
+   "text/plain"
+  ],
+  "tipo": "text/uri-list",
+  "texto": "file:///home/ana/Downloads/foto%201.jpg\r\nfile:///home/ana/Downloads/recibo.pdf\r\n"
+ }
+]

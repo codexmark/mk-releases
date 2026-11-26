@@ -1,0 +1,67 @@
+[
+ {
+  "tarefa": 2
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 2,
+  "acao": "mover",
+  "estado": "conflito",
+  "titulo": "Movendo 5 itens para Documentos",
+  "itens": 0,
+  "itens_total": 5,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": false
+ },
+ {
+  "evento": "conflito",
+  "tarefa": 2,
+  "conflito": 1,
+  "acao": "mover",
+  "origem": {
+   "nome": "foto 1.jpg",
+   "caminho": "/home/ana/Downloads/foto 1.jpg",
+   "tipo": "arquivo",
+   "tamanho": 3120440,
+   "mtime": 1767000000,
+   "modo": 420,
+   "permissoes": "rw-r--r--",
+   "dono": "ana",
+   "grupo": "ana",
+   "oculto": false,
+   "mime": "image/jpeg",
+   "icone": "image-jpeg",
+   "icone_reserva": "image-x-generic",
+   "alvo": null,
+   "quebrado": false,
+   "alvo_tipo": null
+  },
+  "destino": {
+   "nome": "foto 1.jpg",
+   "caminho": "/home/ana/Documentos/foto 1.jpg",
+   "tipo": "arquivo",
+   "tamanho": 2204811,
+   "mtime": 1761691659,
+   "modo": 420,
+   "permissoes": "rw-r--r--",
+   "dono": "ana",
+   "grupo": "ana",
+   "oculto": false,
+   "mime": "image/jpeg",
+   "icone": "image-jpeg",
+   "icone_reserva": "image-x-generic",
+   "alvo": null,
+   "quebrado": false,
+   "alvo_tipo": null
+  },
+  "sugestao": "foto 1 (2).jpg",
+  "restam": 4
+ }
+]

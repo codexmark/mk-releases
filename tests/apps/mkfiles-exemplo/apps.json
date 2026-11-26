@@ -1,0 +1,29 @@
+[
+ {
+  "mime": "text/plain",
+  "padrao": "org.exemplo.Editor.desktop",
+  "apps": [
+   {
+    "id": "org.exemplo.Editor.desktop",
+    "nome": "Editor de texto",
+    "icone": "accessories-text-editor",
+    "terminal": false,
+    "padrao": true
+   },
+   {
+    "id": "mkescrita.desktop",
+    "nome": "MkEscrita",
+    "icone": "mkescrita",
+    "terminal": false,
+    "padrao": false
+   },
+   {
+    "id": "vim.desktop",
+    "nome": "Vim",
+    "icone": "vim",
+    "terminal": true,
+    "padrao": false
+   }
+  ]
+ }
+]

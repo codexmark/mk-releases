@@ -1,0 +1,23 @@
+[
+ {
+  "tarefa": 1
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 1,
+  "acao": "copiar",
+  "estado": "rodando",
+  "titulo": "Copiando 3 itens para Documentos",
+  "itens": 1,
+  "itens_total": 3,
+  "bytes": 262144000,
+  "bytes_total": 734003200,
+  "atual": "/home/ana/Vídeos/aniversário da vó.mp4",
+  "velocidade": 52428800,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": false
+ }
+]

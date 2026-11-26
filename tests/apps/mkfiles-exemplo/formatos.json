@@ -1,0 +1,93 @@
+[
+ {
+  "extrair": [
+   {
+    "formato": "zip",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "tar",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "tar.gz",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "tar.bz2",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "tar.xz",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "tar.zst",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "gz",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "bz2",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "xz",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "zst",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "7z",
+    "disponivel": false,
+    "falta": "7zip"
+   },
+   {
+    "formato": "rar",
+    "disponivel": false,
+    "falta": "unrar"
+   }
+  ],
+  "compactar": [
+   {
+    "formato": "zip",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "tar.gz",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "tar.zst",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "tar.xz",
+    "disponivel": true,
+    "falta": null
+   },
+   {
+    "formato": "7z",
+    "disponivel": false,
+    "falta": "7zip"
+   }
+  ]
+ }
+]

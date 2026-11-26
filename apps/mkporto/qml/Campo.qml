@@ -13,6 +13,8 @@ Item {
     signal apagarVazio()
 
     function focar() { entrada.forceActiveFocus(); }
+    // Seleciona do começo até `ate` (o que for digitado troca a seleção).
+    function selecionar(ate) { entrada.select(0, Math.max(0, Math.min(entrada.text.length, ate))); }
 
     implicitWidth: 260
     implicitHeight: 30

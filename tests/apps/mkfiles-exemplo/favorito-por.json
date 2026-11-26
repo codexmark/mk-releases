@@ -1,0 +1,34 @@
+[
+ {
+  "favoritos": [
+   {
+    "caminho": "/home/ana/Work",
+    "uri": "file:///home/ana/Work",
+    "nome": "Work",
+    "existe": true,
+    "remoto": false
+   },
+   {
+    "caminho": "/home/ana/Documentos/Faculdade",
+    "uri": "file:///home/ana/Documentos/Faculdade",
+    "nome": "Faculdade",
+    "existe": true,
+    "remoto": false
+   },
+   {
+    "caminho": "/home/ana/Pasta que sumiu",
+    "uri": "file:///home/ana/Pasta%20que%20sumiu",
+    "nome": "Pasta que sumiu",
+    "existe": false,
+    "remoto": false
+   },
+   {
+    "caminho": null,
+    "uri": "sftp://servidor.exemplo/home/ana",
+    "nome": "servidor",
+    "existe": true,
+    "remoto": true
+   }
+  ]
+ }
+]

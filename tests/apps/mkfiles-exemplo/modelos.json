@@ -1,0 +1,43 @@
+[
+ {
+  "pasta": "/home/ana/Modelos",
+  "modelos": [
+   {
+    "nome": "Carta.odt",
+    "caminho": "/home/ana/Modelos/Carta.odt",
+    "tipo": "arquivo",
+    "tamanho": 9122,
+    "mtime": 1754576592,
+    "modo": 420,
+    "permissoes": "rw-r--r--",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "application/vnd.oasis.opendocument.text",
+    "icone": "application-vnd.oasis.opendocument.text",
+    "icone_reserva": "x-office-document",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null
+   },
+   {
+    "nome": "Script.sh",
+    "caminho": "/home/ana/Modelos/Script.sh",
+    "tipo": "arquivo",
+    "tamanho": 31,
+    "mtime": 1754313071,
+    "modo": 420,
+    "permissoes": "rw-r--r--",
+    "dono": "ana",
+    "grupo": "ana",
+    "oculto": false,
+    "mime": "application/x-shellscript",
+    "icone": "application-x-shellscript",
+    "icone_reserva": "text-x-script",
+    "alvo": null,
+    "quebrado": false,
+    "alvo_tipo": null
+   }
+  ]
+ }
+]

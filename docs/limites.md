@@ -153,6 +153,19 @@ correção.
   som fica preso à saída que era a padrão: plugar um fone não move o áudio
   até desligar e ligar. As teclas de volume passam a mexer no sink do
   equalizador.
+- **MkFiles:** visto numa instalação (VM), depois de um `mk-update`: abrir
+  pela busca, ir a uma pasta pelo campo de caminho, duas abas, copiar e colar
+  entre elas, a busca, desfazer, clique, menu de contexto pelo botão direito,
+  **arrastar um arquivo para a aba de outra pasta** (moveu), e um **remoto por
+  SFTP com o `gio` de verdade**: por chave e pedindo a senha na folha do
+  MkFiles. Na sessão aninhada: as visões, o painel duplo, renomear, lixeira,
+  pasta nova e a prévia de imagem e de texto; com as ferramentas reais,
+  extrair zip, tar.zst e tar.xz e criar tar.zst. **Não visto:** arrastar para
+  outro app e de outro app, o retângulo de seleção e a roda do mouse, abrir
+  com, propriedades, a tela de conflito, o renomear em lote, 7z e rar, SMB,
+  FTP e WebDAV, a queda de uma conexão, e pastas grandes de verdade. Recortar
+  no MkFiles pode não ser lido pelo Dolphin. Compactado é só leitura. Uma
+  conexão remota por vez.
 - **MkPorto, Máquinas:** QEMU direto, sem libvirt: não há rede em ponte (a
   máquina não ganha IP na rede de casa), o virt-manager não enxerga as
   máquinas, e não há migração nem repasse de placa de vídeo. A tela é a janela

@@ -13,6 +13,8 @@
 # com aceleração como numa máquina de verdade. Sem isso tudo é desenhado no
 # processador e as animações engasgam. Se a janela não abrir ou ficar preta:
 #   MK_VM_GL=0 iso/vm
+# Sem janela nenhuma (a tela só pelas capturas do monitor, abaixo):
+#   MK_VM_TELA=nenhuma iso/vm
 #
 # A porta 2222 daqui vai para o SSH da VM (ssh -p 2222 usuario@localhost),
 # e ~/.cache/mk-vm/monitor.sock é o monitor do QEMU, que tira capturas da
@@ -51,10 +53,19 @@ args=(
   -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:2222-:22"
   -monitor "unix:$dir/monitor.sock,server,nowait"
   -device qemu-xhci -device usb-tablet
-  -audiodev "pipewire,id=som" -device intel-hda -device "hda-duplex,audiodev=som"
 )
 
-if [[ ${MK_VM_GL:-1} == 1 ]] && qemu-system-x86_64 -device help 2>/dev/null | grep -q '"virtio-vga-gl"'; then
+if [[ ${MK_VM_TELA:-} == nenhuma ]]; then
+  # Sem janela nem som: para dirigir a VM só pelo monitor (sendkey,
+  # screendump), sem pôr um cliente a mais no compositor de quem testa.
+  args+=(-device virtio-vga -display none)
+else
+  args+=(-audiodev "pipewire,id=som" -device intel-hda -device "hda-duplex,audiodev=som")
+fi
+
+if [[ ${MK_VM_TELA:-} == nenhuma ]]; then
+  :
+elif [[ ${MK_VM_GL:-1} == 1 ]] && qemu-system-x86_64 -device help 2>/dev/null | grep -q '"virtio-vga-gl"'; then
   # Janela SDL: a GTK do QEMU não consegue OpenGL neste Wayland ("GtkGLArea
   # console lacks DMABUF support" e o QEMU cai).
   args+=(-device virtio-vga-gl -display "sdl,gl=on")

@@ -1,0 +1,28 @@
+[
+ {
+  "tarefa": 3
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 3,
+  "acao": "ligar",
+  "estado": "feita",
+  "titulo": "Criando 1 link em Documentos",
+  "itens": 1,
+  "itens_total": 1,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": true
+ },
+ {
+  "evento": "historico",
+  "desfazer": "Criar 1 link",
+  "refazer": null
+ }
+]

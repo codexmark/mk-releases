@@ -1,0 +1,28 @@
+[
+ {
+  "item": {
+   "nome": "lista de compras.txt",
+   "caminho": "/home/ana/Documentos/lista de compras.txt",
+   "tipo": "arquivo",
+   "tamanho": 148,
+   "mtime": 1766962079,
+   "modo": 420,
+   "permissoes": "rw-r--r--",
+   "dono": "ana",
+   "grupo": "ana",
+   "oculto": false,
+   "mime": "text/plain",
+   "icone": "text-plain",
+   "icone_reserva": "text-x-generic",
+   "alvo": null,
+   "quebrado": false,
+   "alvo_tipo": null
+  },
+  "classe": "texto",
+  "texto": "Lista de compras\n\n- café\n- pão\n- queijo minas\n- maçã (6)\n- sabão em pó\n\nNão esquecer: ração da gata.\n",
+  "cortado": false,
+  "binario": false,
+  "itens": null,
+  "total": null
+ }
+]

@@ -1,0 +1,23 @@
+[
+ {
+  "tarefa": 1
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 1,
+  "acao": "copiar",
+  "estado": "cancelada",
+  "titulo": "Copiando 3 itens para Documentos",
+  "itens": 1,
+  "itens_total": 3,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": false
+ }
+]

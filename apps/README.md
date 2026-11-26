@@ -146,5 +146,20 @@ controle aplica ao vivo, sem reiniciar o som. **Microfone**: as entradas,
 volume e mudo, o nível ao vivo, "gravar e ouvir" (cinco segundos, só na
 memória) e uma frase dizendo o que há de errado. `F1` mostra os atalhos.
 
+## mkfiles
+
+O gerenciador de arquivos (`mkfiles [pasta ou arquivo]`). Abas e painel duplo
+(`F3`), três visões (ícones com miniaturas, lista, compacta), caminho em
+migalhas editável, barra lateral com lugares, favoritos (os mesmos do
+Nautilus e dos seletores de arquivo), discos e rede. Copiar, mover e apagar
+são tarefas com progresso, pausa, conflito e desfazer. Lixeira no padrão do
+freedesktop, busca por nome e conteúdo, abrir com, propriedades e
+permissões. Renomear em lote com prévia, compactados (extrair, criar e abrir
+como pasta; zip e tar pelo próprio motor, xz, zstd, 7z e rar pelas
+ferramentas do sistema), prévia rápida com `Espaço`, e remotos (SFTP, SMB,
+FTP, WebDAV) pelo gvfs. O motor (`mkfiles-motor servir`) é um processo de
+vida longa que vigia as pastas abertas. Entra ao lado do Nautilus, que
+continua o padrão para abrir pastas. `F1` mostra os atalhos.
+
 O sistema liga todos estes (do MkPacotes em diante) por `system/mk/apps-links`.
 

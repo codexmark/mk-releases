@@ -1,0 +1,24 @@
+[
+ {
+  "estado": {
+   "paineis": [
+    {
+     "abas": [
+      "/home/ana/Documentos",
+      "/home/ana/Downloads"
+     ],
+     "atual": 0
+    },
+    {
+     "abas": [
+      "/home/ana"
+     ],
+     "atual": 0
+    }
+   ],
+   "ativo": 0,
+   "duplo": false,
+   "lateral_px": 200
+  }
+ }
+]

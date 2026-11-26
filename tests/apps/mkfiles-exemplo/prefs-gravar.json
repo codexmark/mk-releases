@@ -1,0 +1,27 @@
+[
+  {
+    "prefs": {
+      "visao": "icones",
+      "visao_por_pasta": {
+        "/home/ana/Downloads": "lista"
+      },
+      "ordem": {
+        "campo": "nome",
+        "inversa": false
+      },
+      "ocultos": false,
+      "icone_px": 64,
+      "pastas_antes": true,
+      "confirmar_lixeira": false,
+      "clique": "duplo",
+      "colunas": {
+        "tamanho": 90,
+        "tipo": 150,
+        "mtime": 150,
+        "permissoes": 100
+      },
+      "miniaturas_remotas": true,
+      "miniatura_remota_mb": 5
+    }
+  }
+]

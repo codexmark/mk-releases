@@ -1,0 +1,30 @@
+[
+ {
+  "discos": [
+   {
+    "dispositivo": "/dev/sdb1",
+    "nome": "PENDRIVE",
+    "rotulo": "PENDRIVE",
+    "sistema": "vfat",
+    "tamanho": 16000000000,
+    "montado": "/run/media/ana/PENDRIVE",
+    "livre": 5200000000,
+    "total": 15990000000,
+    "removivel": true,
+    "uuid": "1A2B-3C4D"
+   },
+   {
+    "dispositivo": "/dev/sda3",
+    "nome": "Volume de 500 GB",
+    "rotulo": null,
+    "sistema": "ext4",
+    "tamanho": 500107862016,
+    "montado": null,
+    "livre": null,
+    "total": null,
+    "removivel": false,
+    "uuid": "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+   }
+  ]
+ }
+]

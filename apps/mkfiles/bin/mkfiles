@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Abre o MkFiles, o gerenciador de arquivos do Mk. Cada chamada abre uma
+# janela: é um gerenciador, não um app de janela única.
+#   mkfiles                    abre na pasta pessoal (ou nas abas da última vez)
+#   mkfiles pasta...           abre cada pasta numa aba
+#   mkfiles arquivo            abre a pasta do arquivo, com ele selecionado
+#   mkfiles --nova-janela [..] o mesmo (é o que a própria janela chama)
+#   MKFILES_RAIZ   onde estão bin/ e qml/ (padrão: a pasta acima deste script)
+# Aceita caminhos e file://… (é o que o menu e os outros apps passam).
+set -euo pipefail
+raiz=${MKFILES_RAIZ:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}
+titulo=MkFiles
+
+# Falta algo: avisa na tela (quem abriu pelo menu não vê o terminal) e sai.
+missing() {
+  local text="O $titulo precisa $1. Rode mk atualizar."
+  notify-send -a "$titulo" "$titulo" "$text" 2>/dev/null || true
+  echo "${0##*/}: $text" >&2
+  exit 1
+}
+command -v qs >/dev/null || missing "do Quickshell"
+command -v jq >/dev/null || missing "do jq"
+[[ -x $raiz/bin/mkfiles-motor ]] || missing "do motor (bin/mkfiles-motor)"
+
+# Os caminhos vão para a janela por variável de ambiente, um por linha, nunca
+# por shell. Um file://… é decodificado (%20 e companhia) sem executar nada:
+# só os pares %XX viram bytes.
+abrir=()
+so_caminhos=0
+for arg in "$@"; do
+  if ((!so_caminhos)); then
+    case $arg in
+      --nova-janela) continue ;;
+      --) so_caminhos=1; continue ;;
+      -*)
+        echo "uso: mkfiles [--nova-janela] [pasta ou arquivo...]" >&2
+        exit 2
+        ;;
+    esac
+  fi
+  if [[ $arg == file://* ]]; then
+    arg=${arg#file://}
+    arg=${arg#localhost}
+    decodificado=""
+    while [[ $arg =~ ^([^%]*)%([0-9A-Fa-f]{2})(.*)$ ]]; do
+      printf -v byte '%b' "\\x${BASH_REMATCH[2]}"
+      decodificado+=${BASH_REMATCH[1]}$byte
+      arg=${BASH_REMATCH[3]}
+    done
+    arg=$decodificado$arg
+  fi
+  # Um caminho com quebra de linha não cabe no "um por linha": fica de fora.
+  [[ -n $arg && $arg != *$'\n'* ]] || continue
+  abrir+=("$(realpath -ms -- "$arg")")
+done
+
+if ((${#abrir[@]})); then
+  MKFILES_ABRIR=$(printf '%s\n' "${abrir[@]}")
+  export MKFILES_ABRIR
+fi
+exec qs -p "$raiz/qml"

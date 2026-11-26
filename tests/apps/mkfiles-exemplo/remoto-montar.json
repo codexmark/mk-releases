@@ -1,0 +1,3 @@
+[
+ {"uri": "sftp://ana@servidor/", "caminho": "/run/user/1000/gvfs/sftp:host=servidor,user=ana", "raiz": "/run/user/1000/gvfs/sftp:host=servidor,user=ana", "nome": "servidor"}
+]

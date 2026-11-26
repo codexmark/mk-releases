@@ -84,6 +84,18 @@ hasnt "$qemu" "virtio-vga-gl"
 hasnt "$qemu" "gl=on"
 hasnt "$qemu" "sdl"
 
+t "MK_VM_TELA=nenhuma: sem janela nenhuma (a tela só existe pelas capturas do monitor) e sem som"
+calls_reset
+MK_VM_TELA=nenhuma OVMF=$SBX/ovmf bash "$r/iso/vm" >"$SBX/saida" 2>&1
+eq 0 $?
+qemu=$(grep '^qemu-system-x86_64 -name' "$SBX/calls")
+has "$qemu" "-display none"
+has "$qemu" "-device virtio-vga"
+hasnt "$qemu" "virtio-vga-gl"
+hasnt "$qemu" "sdl"
+hasnt "$qemu" "audiodev"
+has "$qemu" "monitor.sock"
+
 t "QEMU sem virtio-vga-gl: cai para virtio-vga sozinho"
 : >"$SBX/sem-gl"
 vm

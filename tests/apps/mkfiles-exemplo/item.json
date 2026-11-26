@@ -1,0 +1,22 @@
+[
+ {
+  "item": {
+   "nome": "Documentos",
+   "caminho": "/home/ana/Documentos",
+   "tipo": "pasta",
+   "tamanho": 0,
+   "mtime": 1755894197,
+   "modo": 493,
+   "permissoes": "rwxr-xr-x",
+   "dono": "ana",
+   "grupo": "ana",
+   "oculto": false,
+   "mime": "inode/directory",
+   "icone": "folder",
+   "icone_reserva": "folder",
+   "alvo": null,
+   "quebrado": false,
+   "alvo_tipo": null
+  }
+ }
+]

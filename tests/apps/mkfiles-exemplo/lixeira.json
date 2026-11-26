@@ -1,0 +1,32 @@
+[
+ {
+  "tarefa": 7
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 7,
+  "acao": "lixeira",
+  "estado": "feita",
+  "titulo": "Movendo 1 item para a lixeira",
+  "itens": 1,
+  "itens_total": 1,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": true
+ },
+ {
+  "evento": "lixeira",
+  "itens": 4
+ },
+ {
+  "evento": "historico",
+  "desfazer": "Mover 1 item para a lixeira",
+  "refazer": null
+ }
+]

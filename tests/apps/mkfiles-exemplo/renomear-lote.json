@@ -1,0 +1,23 @@
+[
+ {
+  "tarefa": 1
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 1,
+  "acao": "renomear-lote",
+  "estado": "rodando",
+  "titulo": "Renomeando 4 itens",
+  "itens": 1,
+  "itens_total": 4,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": "/home/ana/Documentos/nota 1.txt",
+  "velocidade": 20971520,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": false
+ }
+]

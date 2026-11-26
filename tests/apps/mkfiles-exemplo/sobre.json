@@ -1,0 +1,16 @@
+[
+  {
+    "versao": 1,
+    "ops": [
+      "listar",
+      "item"
+    ],
+    "extensoes": {
+      "lote": true,
+      "compactados": true,
+      "previa": true,
+      "remotos": true
+    },
+    "gvfs": "/run/user/1000/gvfs"
+  }
+]

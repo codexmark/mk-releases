@@ -1,0 +1,9 @@
+[
+ {
+  "hosts": [
+   {"apelido": "casa", "host": "192.168.0.20", "usuario": "ana", "porta": 22},
+   {"apelido": "trabalho", "host": "git.exemplo.org", "usuario": "ana", "porta": 2222},
+   {"apelido": "pi", "host": null, "usuario": null, "porta": null}
+  ]
+ }
+]

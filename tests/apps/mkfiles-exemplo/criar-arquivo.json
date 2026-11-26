@@ -1,0 +1,30 @@
+[
+ {
+  "tarefa": 5
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 5,
+  "acao": "criar-arquivo",
+  "estado": "feita",
+  "titulo": "Criando o arquivo Novo arquivo.txt",
+  "itens": 1,
+  "itens_total": 1,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [
+   "/home/ana/Documentos/Novo arquivo.txt"
+  ],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": true
+ },
+ {
+  "evento": "historico",
+  "desfazer": "Criar o arquivo Novo arquivo.txt",
+  "refazer": null
+ }
+]

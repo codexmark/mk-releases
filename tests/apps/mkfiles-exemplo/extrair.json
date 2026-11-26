@@ -1,0 +1,23 @@
+[
+ {
+  "tarefa": 1
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 1,
+  "acao": "extrair",
+  "estado": "rodando",
+  "titulo": "Extraindo viagem.zip para Documentos",
+  "itens": 2,
+  "itens_total": 6,
+  "bytes": 1048576,
+  "bytes_total": 8388608,
+  "atual": "fotos/praia 01.jpg",
+  "velocidade": 20971520,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": false
+ }
+]

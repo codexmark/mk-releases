@@ -1,0 +1,28 @@
+[
+ {
+  "tarefa": 8
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 8,
+  "acao": "apagar",
+  "estado": "erro",
+  "titulo": "Apagando 2 itens",
+  "itens": 1,
+  "itens_total": 2,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [
+   {
+    "caminho": "/home/ana/Documentos/Contratos",
+    "erro": "você não tem permissão para apagar o que há nesta pasta"
+   }
+  ],
+  "sem_lixeira": [],
+  "desfazivel": false
+ }
+]

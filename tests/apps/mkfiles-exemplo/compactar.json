@@ -1,0 +1,23 @@
+[
+ {
+  "tarefa": 1
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 1,
+  "acao": "compactar",
+  "estado": "rodando",
+  "titulo": "Compactando 3 itens em Documentos.zip",
+  "itens": 1,
+  "itens_total": 3,
+  "bytes": 1048576,
+  "bytes_total": 8388608,
+  "atual": "/home/ana/Documentos/Contratos/aluguel 2024.pdf",
+  "velocidade": 20971520,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": false
+ }
+]

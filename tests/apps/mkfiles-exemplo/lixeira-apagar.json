@@ -1,0 +1,27 @@
+[
+ {
+  "tarefa": 10
+ },
+ {
+  "evento": "tarefa",
+  "tarefa": 10,
+  "acao": "lixeira-apagar",
+  "estado": "feita",
+  "titulo": "Apagando 1 item da lixeira",
+  "itens": 1,
+  "itens_total": 1,
+  "bytes": 0,
+  "bytes_total": 0,
+  "atual": null,
+  "velocidade": 0,
+  "destino": "/home/ana/Documentos",
+  "criados": [],
+  "erros": [],
+  "sem_lixeira": [],
+  "desfazivel": false
+ },
+ {
+  "evento": "lixeira",
+  "itens": 2
+ }
+]

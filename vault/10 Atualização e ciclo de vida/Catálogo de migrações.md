@@ -12,6 +12,7 @@ fontes:
   - "migrations/system/20261203-mkporto.sh"
   - "migrations/system/20261204-dns-ajudante.sh"
   - "migrations/system/20261205-mksom.sh"
+  - "migrations/system/20261206-mkfiles.sh"
   - "migrations/system/20261129-mkpulso.sh"
   - "migrations/user/20261128-papel-de-fabrica.sh"
   - "migrations/system/20261128-entrada-marca.sh"
@@ -67,6 +68,7 @@ Ver a história do sistema pelo que mudou fora de `<raiz>`, e achar um modelo pa
 | `20261203-mkporto.sh` | os links do MkPorto (`apps-links`) | |
 | `20261204-dns-ajudante.sh` | copia o ajudante do DNS dos Ajustes para `/usr/lib/mk/mk-dns` (do root, 755); não muda o DNS de ninguém | |
 | `20261205-mksom.sh` | os links do MkSom (`apps-links`) | |
+| `20261206-mkfiles.sh` | os links do MkFiles (`apps-links`) | |
 
 ### De usuário (`migrations/user/`)
 
@@ -96,7 +98,7 @@ Essa migração existe porque o instalador, até certa versão, **descartava** o
 
 ## Onde está no código
 
-`migrations/system/` (28 arquivos) e `migrations/user/` (8 arquivos).
+`migrations/system/` (29 arquivos) e `migrations/user/` (8 arquivos).
 
 ## Ligações
 

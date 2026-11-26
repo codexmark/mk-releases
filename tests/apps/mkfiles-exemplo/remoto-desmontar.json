@@ -1,0 +1,7 @@
+[
+ {
+  "remotos": [
+   {"uri": "smb://nas/fotos/", "raiz": "/run/user/1000/gvfs/smb-share:server=nas,share=fotos", "nome": "fotos em nas", "protocolo": "smb", "host": "nas"}
+  ]
+ }
+]
