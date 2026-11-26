@@ -46,6 +46,10 @@ Mostrar o essencial (onde estou, que horas são, o que está tocando, o que pede
 
 `shell/mare/Bar.qml` (594 linhas), `IslandItem.qml`, `TrayIcon.qml`, `Sound.qml`, `scripts/mare-cava`.
 
+## Largura estável
+
+As leituras (temperatura, rede, processador, memória, bateria) reservam o lugar do seu texto mais largo: o `IslandItem` tem `reserve`, e os textos vêm do `Island.js` (`rate`, `percent`, `degrees`), que nunca passam de `999K/s`, `100%` e `99°`. Assim a ilha não estica nem encolhe quando um número ganha ou perde um dígito; só muda de tamanho quando algo entra ou sai dela.
+
 ## Ligações
 
 Depende de: [[Maré]], [[Singletons]], [[Áudio]]. Usado por: [[Painel líquido (Tide)]], [[Monitor por tela]], [[Painéis]].

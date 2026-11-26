@@ -108,4 +108,12 @@ T.t("todo programa chamado vem num pacote das listas do Mk", function()
     end
 end)
 
+
+T.t("a aparência vai também para o systemd e o D-Bus (scripts/mare-env): apps ativados por lá pegam o tema", function()
+    local s = started()
+    s:fire("hyprland.start")
+    T.has(table.concat(s.log.execs, "\n"), "bash '" .. s.root .. "shell/scripts/mare-env'")
+    T.ok(T.slurp(T.repo .. "/shell/mare/scripts/mare-env"), "o script existe")
+end)
+
 T.finish()

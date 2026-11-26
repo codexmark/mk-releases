@@ -8,6 +8,7 @@ tags:
 fontes:
   - "shell/mare/README.md"
   - "shell/mare/scripts/mare-start"
+  - "shell/mare/scripts/mare-env"
   - "shell/mare/scripts/mare-updates"
   - "shell/mare/scripts/mare-sleep"
   - "shell/mare/scripts/mare-monitors"
@@ -32,6 +33,7 @@ Manter no QML só desenho e estado, e no bash tudo o que é leitura do sistema o
 |---|---|---|
 | `mare-start` | inicia o Maré com a escala dos Ajustes; `--restart` | autostart, `Settings.qml`, `mk-update`, `mk reiniciar-mare` |
 | `mare-look` | ícones, cursor e fontes por `gsettings` | autostart |
+| `mare-env` | o tema e as outras variáveis do `env.lua` no systemd e no D-Bus (`uwsm finalize`); reinicia o portal GTK | autostart |
 | `mare-caps` | `{"touchpad","bateria","brilho","sono"}`: o que a máquina tem | `Settings.qml` |
 | `mare-sleep` | `status` e `now` | `mare-caps`, hypridle, instalador |
 | `mare-about` | detalhes da máquina | página Sobre |

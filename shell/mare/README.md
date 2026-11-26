@@ -344,6 +344,7 @@ pelo `pkexec`: o `mare-printers`, quando o CUPS recusa uma ação, e o
 |---|---|---|
 | `mare-start` | Inicia o Maré com a escala dos Ajustes; `--restart` fecha o que está rodando, inicia outro e devolve o teclado à janela em uso. | `autostart.lua`, `Settings.qml` (ao trocar `ui.scale`), `bin/mk-update`, `mk reiniciar-mare` |
 | `mare-look` | Aplica ícones, cursor e fontes por `gsettings`, sem desfazer a escolha de outro desktop. | `autostart.lua` |
+| `mare-env` | Leva o tema GTK e as outras variáveis do `env.lua` ao systemd e ao D-Bus, pelo `uwsm finalize`, para os apps que não nascem do Hyprland (o seletor de arquivos, o Nautilus chamado por outro programa); reinicia o portal GTK. Só age no Hyprland da sessão. | `autostart.lua` |
 | `mare-caps` | Imprime `{"touchpad", "bateria", "brilho"}`: o que a máquina tem. | `Settings.qml`, uma vez ao subir |
 | `mare-about` | JSON com os detalhes da máquina. | `SettingsWindow.qml` (página Sobre) |
 | `mare-stats` | Leituras cruas de CPU, memória, rede, temperatura e disco da raiz, uma por linha. | `Stats.qml`, a cada 2 s |

@@ -40,7 +40,7 @@ Fora do `env.lua`, uma variável é posta por processo: `QT_SCALE_FACTOR`, que o
 
 ## Onde está no código
 
-`config/hypr/mare/env.lua`; `shell/mare/scripts/mare-start`; `shell/mare/scripts/mare-look`.
+`config/hypr/mare/env.lua`; `shell/mare/scripts/mare-start`; `shell/mare/scripts/mare-look`; `shell/mare/scripts/mare-env` (leva as variáveis ao systemd e ao D-Bus).
 
 ## Ligações
 

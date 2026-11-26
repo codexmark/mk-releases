@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Leva a aparência da sessão do Mk a quem não nasce do Hyprland. O tema GTK, a
+# plataforma do Qt e o resto são variáveis de ambiente (config/hypr/mare/
+# env.lua), e só os filhos do Hyprland as herdam. Um app ativado pelo D-Bus ou
+# por um serviço do systemd (o seletor de arquivos do portal, o Nautilus
+# chamado por outro programa) nasce sem elas e sai no Adwaita padrão.
+#
+# Quem exporta é o `uwsm finalize`: ele põe as variáveis no ambiente do systemd
+# e do D-Bus e as tira quando a sessão acaba, então continua valendo só dentro
+# do Mk. Só nomes vão na linha de comando; o valor o uwsm lê do ambiente.
+#
+# Só age no Hyprland da sessão: um Hyprland aninhado (de teste) tem outra
+# assinatura, e exportar dali sujaria a sessão de quem está testando.
+set -uo pipefail
+
+[[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] || exit 0
+command -v uwsm >/dev/null || exit 0
+
+# O uwsm registra o Hyprland da sessão no systemd logo no começo; o início
+# automático pode chegar antes. Espera até 5 s e, se não for ele, desiste.
+da_sessao() {
+  systemctl --user show-environment 2>/dev/null |
+    grep -qxF "HYPRLAND_INSTANCE_SIGNATURE=$HYPRLAND_INSTANCE_SIGNATURE"
+}
+outro() { systemctl --user show-environment 2>/dev/null | grep -q '^HYPRLAND_INSTANCE_SIGNATURE='; }
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  da_sessao && break
+  outro && exit 0
+  sleep 0.5
+done
+da_sessao || exit 0
+
+nomes=()
+for v in GTK_THEME QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM ELECTRON_OZONE_PLATFORM_HINT TERMINAL SSH_AUTH_SOCK; do
+  [[ -n ${!v:-} ]] && nomes+=("$v")
+done
+((${#nomes[@]})) || exit 0
+
+if ! uwsm finalize "${nomes[@]}"; then
+  echo "mare-env: o uwsm não exportou o ambiente da sessão; apps ativados pelo D-Bus saem sem o tema" >&2
+  exit 0
+fi
+# O portal GTK (o seletor de arquivos) sobe junto com a sessão e pode já estar
+# de pé com o ambiente velho.
+systemctl --user try-restart xdg-desktop-portal-gtk.service 2>/dev/null || true

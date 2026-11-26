@@ -37,11 +37,12 @@ O Mk pode ser uma de várias sessões na mesma conta ([[D01 Maré fora da pasta 
 
 - Outro desktop na mesma conta não é afetado, e a escolha da pessoa lá não é desfeita.
 - No `gsettings` fica `adw-gtk3-dark` como tema GTK; dentro da sessão, a variável `GTK_THEME=Mk` vence.
+- A variável só chega aos filhos do Hyprland. Para os apps que nascem pelo D-Bus ou pelo systemd, o `mare-env` a exporta pelo `uwsm finalize`, que a retira no fim da sessão: a decisão ("vale só dentro do Mk") continua de pé.
 - O `try-session` instala o tema em `~/.local/share/themes`, sem tocar em `~/.config/gtk-*`.
 
 ## Onde está no código
 
-`config/hypr/mare/env.lua`; `shell/mare/scripts/mare-look` (o cabeçalho e a função `apply`).
+`config/hypr/mare/env.lua`; `shell/mare/scripts/mare-look` (o cabeçalho e a função `apply`); `shell/mare/scripts/mare-env`.
 
 ## Ligações
 

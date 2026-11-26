@@ -8,6 +8,7 @@ import Quickshell.Networking
 import Quickshell.Services.Pipewire
 import Quickshell.Services.SystemTray
 import Quickshell.Services.UPower
+import "Island.js" as Island
 
 // A ilha, no molde da do Ryoku (orpheus): uma peça só, pendurada no meio da
 // borda de cima, com filetes côncavos onde encosta na tela. Esquerda: marca,
@@ -394,7 +395,8 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: Stats.temp > 0 && Settings.get("island.showSystem")
                     icon: "󰔏"
-                    text: Math.round(Stats.temp) + "°"
+                    text: Island.degrees(Stats.temp)
+                    reserve: Island.reserve.degrees
                     iconColor: Stats.temp > 90 ? Theme.copper : Theme.textDim
                     panel: "system"
                 }
@@ -402,14 +404,16 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: Settings.get("island.showSystem")
                     icon: "󰇚"
-                    text: Stats.rate(Stats.rxRate).replace(" ", "").replace(",0", "")
+                    text: Island.rate(Stats.rxRate)
+                    reserve: Island.reserve.rate
                     panel: "system"
                 }
                 IslandItem {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: Settings.get("island.showSystem")
                     icon: "󰍛"
-                    text: Math.round(Stats.cpu * 100) + "%"
+                    text: Island.percent(Stats.cpu)
+                    reserve: Island.reserve.percent
                     iconColor: Stats.cpu > 0.9 ? Theme.copper : Theme.textDim
                     panel: "system"
                 }
@@ -417,7 +421,8 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: Settings.get("island.showSystem")
                     icon: "󰘚"
-                    text: Math.round(Stats.mem * 100) + "%"
+                    text: Island.percent(Stats.mem)
+                    reserve: Island.reserve.percent
                     iconColor: Stats.mem > 0.9 ? Theme.copper : Theme.textDim
                     panel: "system"
                 }
@@ -589,7 +594,8 @@ PanelWindow {
                     visible: bar.battery && bar.battery.isLaptopBattery
                     icon: charging ? "󰂄" : bar.batteryPct > 60 ? "󰁹" : bar.batteryPct > 25 ? "󰁾" : "󰁻"
                     iconColor: bar.batteryPct <= 15 ? Theme.copper : Theme.textDim
-                    text: bar.batteryPct + "%"
+                    text: Island.percent(bar.batteryPct / 100)
+                    reserve: Island.reserve.percent
                     textColor: Theme.text
                     panel: "power"
                 }

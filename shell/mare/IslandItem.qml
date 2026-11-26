@@ -15,6 +15,10 @@ Item {
     property string textFamily: Theme.mono
     property int textSize: 11
     property bool dot: false
+    // O texto mais largo que este item mostra (ex.: "100%"). Com ele, o item
+    // guarda esse lugar e não muda de largura quando o valor ganha ou perde
+    // um dígito; vazio, a largura é a do próprio texto.
+    property string reserve: ""
 
     signal clicked
     signal scrolled(int delta)
@@ -30,6 +34,14 @@ Item {
         Behavior on color {
             ColorAnimation { duration: Motion.fast }
         }
+    }
+
+    TextMetrics {
+        id: reserved
+        text: item.reserve
+        font.family: item.textFamily
+        font.pixelSize: item.textSize
+        font.features: ({ "tnum": 1 })
     }
 
     Row {
@@ -54,6 +66,7 @@ Item {
             font.family: item.textFamily
             font.pixelSize: item.textSize
             font.features: ({ "tnum": 1 })
+            width: Math.max(implicitWidth, Math.ceil(reserved.advanceWidth))
         }
     }
 

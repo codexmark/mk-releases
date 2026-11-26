@@ -32,6 +32,7 @@ Para o Nautilus, o editor de texto e os apps Qt não parecerem de outro sistema 
 - **Qt**: `qt6ct.conf` (estilo Fusion, paleta `colors/Mk.conf`, ícones Mk, Space Grotesk e Space Mono), copiado para `~/.config/qt6ct` via skel; ativado por `QT_QPA_PLATFORMTHEME=qt6ct`.
 - **Cursor**: `XCURSOR_THEME=Adwaita`, tamanho 24.
 - **`mare-look`** (no autostart) aplica por `gsettings`: `color-scheme prefer-dark`, `gtk-theme adw-gtk3-dark`, `icon-theme Mk`, cursor, e as fontes.
+- **`mare-env`** (no autostart) leva `GTK_THEME` e as outras variáveis do `env.lua` ao ambiente do systemd e do D-Bus, pelo `uwsm finalize`. Sem isso, só os filhos do Hyprland herdam o tema: um app ativado pelo D-Bus ou por um serviço (o seletor de arquivos do portal, o Nautilus chamado por outro programa) saía no Adwaita padrão, cinza azulado e com o destaque azul. O `uwsm` tira as variáveis quando a sessão acaba, então continua valendo só no Mk. O script só age no Hyprland da sessão (confere a assinatura no systemd), para um Hyprland aninhado de teste não sujar a sessão de quem testa.
 
 ## Por quê assim
 

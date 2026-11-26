@@ -1,6 +1,8 @@
 -- Variáveis de ambiente da sessão.
 -- Os apps GTK na paleta Folha (tema em system/mk/look). Por variável de
--- ambiente, vale só dentro do Mk.
+-- ambiente, vale só dentro do Mk. Só os filhos do Hyprland as herdam: para os
+-- apps que nascem pelo D-Bus ou pelo systemd, o scripts/mare-env (no autostart)
+-- as exporta. Variável nova de aparência entra aqui e na lista de lá.
 hl.env("GTK_THEME", "Mk")
 hl.env("XCURSOR_THEME", "Adwaita")
 hl.env("XCURSOR_SIZE", "24")

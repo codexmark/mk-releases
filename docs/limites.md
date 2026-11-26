@@ -59,6 +59,9 @@ conferidos:
 - **Suspender na AMD Navi 10** (RX 5600/5700). A placa às vezes não volta: a
   tela fica preta e só reiniciando. É um defeito do driver, não do Mk.
   Ajustes › Energia avisa quem escolher suspender nessas máquinas.
+- **Aparência dos apps.** Apps Qt 5 não pegam a paleta (o Mk traz o `qt6ct`,
+  não o `qt5ct`). Flatpak, Electron e navegadores não leem o tema GTK do
+  sistema: seguem só o "escuro" do portal.
 - **DNS cifrado (DoT/DoH).** Ajustes › DNS troca o servidor de nomes, mas a
   consulta vai sem cifra: o NetworkManager sozinho não faz DNS sobre TLS nem
   sobre HTTPS; precisaria do systemd-resolved, que o Mk não usa. Uma VPN ligada

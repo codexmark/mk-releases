@@ -18,5 +18,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     -- Ícones, cursor e fontes dos apps (sem desfazer a escolha de outro desktop).
     hl.exec_cmd("bash '" .. paths.shell .. "/scripts/mare-look'")
+    -- O tema e o resto de env.lua para quem nasce pelo D-Bus ou pelo systemd (o
+    -- seletor de arquivos, o Nautilus chamado por outro programa).
+    hl.exec_cmd("bash '" .. paths.shell .. "/scripts/mare-env'")
     hl.exec_cmd("udiskie --automount --no-tray")
 end)
